@@ -1,26 +1,278 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono&display=swap");
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Vacay";
+  src: url("/fonts/Vacay-Demo.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Albra";
+  src: url("/fonts/Albra-Grotesk-Regular.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PowerGrotesk";
+  src: url("/fonts/PowerGrotesk-Regular.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Mabry Pro Font Family */
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-LightItalic.ttf") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-RegularItalic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-MediumItalic.ttf") format("truetype");
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MabryPro";
+  src: url("/fonts/Mabry/MabryPro-BlackItalic.ttf") format("truetype");
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@theme {
+  --font-vacay: "Vacay", "sans-serif";
+  --font-albra: "Albra", "system-ui", "sans-serif";
+  --font-jetbrains: "JetBrainsMono", "monospace";
+  --font-power: "PowerGrotesk", "sans-serif";
+  --font-mabrypro: "MabryPro", "system-ui", "sans-serif";
+
+  --color-fdfffc: #FDFFFC;
+  --color-0f52fb: #0F52FB;
+  --color-303130: #303130;
+  --color-cfd0ce: #CFD0CE;
+
+  --color-accent: #FFFFFF;
+  --color-accent-dim: #AAAAAA;
+  --color-accent-dimmer: #666666;
+  --color-dark-black: #000000;
+  --color-dark-900: #121212;
+  --color-dark-800: #1a1a1a;
+  --color-dark-700: #222222;
+  --color-dark-600: #2a2a2a;
+  --color-dark-500: #282828;
+  --color-dark-400: #383838;
+  --color-dark-300: #585858;
+  --color-dark-200: #787878;
+  --color-dark-100: #A0A0A0;
+  --color-dark-50: #C0C0C0;
+  --color-glass-white: rgba(255, 255, 255, 0.1);
+  --color-glass-black: rgba(0, 0, 0, 0.3);
+  --color-accent-primary: #0F52FB;
+  --color-accent-secondary: #CFD0CE;
+
+  --text-caption: 0.75rem;
+  --text-body-compact: 0.875rem;
+  --text-body: 1rem;
+  --text-heading-compact: 1.25rem;
+  --text-heading: 1.5rem;
+  --text-title: 2rem;
+  --text-display: 3rem;
+
+  --spacing-01: 0.125rem;
+  --spacing-02: 0.25rem;
+  --spacing-03: 0.5rem;
+  --spacing-04: 0.75rem;
+  --spacing-05: 1rem;
+  --spacing-06: 1.5rem;
+  --spacing-07: 2rem;
+  --spacing-08: 2.5rem;
+  --spacing-09: 3rem;
+
+  --radius-glass: 0.5rem;
+  --radius-sharp: 0 0 16px 0;
+  --radius-asymmetric-1: 0 8px 0 8px;
+  --radius-asymmetric-2: 8px 0 8px 0;
+
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
+  --shadow-button-primary: 0 4px 15px rgba(15, 82, 251, 0.2), inset 0 1px 1px rgba(253, 255, 252, 0.1);
+  --shadow-button-primary-hover: 0 6px 20px rgba(15, 82, 251, 0.3), inset 0 1px 1px rgba(253, 255, 252, 0.15);
+  --shadow-button-secondary: 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(253, 255, 252, 0.05);
+  --shadow-button-secondary-hover: 0 6px 20px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(253, 255, 252, 0.1);
+
+  --animate-float: float 5s ease-in-out infinite;
+  --animate-pulse-slow: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-delay-200: fadeIn 0.7s ease forwards 0.2s;
+  --animate-delay-400: fadeIn 0.7s ease forwards 0.4s;
+  --animate-delay-600: fadeIn 0.7s ease forwards 0.6s;
+  --animate-delay-800: fadeIn 0.7s ease forwards 0.8s;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground: 253, 255, 252;
+  --background-start: 18, 18, 18;
+  --background-end: 26, 26, 26;
+  --accent-primary: 15, 82, 251;
+  --accent-secondary: 207, 208, 206;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--foreground));
+  background: #121212;
+  letter-spacing: -0.01em;
+  line-height: 1.6;
+}
+
+* {
+  font-family: "MabryPro", system-ui, sans-serif;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Utilities */
+@utility glass {
+  background: rgba(207, 208, 206, 0.03);
+  border: 1px solid rgba(253, 255, 252, 0.05);
+  backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+@utility glass-dark {
+  background: rgba(48, 49, 48, 0.7);
+  border: 1px solid rgba(253, 255, 252, 0.03);
+  backdrop-filter: blur(16px) saturate(180%);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+}
+
+@utility glow-border {
+  border: 1px solid rgba(15, 82, 251, 0.2);
+  box-shadow: 0 0 10px rgba(15, 82, 251, 0.1), 0 0 20px rgba(15, 82, 251, 0.05);
+}
+
+@utility glow-text {
+  text-shadow: 0 0 5px rgba(15, 82, 251, 0.2);
+}
+
+@utility backdrop-blur-glass {
+  backdrop-filter: blur(16px) saturate(180%);
+}
+
+@utility backdrop-blur-glass-sm {
+  backdrop-filter: blur(8px) saturate(150%);
+}
+
+@utility gradient-text {
+  background: linear-gradient(to right, #FDFFFC, #CFD0CE);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility shadow-glow {
+  box-shadow: 0 0 10px rgba(15, 82, 251, 0.15), 0 0 20px rgba(15, 82, 251, 0.1);
+}
+
+@utility scrollbar-thin {
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: #303130;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(207, 208, 206, 0.5);
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(207, 208, 206, 0.7);
+  }
 }
