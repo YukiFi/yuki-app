@@ -29,7 +29,7 @@ export default function Portfolio() {
         type: "Deposit",
         asset: "USDC",
         amount: "+$1,000.00",
-        vault: "Yuki Stable Vault",
+        vault: "Safe Vault",
         date: "Today, 10:23 AM",
         status: "Completed",
         tx: "0x8f...2a9c"
@@ -42,7 +42,7 @@ export default function Portfolio() {
                 type: "Deposit",
                 asset: "USDC",
                 amount: `+$${(val - 1000).toLocaleString()}`,
-                vault: "Yuki Stable Vault",
+                vault: "Safe Vault",
                 date: "Today, 10:45 AM",
                 status: "Completed",
                 tx: `0x${Math.random().toString(16).substr(2, 8)}`
@@ -54,7 +54,7 @@ export default function Portfolio() {
                 type: "Deposit",
                 asset: key === 'eth-yield' ? 'ETH' : 'SOL',
                 amount: `+$${val.toLocaleString()}`,
-                vault: key === 'eth-yield' ? 'ETH Yield Strategy' : 'SOL Turbo',
+                vault: key === 'eth-yield' ? 'Moderate Vault' : 'Aggressive Vault',
                 date: "Today, 10:50 AM",
                 status: "Completed",
                 tx: `0x${Math.random().toString(16).substr(2, 8)}`

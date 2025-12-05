@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useAccount, useDisconnect } from "wagmi";
 
 const navigation = [
   { name: "Dashboard", href: "/" },
@@ -14,7 +15,12 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authMethod, setAuthMethod] = useState<string | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -23,7 +29,11 @@ export default function Navbar() {
 
     const checkLoginStatus = () => {
       const status = localStorage.getItem("yuki_onboarding_complete");
+      const method = localStorage.getItem("yuki_auth_method");
+      const email = localStorage.getItem("yuki_user_email");
       setIsLoggedIn(status === "true");
+      setAuthMethod(method);
+      setUserEmail(email);
     };
 
     // Check initially
@@ -52,9 +62,57 @@ export default function Navbar() {
   // Logout function for demo purposes
   const handleLogout = () => {
     localStorage.removeItem("yuki_onboarding_complete");
+    localStorage.removeItem("yuki_auth_method");
+    localStorage.removeItem("yuki_user_email");
+    localStorage.removeItem("yuki_wallet_address");
+    localStorage.removeItem("yuki_balances");
+    
+    // Disconnect wallet if connected
+    if (isConnected) {
+      disconnect();
+    }
+    
     setIsLoggedIn(false);
     setIsProfileOpen(false);
     window.dispatchEvent(new Event("yuki_login_update"));
+  };
+
+  // Format address for display
+  const formatAddress = (addr: string) => {
+    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+  };
+
+  // Get display name based on auth method
+  const getDisplayName = () => {
+    if (authMethod === "wallet" && address) {
+      return formatAddress(address);
+    }
+    if (authMethod === "email" && userEmail) {
+      return userEmail.split("@")[0];
+    }
+    return "User";
+  };
+
+  // Get display subtitle
+  const getDisplaySubtitle = () => {
+    if (authMethod === "wallet" && address) {
+      return formatAddress(address);
+    }
+    if (authMethod === "email" && userEmail) {
+      return userEmail;
+    }
+    return "";
+  };
+
+  // Get initials for avatar
+  const getInitials = () => {
+    if (authMethod === "wallet" && address) {
+      return address.slice(2, 4).toUpperCase();
+    }
+    if (authMethod === "email" && userEmail) {
+      return userEmail.slice(0, 2).toUpperCase();
+    }
+    return "U";
   };
 
   return (
@@ -65,8 +123,8 @@ export default function Navbar() {
           : "bg-transparent border-transparent py-5"
       }`}
     >
-      <div className="max-w-[1200px] mx-auto px-6">
-        <div className="flex items-center justify-between">
+      <div className="max-w-5xl mx-auto px-6">
+        <div className="flex items-center justify-between relative">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <Image
@@ -81,8 +139,8 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+          {/* Desktop Navigation - Absolutely centered */}
+          <nav className="hidden md:flex items-center space-x-8 absolute left-1/2 -translate-x-1/2">
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -103,20 +161,32 @@ export default function Navbar() {
                     className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
                  >
                     <div className="text-sm text-right">
-                        <div className="text-fdfffc font-medium">Alex Thompson</div>
-                        <div className="text-xs text-gray-500">0x71...3A9</div>
+                        <div className="text-fdfffc font-medium">{getDisplayName()}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          {authMethod === "wallet" && (
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                          )}
+                          {authMethod === "email" && (
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                            </svg>
+                          )}
+                          {getDisplaySubtitle()}
+                        </div>
                     </div>
                     <div className="w-10 h-10 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary">
-                        <span className="font-medium text-sm">AT</span>
+                        <span className="font-medium text-sm">{getInitials()}</span>
                     </div>
                  </button>
 
                  {/* Dropdown Menu */}
                  {isProfileOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-dark-800 border border-white/10 rounded-lg shadow-xl py-1 animate-fade-in z-50">
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-dark-800 border border-white/10 rounded-lg shadow-xl py-1 animate-fade-in z-50">
                         <div className="px-4 py-2 border-b border-white/5 mb-1">
-                            <p className="text-xs text-gray-500">Signed in as</p>
-                            <p className="text-sm text-fdfffc truncate">Alex Thompson</p>
+                            <p className="text-xs text-gray-500">Signed in with {authMethod === "wallet" ? "Wallet" : "Email"}</p>
+                            <p className="text-sm text-fdfffc truncate">{getDisplaySubtitle()}</p>
                         </div>
                         <button 
                             onClick={handleLogout}
@@ -129,14 +199,17 @@ export default function Navbar() {
               </div>
             ) : (
               <>
-                <button className="px-4 py-2 text-gray-400 hover:text-fdfffc text-sm font-medium transition-colors duration-200 cursor-pointer">
-                  Connect Wallet
-                </button>
                 <Link
-                  href="/onboarding"
+                  href="/signin"
+                  className="px-4 py-2 text-gray-400 hover:text-fdfffc text-sm font-medium transition-colors duration-200"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signin"
                   className="px-4 py-2 bg-accent-primary text-white rounded-lg text-sm font-medium shadow-button-primary hover:shadow-button-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Start with Card</span>
+                  <span>Get Started</span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
@@ -186,7 +259,7 @@ export default function Navbar() {
           isMobileMenuOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="max-w-[1200px] mx-auto px-6 py-6 space-y-4">
+        <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
           {navigation.map((item) => (
             <Link
               key={item.name}
@@ -201,8 +274,20 @@ export default function Navbar() {
             {isLoggedIn ? (
                 <>
                     <div className="px-4 py-2 border-b border-white/5 mb-2">
-                        <div className="text-sm font-medium text-fdfffc">Alex Thompson</div>
-                        <div className="text-xs text-gray-500">0x71...3A9</div>
+                        <div className="text-sm font-medium text-fdfffc">{getDisplayName()}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          {authMethod === "wallet" && (
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                            </svg>
+                          )}
+                          {authMethod === "email" && (
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                            </svg>
+                          )}
+                          {getDisplaySubtitle()}
+                        </div>
                     </div>
                     <button 
                         onClick={() => {
@@ -217,15 +302,19 @@ export default function Navbar() {
             ) : (
                 <>
                     <Link
-                    href="/onboarding"
+                    href="/signin"
                     className="w-full px-4 py-3 bg-accent-primary text-white rounded-lg text-sm font-medium shadow-button-primary hover:shadow-button-primary-hover transition-all flex items-center justify-center gap-2 cursor-pointer"
                     onClick={() => setIsMobileMenuOpen(false)}
                     >
-                    Start with Card
+                    Get Started
                     </Link>
-                    <button className="w-full px-4 py-3 bg-white/5 text-gray-300 hover:text-white rounded-lg text-sm font-medium border border-white/10 hover:bg-white/10 transition-all cursor-pointer">
-                    Connect Wallet
-                    </button>
+                    <Link
+                    href="/signin"
+                    className="w-full px-4 py-3 bg-white/5 text-gray-300 hover:text-white rounded-lg text-sm font-medium border border-white/10 hover:bg-white/10 transition-all cursor-pointer text-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                    Sign In
+                    </Link>
                 </>
             )}
           </div>

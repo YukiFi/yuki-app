@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 const vaults = [
   {
     id: "yuki-stable",
-    name: "Yuki Stable Vault",
-    description: "Automated yield farming on Aave & Compound stablecoin pools.",
+    name: "Safe Vault",
+    description: "Low-risk automated yield farming on stablecoin pools.",
     asset: "USDC",
     apy: "15.4%",
     tvl: "$12.4M",
@@ -14,8 +15,8 @@ const vaults = [
   },
   {
     id: "eth-yield",
-    name: "ETH Yield Strategy",
-    description: "Leveraged staking yields via Lido & RocketPool.",
+    name: "Moderate Vault",
+    description: "Balanced risk with leveraged staking strategies.",
     asset: "ETH",
     apy: "4.2%",
     tvl: "$8.1M",
@@ -23,8 +24,8 @@ const vaults = [
   },
   {
     id: "sol-turbo",
-    name: "SOL Turbo",
-    description: "High-frequency LP provision on Solana DEXs.",
+    name: "Aggressive Vault",
+    description: "High-risk, high-reward liquidity provision strategies.",
     asset: "SOL",
     apy: "18.9%",
     tvl: "$3.2M",
@@ -33,14 +34,12 @@ const vaults = [
 ];
 
 export default function Vaults() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
   const [balances, setBalances] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState<string | null>(null); // vault id being processed
 
   useEffect(() => {
     const checkLoginStatus = () => {
       const status = localStorage.getItem("yuki_onboarding_complete");
-      setIsLoggedIn(status === "true");
       
       // Load balances
       const storedBalances = localStorage.getItem("yuki_balances");
@@ -55,24 +54,9 @@ export default function Vaults() {
     };
 
     checkLoginStatus();
+    window.addEventListener("yuki_login_update", checkLoginStatus);
+    return () => window.removeEventListener("yuki_login_update", checkLoginStatus);
   }, []);
-
-  const handleDeposit = (vaultId: string) => {
-    if (!isLoggedIn) {
-        alert("Please connect your wallet or start with a card first.");
-        return;
-    }
-    setLoading(vaultId);
-    setTimeout(() => {
-        const newBalances = { ...balances, [vaultId]: (balances[vaultId] || 0) + 500 };
-        setBalances(newBalances);
-        localStorage.setItem("yuki_balances", JSON.stringify(newBalances));
-        setLoading(null);
-        
-        // Trigger global update
-        window.dispatchEvent(new Event("yuki_login_update"));
-    }, 1000);
-  };
 
   return (
     <div className="w-full space-y-6 animate-fade-in pb-12">
@@ -88,12 +72,13 @@ export default function Vaults() {
         {vaults.map((vault) => (
           <div
             key={vault.id}
-            className="glass p-6 rounded-md border border-white/5 hover:border-white/10 transition-all"
+            onClick={() => router.push(`/vaults/${vault.id}`)}
+            className="glass p-6 rounded-xl border border-white/5 hover:border-accent-primary/30 hover:shadow-lg hover:shadow-accent-primary/5 transition-all cursor-pointer group"
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-4 flex-1">
                 <div
-                  className={`w-12 h-12 rounded-md flex items-center justify-center shrink-0 ${
+                  className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 ${
                     vault.asset === "USDC"
                       ? "bg-blue-500/20 text-blue-400"
                       : vault.asset === "ETH"
@@ -101,62 +86,55 @@ export default function Vaults() {
                       : "bg-teal-500/20 text-teal-400"
                   }`}
                 >
-                  <span className="font-bold text-sm">{vault.asset}</span>
+                  <span className="font-bold text-base">{vault.asset}</span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="text-lg font-medium text-fdfffc">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-medium text-fdfffc group-hover:text-accent-primary transition-colors">
                       {vault.name}
                     </h3>
                     <span
-                      className={`px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium rounded ${
+                      className={`px-2.5 py-1 text-[10px] uppercase tracking-wider font-medium rounded-full ${
                         vault.risk === "Low"
-                          ? "bg-green-500/10 text-green-400"
+                          ? "bg-green-500/10 text-green-400 border border-green-500/20"
                           : vault.risk === "Medium"
-                          ? "bg-yellow-500/10 text-yellow-400"
-                          : "bg-orange-500/10 text-orange-400"
+                          ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                          : "bg-orange-500/10 text-orange-400 border border-orange-500/20"
                       }`}
                     >
                       {vault.risk} Risk
                     </span>
                   </div>
-                  <p className="text-sm text-gray-400 max-w-lg">
+                  <p className="text-sm text-gray-400 max-w-2xl leading-relaxed">
                     {vault.description}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-8 md:justify-end w-full md:w-auto">
-                 <div className="flex flex-col items-start md:items-end min-w-[80px]">
+              <div className="flex items-center gap-8 md:justify-end">
+                 <div className="flex flex-col items-start md:items-end min-w-[90px]">
                     <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">APY</span>
-                    <span className="text-xl font-medium text-green-400">{vault.apy}</span>
+                    <span className="text-2xl font-medium text-green-400">{vault.apy}</span>
                  </div>
-                 <div className="flex flex-col items-start md:items-end min-w-[80px]">
+                 <div className="flex flex-col items-start md:items-end min-w-[90px]">
                     <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">TVL</span>
-                    <span className="text-lg font-medium text-fdfffc">{vault.tvl}</span>
+                    <span className="text-xl font-medium text-fdfffc">{vault.tvl}</span>
                  </div>
-                 <div className="flex flex-col items-start md:items-end min-w-[100px]">
+                 <div className="flex flex-col items-start md:items-end min-w-[110px]">
                     <span className="text-xs text-gray-500 uppercase tracking-wider mb-1">Your Balance</span>
-                    <span className="text-lg font-medium text-fdfffc">
+                    <span className="text-xl font-medium text-accent-primary">
                         {balances[vault.id] 
                             ? `$${balances[vault.id].toLocaleString()}` 
                             : "$0.00"}
                     </span>
                  </div>
-              </div>
-
-              <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-white/5">
-                 <button 
-                    onClick={() => handleDeposit(vault.id)}
-                    disabled={loading === vault.id}
-                    className="flex-1 md:flex-none px-6 py-2 bg-white text-dark-900 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-                 >
-                    {loading === vault.id ? (
-                        <div className="w-4 h-4 border-2 border-dark-900/30 border-t-dark-900 rounded-full animate-spin" />
-                    ) : (
-                        "Deposit"
-                    )}
-                 </button>
+                 
+                 {/* Arrow indicator */}
+                 <div className="hidden md:flex items-center justify-center w-10 h-10 rounded-full bg-white/5 group-hover:bg-accent-primary/10 transition-colors">
+                    <svg className="w-5 h-5 text-gray-400 group-hover:text-accent-primary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                 </div>
               </div>
             </div>
           </div>

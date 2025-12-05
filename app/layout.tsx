@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
+import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -39,18 +40,20 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className="font-mabrypro min-h-screen bg-dark-900 text-fdfffc">
-        {/* Demo Banner */}
-        <div className="fixed top-0 left-0 w-full bg-accent-primary/10 backdrop-blur-md border-b border-accent-primary/20 z-[55] py-1 text-center">
-            <p className="text-[10px] font-medium text-accent-primary uppercase tracking-widest">
-                Demo Mode
-            </p>
-        </div>
+        <Providers>
+          {/* Demo Banner */}
+          <div className="fixed top-0 left-0 w-full bg-accent-primary/10 backdrop-blur-md border-b border-accent-primary/20 z-[55] py-1 text-center">
+              <p className="text-[10px] font-medium text-accent-primary uppercase tracking-widest">
+                  Demo Mode
+              </p>
+          </div>
 
-        <div className="fixed inset-0 bg-[url('/images/grid.svg')] opacity-5 bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] pointer-events-none"></div>
-        <div className="relative z-10">
-          <Navbar />
-          <main className="pt-28 px-6 max-w-[1200px] mx-auto">{children}</main>
-        </div>
+          <div className="fixed inset-0 bg-[url('/images/grid.svg')] opacity-5 bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] pointer-events-none"></div>
+          <div className="relative z-10">
+            <Navbar />
+            <main className="pt-28 px-6 max-w-5xl mx-auto">{children}</main>
+          </div>
+        </Providers>
       </body>
     </html>
   );
