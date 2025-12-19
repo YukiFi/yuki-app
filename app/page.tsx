@@ -1,51 +1,50 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
-// Vault definitions
-const vaultDefinitions = [
+// Savings profile definitions - using friendly names and ranges, not exact APYs
+const savingsProfiles = [
   {
     id: "yuki-stable",
-    name: "Safe Vault",
+    name: "Stable",
+    description: "Currently earning ~4–6%",
     asset: "USDC",
-    apy: "15.4%",
-    risk: "Low",
+    apyRange: "4–6%",
+    apyValue: 5,
   },
   {
     id: "eth-yield",
-    name: "Moderate Vault",
-    asset: "ETH",
-    apy: "4.2%",
-    risk: "Medium",
+    name: "Balanced",
+    description: "Currently earning ~6–9%",
+    asset: "USDC",
+    apyRange: "6–9%",
+    apyValue: 7.5,
   },
   {
     id: "sol-turbo",
-    name: "Aggressive Vault",
-    asset: "SOL",
-    apy: "18.9%",
-    risk: "High",
+    name: "Growth",
+    description: "Currently earning ~8–12%",
+    asset: "USDC",
+    apyRange: "8–12%",
+    apyValue: 10,
   },
 ];
 
-type TimeRange = "7D" | "30D" | "90D" | "1Y";
+type TimeRange = "1W" | "1M" | "3M" | "All";
 
-// Generate historical data based on current balances and APYs
 const generateHistoricalData = (
   balances: Record<string, number>,
   timeRange: TimeRange
 ) => {
-  const days = timeRange === "7D" ? 7 : timeRange === "30D" ? 30 : timeRange === "90D" ? 90 : 365;
-  const data: { date: string; balance: number; earnings: number }[] = [];
+  const days = timeRange === "1W" ? 7 : timeRange === "1M" ? 30 : timeRange === "3M" ? 90 : 365;
+  const data: { date: string; value: number }[] = [];
   
   const totalBalance = Object.values(balances).reduce((acc, val) => acc + val, 0);
   
-  // Calculate weighted average APY
-  const weightedAPY = vaultDefinitions.reduce((acc, vault) => {
-    const balance = balances[vault.id] || 0;
-    if (balance === 0) return acc;
-    const apyPercent = parseFloat(vault.apy) / 100;
-    return acc + (balance / totalBalance) * apyPercent;
+  const weightedAPY = savingsProfiles.reduce((acc, profile) => {
+    const balance = balances[profile.id] || 0;
+    if (balance === 0 || totalBalance === 0) return acc;
+    return acc + (balance / totalBalance) * (profile.apyValue / 100);
   }, 0);
 
   const now = new Date();
@@ -54,301 +53,296 @@ const generateHistoricalData = (
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     
-    // Calculate balance at this point (working backwards from current)
-    const daysFromNow = i;
-    const earningsSoFar = totalBalance * weightedAPY * (daysFromNow / 365);
+    const earningsSoFar = totalBalance * weightedAPY * (i / 365);
     const historicalBalance = Math.max(0, totalBalance - earningsSoFar);
-    const earnings = totalBalance - historicalBalance;
     
     data.push({
       date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      balance: historicalBalance,
-      earnings: earnings,
+      value: historicalBalance,
     });
   }
   
   return data;
 };
 
-// Chart Component
-function BalanceChart({ 
+// Simple, calm line chart
+function GrowthChart({ 
   data, 
   timeRange, 
-  onTimeRangeChange 
+  onTimeRangeChange,
 }: { 
-  data: { date: string; balance: number; earnings: number }[];
+  data: { date: string; value: number }[];
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
 }) {
-  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const { maxValue, minValue, points, earningsPoints } = useMemo(() => {
-    if (data.length === 0) return { maxValue: 0, minValue: 0, points: "", earningsPoints: "" };
+  const chartData = useMemo(() => {
+    if (data.length === 0) return { points: "", areaPath: "", pointsArray: [] as { x: number; y: number; data: typeof data[0] }[] };
     
-    const values = data.map(d => d.balance);
+    const values = data.map(d => d.value);
     const max = Math.max(...values);
     const min = Math.min(...values);
     const range = max - min || 1;
+    const padding = range * 0.15;
 
-    // Generate points for balance line
-    const balancePoints = data.map((d, i) => {
-      const x = (i / (data.length - 1)) * 100;
-      const y = 100 - ((d.balance - min) / range) * 80 - 10;
-      return `${x},${y}`;
-    }).join(" ");
+    const pointsArray = data.map((d, i) => {
+      const x = data.length === 1 ? 50 : (i / (data.length - 1)) * 100;
+      const y = 100 - (((d.value) - min + padding) / (range + padding * 2)) * 100;
+      return { x, y, data: d };
+    });
 
-    // Generate points for earnings area
-    const earningsPointsStr = data.map((d, i) => {
-      const x = (i / (data.length - 1)) * 100;
-      const y = 100 - ((d.earnings) / max) * 30;
-      return `${x},${y}`;
-    }).join(" ");
+    const pointsStr = pointsArray.map(p => `${p.x},${p.y}`).join(" ");
+    const areaPath = `M${pointsArray[0].x},100 L${pointsArray.map(p => `${p.x},${p.y}`).join(" L")} L${pointsArray[pointsArray.length - 1].x},100 Z`;
 
-    return {
-      maxValue: max,
-      minValue: min,
-      points: balancePoints,
-      earningsPoints: earningsPointsStr,
-    };
+    return { points: pointsStr, areaPath, pointsArray };
   }, [data]);
 
-  const currentData = hoveredPoint !== null ? data[hoveredPoint] : data[data.length - 1];
-  const previousBalance = hoveredPoint !== null && hoveredPoint > 0 ? data[hoveredPoint - 1].balance : data[0].balance;
-  const change = currentData.balance - previousBalance;
-  const changePercent = previousBalance > 0 ? (change / previousBalance) * 100 : 0;
-
   return (
-    <div className="space-y-4">
-      {/* Stats Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-gray-500 mb-1">
-            {hoveredPoint !== null ? currentData.date : "Current Balance"}
-          </p>
-          <p className="text-3xl font-medium text-fdfffc">
-            ${currentData.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          {change !== 0 && (
-            <p className={`text-sm mt-1 ${change >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {change >= 0 ? "+" : ""}${change.toFixed(2)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(2)}%)
-            </p>
-          )}
-        </div>
-        
-        {/* Time Range Selector */}
-        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/5">
-          {(["7D", "30D", "90D", "1Y"] as TimeRange[]).map((range) => (
-            <button
-              key={range}
-              onClick={() => onTimeRangeChange(range)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                timeRange === range
-                  ? "bg-accent-primary text-white"
-                  : "text-gray-400 hover:text-fdfffc"
-              }`}
-            >
-              {range}
-            </button>
-          ))}
-        </div>
-      </div>
-
+    <div className="relative">
       {/* Chart */}
-      <div className="relative h-48 rounded-lg bg-gradient-to-b from-accent-primary/5 to-transparent border border-white/5 overflow-hidden">
+      <div className="relative h-48 md:h-56">
         <svg
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           className="w-full h-full"
-          onMouseLeave={() => setHoveredPoint(null)}
+          onMouseLeave={() => setHoveredIndex(null)}
         >
-          {/* Grid lines */}
-          <line x1="0" y1="25" x2="100" y2="25" stroke="currentColor" strokeWidth="0.1" className="text-white/5" />
-          <line x1="0" y1="50" x2="100" y2="50" stroke="currentColor" strokeWidth="0.1" className="text-white/5" />
-          <line x1="0" y1="75" x2="100" y2="75" stroke="currentColor" strokeWidth="0.1" className="text-white/5" />
+          {/* Gradient definitions */}
+          <defs>
+            <linearGradient id="chartAreaGradient" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#1148D0" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="#1148D0" stopOpacity="0" />
+            </linearGradient>
+          </defs>
 
-          {/* Earnings area (subtle background) */}
-          {earningsPoints && (
-            <path
-              d={`M0,100 ${earningsPoints} L100,100 Z`}
-              fill="url(#earningsGradient)"
-              className="opacity-30"
+          {/* Area fill */}
+          {chartData.areaPath && chartData.areaPath.length > 10 && (
+            <path d={chartData.areaPath} fill="url(#chartAreaGradient)" />
+          )}
+
+          {/* Line */}
+          {chartData.points && chartData.points.length > 0 && (
+            <polyline
+              points={chartData.points}
+              fill="none"
+              stroke="#1148D0"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.8"
             />
           )}
 
-          {/* Balance gradient area */}
-          {points && (
+          {/* Hover areas */}
+          {data.map((_, i) => (
+            <rect
+              key={i}
+              x={(i / data.length) * 100}
+              y="0"
+              width={100 / data.length}
+              height="100"
+              fill="transparent"
+              className="cursor-crosshair"
+              onMouseEnter={() => setHoveredIndex(i)}
+            />
+          ))}
+
+          {/* Hover indicator */}
+          {hoveredIndex !== null && chartData.pointsArray[hoveredIndex] && (
             <>
-              <path
-                d={`M0,100 L${points.split(" ")[0]} ${points} L100,100 Z`}
-                fill="url(#chartGradient)"
-                className="opacity-20"
+              <line
+                x1={chartData.pointsArray[hoveredIndex].x}
+                y1="0"
+                x2={chartData.pointsArray[hoveredIndex].x}
+                y2="100"
+                stroke="white"
+                strokeOpacity="0.1"
+                strokeWidth="0.3"
               />
-              
-              {/* Balance line */}
-              <polyline
-                points={points}
-                fill="none"
-                stroke="#0F52FB"
-                strokeWidth="2"
-                vectorEffect="non-scaling-stroke"
-                className="drop-shadow-lg"
+              <circle
+                cx={chartData.pointsArray[hoveredIndex].x}
+                cy={chartData.pointsArray[hoveredIndex].y}
+                r="1.2"
+                fill="#1148D0"
+                stroke="white"
+                strokeWidth="0.4"
               />
             </>
           )}
-
-          {/* Hover points */}
-          {points && data.map((d, i) => {
-            const [x, y] = points.split(" ")[i].split(",").map(Number);
-            return (
-              <g key={i}>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="0.8"
-                  fill="#0F52FB"
-                  className={`transition-all ${hoveredPoint === i ? "opacity-100" : "opacity-0"}`}
-                />
-                <rect
-                  x={x - 2}
-                  y="0"
-                  width="4"
-                  height="100"
-                  fill="transparent"
-                  className="cursor-pointer"
-                  onMouseEnter={() => setHoveredPoint(i)}
-                />
-              </g>
-            );
-          })}
-
-          {/* Gradients */}
-          <defs>
-            <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#0F52FB" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#0F52FB" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="earningsGradient" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#10B981" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
-            </linearGradient>
-          </defs>
         </svg>
+        
+        {/* Hovered value tooltip */}
+        {hoveredIndex !== null && data[hoveredIndex] && (
+          <div className="absolute top-2 left-2 text-xs text-gray-400">
+            {data[hoveredIndex].date}: ${data[hoveredIndex].value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        )}
       </div>
 
-      {/* Chart Legend */}
-      <div className="flex items-center gap-6 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-0.5 bg-accent-primary"></div>
-          <span className="text-gray-400">Balance</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-0.5 bg-green-400 opacity-50"></div>
-          <span className="text-gray-400">Earnings</span>
-        </div>
+      {/* Time range toggles - understated */}
+      <div className="flex items-center justify-center gap-1 mt-6">
+        {(["1W", "1M", "3M", "All"] as TimeRange[]).map((range) => (
+          <button
+            key={range}
+            onClick={() => onTimeRangeChange(range)}
+            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+              timeRange === range
+                ? "bg-white/10 text-white"
+                : "text-gray-500 hover:text-gray-400"
+            }`}
+          >
+            {range}
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
-// APY Distribution Chart
-function APYDistribution({ balances }: { balances: Record<string, number> }) {
-  const totalBalance = Object.values(balances).reduce((acc, val) => acc + val, 0);
-  
-  const distribution = vaultDefinitions
-    .map(vault => ({
-      ...vault,
-      balance: balances[vault.id] || 0,
-      percentage: totalBalance > 0 ? ((balances[vault.id] || 0) / totalBalance) * 100 : 0,
-    }))
-    .filter(v => v.balance > 0);
-
-  if (distribution.length === 0) return null;
-
-  const colors = {
-    "yuki-stable": "#3B82F6",
-    "eth-yield": "#A855F7", 
-    "sol-turbo": "#14B8A6",
-  };
-
-  let currentAngle = -90;
-
+// Savings card component
+function SavingsCard({ 
+  profile, 
+  balance,
+  isExpanded,
+  onToggle,
+}: { 
+  profile: typeof savingsProfiles[0]; 
+  balance: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-medium text-gray-400">Asset Allocation</h3>
+    <div className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-1">
+          <h3 className="text-lg font-medium text-white">{profile.name}</h3>
+          <span className="text-2xl font-medium text-white">
+            ${balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
+        <p className="text-sm text-gray-500">{profile.description}</p>
+      </div>
       
-      <div className="flex items-center gap-6">
-        {/* Donut Chart */}
-        <div className="relative w-32 h-32 shrink-0">
-          <svg viewBox="0 0 100 100" className="transform -rotate-90">
-            {distribution.map((vault, index) => {
-              const angle = (vault.percentage / 100) * 360;
-              const radius = 40;
-              const circumference = 2 * Math.PI * radius;
-              const offset = circumference - (vault.percentage / 100) * circumference;
-              
-              const segment = (
-                <circle
-                  key={vault.id}
-                  cx="50"
-                  cy="50"
-                  r={radius}
-                  fill="none"
-                  stroke={colors[vault.id as keyof typeof colors]}
-                  strokeWidth="12"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={offset}
-                  style={{
-                    transformOrigin: "center",
-                    transform: `rotate(${currentAngle}deg)`,
-                  }}
-                  className="transition-all duration-300"
-                />
-              );
-              
-              currentAngle += angle;
-              return segment;
-            })}
-          </svg>
-          
-          {/* Center text */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-xs text-gray-500">Total</p>
-              <p className="text-sm font-medium text-fdfffc">{distribution.length}</p>
-            </div>
+      {/* View details toggle */}
+      <button
+        onClick={onToggle}
+        className="w-full px-6 py-3 text-xs text-gray-500 hover:text-gray-400 border-t border-white/5 transition-colors cursor-pointer flex items-center justify-between"
+      >
+        <span>View details</span>
+        <svg 
+          className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {/* Expanded details */}
+      {isExpanded && (
+        <div className="px-6 pb-6 pt-2 border-t border-white/5 space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Yield range</span>
+            <span className="text-gray-300">{profile.apyRange} annually</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Asset</span>
+            <span className="text-gray-300">{profile.asset}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Strategy</span>
+            <span className="text-gray-300">Automated allocation</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Rebalancing</span>
+            <span className="text-gray-300">Daily</span>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Legend */}
-        <div className="space-y-3 flex-1">
-          {distribution.map(vault => (
-            <div key={vault.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: colors[vault.id as keyof typeof colors] }}
-                ></div>
-                <span className="text-sm text-gray-400">{vault.name}</span>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-fdfffc">
-                  ${vault.balance.toLocaleString()}
-                </p>
-                <p className="text-xs text-gray-500">{vault.percentage.toFixed(1)}%</p>
-              </div>
-            </div>
-          ))}
+// Activity item component
+function ActivityItem({ 
+  type, 
+  amount, 
+  date 
+}: { 
+  type: "deposit" | "withdrawal"; 
+  amount: number; 
+  date: string;
+}) {
+  return (
+    <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0">
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+          type === "deposit" ? "bg-green-500/10" : "bg-white/5"
+        }`}>
+          {type === "deposit" ? (
+            <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m0-16l-4 4m4-4l4 4" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V4m0 16l-4-4m4 4l4-4" />
+            </svg>
+          )}
         </div>
+        <div>
+          <p className="text-sm font-medium text-white capitalize">{type}</p>
+          <p className="text-xs text-gray-500">{date}</p>
+        </div>
+      </div>
+      <span className={`text-sm font-medium ${type === "deposit" ? "text-green-500" : "text-white"}`}>
+        {type === "deposit" ? "+" : "-"}${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+      </span>
+    </div>
+  );
+}
+
+// Landing Hero for non-authenticated users
+function LandingHero() {
+  return (
+    <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
+      <h1 className="text-4xl md:text-6xl font-medium text-white tracking-tight mb-6 max-w-3xl leading-[1.15]">
+        Your savings,{" "}
+        <span className="text-gray-400">
+          growing quietly
+        </span>
+      </h1>
+      
+      <p className="text-lg text-gray-500 max-w-lg mb-12 leading-relaxed">
+        Deposit your savings. Watch them grow. Withdraw anytime.
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Link
+          href="/signin"
+          className="px-8 py-4 bg-white text-black rounded-full text-base font-medium hover:bg-gray-100 transition-all"
+        >
+          Get started
+        </Link>
+        <Link
+          href="/vaults"
+          className="px-8 py-4 text-gray-400 rounded-full text-base font-medium hover:text-white transition-all"
+        >
+          Learn more
+        </Link>
       </div>
     </div>
   );
 }
 
 export default function Dashboard() {
-  const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [balances, setBalances] = useState<Record<string, number>>({});
-  const [timeRange, setTimeRange] = useState<TimeRange>("30D");
+  const [timeRange, setTimeRange] = useState<TimeRange>("All");
+  const [isLoading, setIsLoading] = useState(true);
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const checkLoginStatus = () => {
@@ -357,234 +351,162 @@ export default function Dashboard() {
       setIsLoggedIn(loggedIn);
       
       if (loggedIn) {
-          const storedBalances = localStorage.getItem("yuki_balances");
-          if (storedBalances) {
-              setBalances(JSON.parse(storedBalances));
-          } else {
-              const initial = { "yuki-stable": 1000 };
-              setBalances(initial);
-              localStorage.setItem("yuki_balances", JSON.stringify(initial));
-          }
+        const storedBalances = localStorage.getItem("yuki_balances");
+        if (storedBalances) {
+          setBalances(JSON.parse(storedBalances));
+        } else {
+          const initial = { "yuki-stable": 8200, "eth-yield": 4238.72 };
+          setBalances(initial);
+          localStorage.setItem("yuki_balances", JSON.stringify(initial));
+        }
       } else {
-          setBalances({});
+        setBalances({});
       }
+      setIsLoading(false);
     };
 
     checkLoginStatus();
     window.addEventListener("yuki_login_update", checkLoginStatus);
-    return () =>
-      window.removeEventListener("yuki_login_update", checkLoginStatus);
+    return () => window.removeEventListener("yuki_login_update", checkLoginStatus);
   }, []);
 
   const totalBalance = Object.values(balances).reduce((acc, val) => acc + val, 0);
-  const activeVaults = vaultDefinitions.filter(vault => (balances[vault.id] || 0) > 0);
-  const dailyEarnings = vaultDefinitions.reduce((acc, vault) => {
-    const balance = balances[vault.id] || 0;
-    const apyPercent = parseFloat(vault.apy) / 100;
-    return acc + (balance * apyPercent / 365);
-  }, 0);
-
+  const activeProfiles = savingsProfiles.filter(profile => (balances[profile.id] || 0) > 0);
+  
+  // Calculate all-time earnings (simulated)
+  const allTimeEarnings = totalBalance * 0.035; // ~3.5% earned so far
+  
   const historicalData = useMemo(
     () => generateHistoricalData(balances, timeRange),
     [balances, timeRange]
   );
 
-  if (!isLoggedIn) {
+  const toggleCard = (id: string) => {
+    setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Mock activity data
+  const recentActivity = [
+    { type: "deposit" as const, amount: 2000, date: "Dec 15, 2024" },
+    { type: "deposit" as const, amount: 5000, date: "Nov 28, 2024" },
+    { type: "withdrawal" as const, amount: 500, date: "Nov 10, 2024" },
+    { type: "deposit" as const, amount: 6000, date: "Oct 1, 2024" },
+  ];
+
+  if (isLoading) {
     return (
-      <div className="w-full min-h-[70vh] flex flex-col items-center justify-center text-center space-y-8 animate-fade-in">
-        <div className="space-y-4">
-          <h1 className="text-4xl md:text-5xl font-medium text-fdfffc tracking-tight">
-            Start earning today
-          </h1>
-          <p className="text-lg text-gray-400 max-w-md">
-            Secure, transparent yields on your digital assets.
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            href="/signin"
-            className="px-8 py-3.5 bg-accent-primary text-white rounded-lg text-sm font-medium shadow-lg shadow-accent-primary/20 hover:shadow-xl hover:shadow-accent-primary/30 transition-all"
-          >
-            Get Started
-          </Link>
-          <Link
-            href="/vaults"
-            className="px-8 py-3.5 bg-white/5 text-fdfffc rounded-lg text-sm font-medium border border-white/10 hover:bg-white/10 transition-all"
-          >
-            View Vaults
-          </Link>
-        </div>
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
       </div>
     );
   }
 
+  if (!isLoggedIn) {
+    return <LandingHero />;
+  }
+
   return (
-    <div className="w-full space-y-6 pb-16 animate-fade-in">
-      {/* Performance Chart */}
+    <div className="w-full mx-auto px-4 pb-24 animate-fade-in">
+      {/* Hero: Portfolio Value */}
+      <section className="pt-12 pb-8 text-center">
+        <p className="text-sm text-gray-500 mb-3">Total Savings</p>
+        <h1 className="text-5xl md:text-6xl font-medium text-white tracking-tight mb-4">
+          ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </h1>
+        {allTimeEarnings > 0 && (
+          <p className="text-sm text-blue-500">
+            +${allTimeEarnings.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} all-time
+          </p>
+        )}
+      </section>
+
+      {/* Growth Graph */}
       {totalBalance > 0 && (
-        <div className="glass rounded-2xl border border-white/5 p-6 md:p-8">
-          <BalanceChart 
+        <section className="mb-12">
+          <GrowthChart 
             data={historicalData}
             timeRange={timeRange}
             onTimeRangeChange={setTimeRange}
           />
-        </div>
+        </section>
       )}
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass rounded-xl border border-white/5 p-6">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Total Balance</p>
-          <p className="text-3xl font-medium text-fdfffc">
-            ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-        
-        <div className="glass rounded-xl border border-white/5 p-6">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Daily Earnings</p>
-          <p className="text-3xl font-medium text-green-400">
-            +${dailyEarnings.toFixed(2)}
-          </p>
-        </div>
-        
-        <div className="glass rounded-xl border border-white/5 p-6">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Monthly Projection</p>
-          <p className="text-3xl font-medium text-accent-primary">
-            +${(dailyEarnings * 30).toFixed(2)}
-          </p>
-        </div>
-      </div>
-
-      {/* Allocation Chart */}
-      {activeVaults.length > 0 && (
-        <div className="glass rounded-2xl border border-white/5 p-6 md:p-8">
-          <APYDistribution balances={balances} />
-        </div>
-      )}
-
-      {/* Active Positions */}
-      {activeVaults.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-fdfffc">Your Vaults</h2>
-            <Link 
-              href="/vaults" 
-              className="text-sm text-gray-400 hover:text-fdfffc transition-colors"
-            >
-              View All
-            </Link>
-          </div>
-          
-          <div className="space-y-2">
-            {activeVaults.map((vault) => {
-              const balance = balances[vault.id] || 0;
-              const apyPercent = parseFloat(vault.apy) / 100;
-              const dailyEarn = balance * apyPercent / 365;
-
-              return (
-                <div
-                  key={vault.id}
-                  onClick={() => router.push(`/vaults/${vault.id}`)}
-                  className="glass rounded-xl border border-white/5 p-5 hover:border-white/10 hover:bg-white/[0.02] transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-base font-medium text-fdfffc group-hover:text-accent-primary transition-colors">
-                          {vault.name}
-                        </h3>
-                        <span className="text-xs text-gray-500">
-                          {vault.asset}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Balance: </span>
-                          <span className="text-fdfffc font-medium">${balance.toLocaleString()}</span>
-                        </div>
-                        <div className="h-3 w-px bg-white/10"></div>
-                        <div>
-                          <span className="text-gray-500">APY: </span>
-                          <span className="text-green-400 font-medium">{vault.apy}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-500 mb-1">Daily</p>
-                      <p className="text-base font-medium text-accent-primary">+${dailyEarn.toFixed(2)}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {activeVaults.length === 0 && (
-        <div className="glass rounded-xl border border-white/5 p-10 text-center">
-          <div className="max-w-sm mx-auto space-y-4">
-            <div className="w-16 h-16 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center mx-auto">
-              <svg className="w-8 h-8 text-accent-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-xl font-medium text-fdfffc mb-2">Start Earning</h3>
-              <p className="text-sm text-gray-400 mb-6">
-                Choose a vault to deposit your funds and start earning yield automatically.
-              </p>
-              <Link
-                href="/vaults"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary text-white rounded-lg text-sm font-medium hover:bg-accent-primary/90 transition-colors"
-              >
-                Browse Vaults
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Links */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Primary Actions */}
+      <section className="flex gap-3 mb-16">
         <Link
           href="/vaults"
-          className="glass rounded-xl border border-white/5 p-5 hover:border-white/10 hover:bg-white/[0.02] transition-all group"
+          className="flex-1 py-4 bg-white text-black rounded-full text-center font-medium hover:bg-gray-100 transition-all"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5 text-accent-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-fdfffc group-hover:text-accent-primary transition-colors">Vaults</p>
-              <p className="text-xs text-gray-500">Explore strategies</p>
-            </div>
-          </div>
+          Deposit
         </Link>
+        <button
+          className="flex-1 py-4 bg-white/5 text-white rounded-full text-center font-medium hover:bg-white/10 transition-all border border-white/10 cursor-pointer"
+        >
+          Withdraw
+        </button>
+      </section>
 
-        <Link
-          href="/portfolio"
-          className="glass rounded-xl border border-white/5 p-5 hover:border-white/10 hover:bg-white/[0.02] transition-all group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-fdfffc group-hover:text-accent-primary transition-colors">History</p>
-              <p className="text-xs text-gray-500">View transactions</p>
-            </div>
+      {/* Your Savings */}
+      {activeProfiles.length > 0 && (
+        <section className="mb-16">
+          <h2 className="text-sm text-gray-500 uppercase tracking-wider mb-4">Your Savings</h2>
+          <div className="space-y-3">
+            {activeProfiles.map((profile) => (
+              <SavingsCard
+                key={profile.id}
+                profile={profile}
+                balance={balances[profile.id] || 0}
+                isExpanded={expandedCards[profile.id] || false}
+                onToggle={() => toggleCard(profile.id)}
+              />
+            ))}
           </div>
-        </Link>
-      </div>
+        </section>
+      )}
+
+      {/* Assets */}
+      <section className="mb-16">
+        <h2 className="text-sm text-gray-500 uppercase tracking-wider mb-4">Assets</h2>
+        <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                <span className="text-xs font-medium text-blue-400">$</span>
+              </div>
+              <span className="text-white font-medium">USDC</span>
+            </div>
+            <span className="text-gray-400">100%</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Activity */}
+      <section>
+        <h2 className="text-sm text-gray-500 uppercase tracking-wider mb-4">Activity</h2>
+        <div className="bg-white/[0.02] rounded-2xl border border-white/5 px-6">
+          {recentActivity.map((activity, index) => (
+            <ActivityItem
+              key={index}
+              type={activity.type}
+              amount={activity.amount}
+              date={activity.date}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Empty State */}
+      {activeProfiles.length === 0 && (
+        <section className="text-center py-16">
+          <p className="text-gray-500 mb-6">You haven&apos;t deposited any savings yet.</p>
+          <Link
+            href="/vaults"
+            className="inline-block px-8 py-4 bg-white text-black rounded-full font-medium hover:bg-gray-100 transition-all"
+          >
+            Make your first deposit
+          </Link>
+        </section>
+      )}
     </div>
   );
 }

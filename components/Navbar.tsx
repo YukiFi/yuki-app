@@ -6,8 +6,7 @@ import { useAccount, useDisconnect } from "wagmi";
 
 const navigation = [
   { name: "Dashboard", href: "/" },
-  { name: "Vaults", href: "/vaults" },
-  { name: "Portfolio", href: "/portfolio" },
+  { name: "Savings", href: "/vaults" },
 ];
 
 export default function Navbar() {
@@ -36,14 +35,10 @@ export default function Navbar() {
       setUserEmail(email);
     };
 
-    // Check initially
     checkLoginStatus();
-
-    // Listen for custom event to update state immediately
     window.addEventListener("yuki_login_update", checkLoginStatus);
     window.addEventListener("scroll", handleScroll);
 
-    // Click outside handler
     const handleClickOutside = (event: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
@@ -59,7 +54,6 @@ export default function Navbar() {
     };
   }, []);
 
-  // Logout function for demo purposes
   const handleLogout = () => {
     localStorage.removeItem("yuki_onboarding_complete");
     localStorage.removeItem("yuki_auth_method");
@@ -67,7 +61,6 @@ export default function Navbar() {
     localStorage.removeItem("yuki_wallet_address");
     localStorage.removeItem("yuki_balances");
     
-    // Disconnect wallet if connected
     if (isConnected) {
       disconnect();
     }
@@ -77,42 +70,20 @@ export default function Navbar() {
     window.dispatchEvent(new Event("yuki_login_update"));
   };
 
-  // Format address for display
-  const formatAddress = (addr: string) => {
-    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
-  };
-
-  // Get display name based on auth method
-  const getDisplayName = () => {
-    if (authMethod === "wallet" && address) {
-      return formatAddress(address);
+  // Get first letter for the simple profile icon
+  const getInitial = () => {
+    if (userEmail) {
+      return userEmail.charAt(0).toUpperCase();
     }
-    if (authMethod === "email" && userEmail) {
-      return userEmail.split("@")[0];
-    }
-    return "User";
-  };
-
-  // Get display subtitle
-  const getDisplaySubtitle = () => {
-    if (authMethod === "wallet" && address) {
-      return formatAddress(address);
-    }
-    if (authMethod === "email" && userEmail) {
-      return userEmail;
-    }
-    return "";
-  };
-
-  // Get initials for avatar
-  const getInitials = () => {
-    if (authMethod === "wallet" && address) {
-      return address.slice(2, 4).toUpperCase();
-    }
-    if (authMethod === "email" && userEmail) {
-      return userEmail.slice(0, 2).toUpperCase();
+    if (address) {
+      return address.charAt(2).toUpperCase();
     }
     return "U";
+  };
+
+  // Format address for display in account section
+  const formatAddress = (addr: string) => {
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
   return (
@@ -153,49 +124,90 @@ export default function Navbar() {
           </nav>
 
           {/* Right Side Actions */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center">
             {isLoggedIn ? (
               <div className="relative" ref={profileRef}>
-                 <button 
-                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
-                 >
-                    <div className="text-sm text-right">
-                        <div className="text-fdfffc font-medium">{getDisplayName()}</div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          {authMethod === "wallet" && (
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                            </svg>
-                          )}
-                          {authMethod === "email" && (
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                            </svg>
-                          )}
-                          {getDisplaySubtitle()}
-                        </div>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary">
-                        <span className="font-medium text-sm">{getInitials()}</span>
-                    </div>
-                 </button>
+                {/* Simple circular profile button - muted gray, just initial */}
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/20 transition-all cursor-pointer"
+                >
+                  <span className="text-sm font-medium">{getInitial()}</span>
+                </button>
 
-                 {/* Dropdown Menu */}
-                 {isProfileOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-dark-800 border border-white/10 rounded-lg shadow-xl py-1 animate-fade-in z-50">
-                        <div className="px-4 py-2 border-b border-white/5 mb-1">
-                            <p className="text-xs text-gray-500">Signed in with {authMethod === "wallet" ? "Wallet" : "Email"}</p>
-                            <p className="text-sm text-fdfffc truncate">{getDisplaySubtitle()}</p>
-                        </div>
-                        <button 
-                            onClick={handleLogout}
-                            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/5 hover:text-red-300 transition-colors"
-                        >
-                            Logout
-                        </button>
-                    </div>
-                 )}
+                {/* Dropdown Menu - calm, minimal, intentional */}
+                {isProfileOpen && (
+                  <div className="absolute right-0 top-full mt-3 w-64 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl animate-fade-in z-50 overflow-hidden">
+                    
+                    {/* Account Section */}
+                    <Link
+                      href="/account"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="block px-5 py-4 hover:bg-white/[0.03] transition-colors"
+                    >
+                      <p className="text-sm text-white mb-2">Account</p>
+                      <div className="space-y-1.5">
+                        {userEmail && (
+                          <p className="text-xs text-gray-500">{userEmail}</p>
+                        )}
+                        {address && (
+                          <p className="text-xs text-gray-500 font-mono">{formatAddress(address)}</p>
+                        )}
+                        <p className="text-xs text-gray-600">Connected (Demo)</p>
+                      </div>
+                    </Link>
+                    
+                    <div className="h-px bg-white/5" />
+                    
+                    {/* Security */}
+                    <Link
+                      href="/security"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                    >
+                      Security
+                    </Link>
+                    
+                    {/* Activity */}
+                    <Link
+                      href="/activity"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                    >
+                      Activity
+                    </Link>
+                    
+                    <div className="h-px bg-white/5" />
+                    
+                    {/* Documents */}
+                    <Link
+                      href="/documents"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                    >
+                      Documents
+                    </Link>
+                    
+                    {/* Help */}
+                    <Link
+                      href="/help"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                    >
+                      Help
+                    </Link>
+                    
+                    <div className="h-px bg-white/5" />
+                    
+                    {/* Log out - separated, last */}
+                    <button 
+                      onClick={handleLogout}
+                      className="w-full text-left px-5 py-3.5 text-sm text-gray-500 hover:text-white hover:bg-white/[0.03] transition-colors cursor-pointer"
+                    >
+                      Log out
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -207,21 +219,9 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/signin"
-                  className="px-4 py-2 bg-accent-primary text-white rounded-lg text-sm font-medium shadow-button-primary hover:shadow-button-primary-hover transition-all duration-200 flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2 bg-white text-black rounded-full text-sm font-medium hover:bg-gray-100 transition-all duration-200 cursor-pointer"
                 >
-                  <span>Get Started</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-4 h-4"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M12.97 3.97a.75.75 0 0 1 1.06 0l7.5 7.5a.75.75 0 0 1 0 1.06l-7.5 7.5a.75.75 0 1 1-1.06-1.06l6.22-6.22H3a.75.75 0 0 1 0-1.5h16.19l-6.22-6.22a.75.75 0 0 1 0-1.06Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  Get Started
                 </Link>
               </>
             )}
@@ -256,68 +256,102 @@ export default function Navbar() {
       {/* Mobile menu */}
       <div
         className={`md:hidden bg-dark-900/95 backdrop-blur-xl border-b border-white/5 transition-all duration-300 overflow-hidden ${
-          isMobileMenuOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
+          isMobileMenuOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className="block py-2 text-gray-400 hover:text-fdfffc text-base font-medium border-b border-white/5"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              {item.name}
-            </Link>
-          ))}
-          <div className="pt-4 flex flex-col gap-3">
-            {isLoggedIn ? (
-                <>
-                    <div className="px-4 py-2 border-b border-white/5 mb-2">
-                        <div className="text-sm font-medium text-fdfffc">{getDisplayName()}</div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          {authMethod === "wallet" && (
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                            </svg>
-                          )}
-                          {authMethod === "email" && (
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                            </svg>
-                          )}
-                          {getDisplaySubtitle()}
-                        </div>
-                    </div>
-                    <button 
-                        onClick={() => {
-                            handleLogout();
-                            setIsMobileMenuOpen(false);
-                        }}
-                        className="w-full px-4 py-3 bg-white/5 text-red-400 hover:text-red-300 rounded-lg text-sm font-medium border border-white/10 hover:bg-white/10 transition-all cursor-pointer text-left"
-                    >
-                        Logout
-                    </button>
-                </>
-            ) : (
-                <>
-                    <Link
-                    href="/signin"
-                    className="w-full px-4 py-3 bg-accent-primary text-white rounded-lg text-sm font-medium shadow-button-primary hover:shadow-button-primary-hover transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                    Get Started
-                    </Link>
-                    <Link
-                    href="/signin"
-                    className="w-full px-4 py-3 bg-white/5 text-gray-300 hover:text-white rounded-lg text-sm font-medium border border-white/10 hover:bg-white/10 transition-all cursor-pointer text-center"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                    Sign In
-                    </Link>
-                </>
-            )}
+        <div className="max-w-5xl mx-auto px-6 py-6">
+          {/* Navigation links */}
+          <div className="space-y-1 mb-6">
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="block py-3 text-gray-400 hover:text-fdfffc text-base font-medium"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                {item.name}
+              </Link>
+            ))}
           </div>
+          
+          {isLoggedIn ? (
+            <div className="border-t border-white/5 pt-6 space-y-1">
+              {/* Account info */}
+              <div className="pb-4 mb-2">
+                {userEmail && (
+                  <p className="text-sm text-gray-500">{userEmail}</p>
+                )}
+                {address && (
+                  <p className="text-xs text-gray-600 font-mono mt-1">{formatAddress(address)}</p>
+                )}
+              </div>
+              
+              <Link
+                href="/account"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-3 text-gray-400 hover:text-white text-sm"
+              >
+                Account
+              </Link>
+              <Link
+                href="/security"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-3 text-gray-400 hover:text-white text-sm"
+              >
+                Security
+              </Link>
+              <Link
+                href="/activity"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-3 text-gray-400 hover:text-white text-sm"
+              >
+                Activity
+              </Link>
+              <Link
+                href="/documents"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-3 text-gray-400 hover:text-white text-sm"
+              >
+                Documents
+              </Link>
+              <Link
+                href="/help"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="block py-3 text-gray-400 hover:text-white text-sm"
+              >
+                Help
+              </Link>
+              
+              <div className="pt-4 mt-4 border-t border-white/5">
+                <button 
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="py-3 text-gray-500 hover:text-white text-sm cursor-pointer"
+                >
+                  Log out
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="border-t border-white/5 pt-6 flex flex-col gap-3">
+              <Link
+                href="/signin"
+                className="w-full py-3 bg-white text-black rounded-full text-sm font-medium text-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Get Started
+              </Link>
+              <Link
+                href="/signin"
+                className="w-full py-3 text-gray-400 hover:text-white text-sm font-medium text-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Sign In
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </header>

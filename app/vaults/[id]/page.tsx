@@ -4,108 +4,128 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-interface Vault {
+interface Profile {
   id: string;
   name: string;
-  description: string;
+  tagline: string;
+  volatility: string;
+  yieldRange: string;
   asset: string;
-  apy: string;
-  tvl: string;
-  risk: "Low" | "Medium" | "High";
-  longDescription: string;
-  strategy: string[];
-  fees: {
-    deposit: string;
-    withdrawal: string;
-    performance: string;
+  liquidity: string;
+  management: string;
+  howItWorks: {
+    strategy: string;
+    protocols: string;
+    rebalancing: string;
+    risks: string;
+  };
+  advanced: {
+    allocations: { name: string; percentage: string }[];
+    contractAddress: string;
   };
 }
 
-const vaultsData: Record<string, Vault> = {
+const profilesData: Record<string, Profile> = {
   "yuki-stable": {
     id: "yuki-stable",
-    name: "Safe Vault",
-    description: "Low-risk automated yield farming on stablecoin pools.",
-    longDescription: "Our Safe Vault provides stable, predictable returns by automatically optimizing yields across multiple battle-tested DeFi protocols. Perfect for risk-averse investors seeking consistent returns.",
+    name: "Stable",
+    tagline: "Conservative on-chain yield with a focus on capital preservation.",
+    volatility: "Low volatility",
+    yieldRange: "~3–6%",
     asset: "USDC",
-    apy: "15.4%",
-    tvl: "$12.4M",
-    risk: "Low",
-    strategy: [
-      "Automated rebalancing across Aave, Compound, and other lending protocols",
-      "Smart contract insurance coverage",
-      "Real-time risk monitoring and automated position adjustments",
-      "Optimized gas efficiency with batch transactions"
-    ],
-    fees: {
-      deposit: "0%",
-      withdrawal: "0.1%",
-      performance: "10%"
-    }
+    liquidity: "Withdraw anytime",
+    management: "Automated, rule-based",
+    howItWorks: {
+      strategy: "This profile allocates your funds across established lending protocols that have been battle-tested over years. The focus is on large, liquid markets with proven track records.",
+      protocols: "Funds may be deployed across Aave, Compound, and other established lending markets. Allocation is dynamic and adjusts based on rates and utilization.",
+      rebalancing: "Positions are monitored continuously and rebalanced daily to optimize yield while staying within conservative risk parameters.",
+      risks: "While this profile prioritizes safety, all on-chain activity carries inherent smart contract risk. No guarantees are made about returns or principal protection.",
+    },
+    advanced: {
+      allocations: [
+        { name: "Aave v3 USDC", percentage: "45%" },
+        { name: "Compound v3 USDC", percentage: "35%" },
+        { name: "Reserve (liquid)", percentage: "20%" },
+      ],
+      contractAddress: "0x1234...5678",
+    },
   },
   "eth-yield": {
     id: "eth-yield",
-    name: "Moderate Vault",
-    description: "Balanced risk with leveraged staking strategies.",
-    longDescription: "The Moderate Vault strikes the perfect balance between risk and reward, utilizing leveraged staking strategies to amplify yields while maintaining prudent risk management.",
-    asset: "ETH",
-    apy: "4.2%",
-    tvl: "$8.1M",
-    risk: "Medium",
-    strategy: [
-      "Leveraged ETH staking via Lido and RocketPool",
-      "Dynamic leverage ratio optimization (1.5x - 2.5x)",
-      "Automated liquidation protection mechanisms",
-      "Multi-layer security audits and monitoring"
-    ],
-    fees: {
-      deposit: "0%",
-      withdrawal: "0.2%",
-      performance: "15%"
-    }
+    name: "Balanced",
+    tagline: "A blend of stability and growth for moderate risk tolerance.",
+    volatility: "Moderate volatility",
+    yieldRange: "~5–9%",
+    asset: "USDC",
+    liquidity: "Withdraw anytime",
+    management: "Automated, rule-based",
+    howItWorks: {
+      strategy: "This profile combines conservative lending strategies with higher-yielding opportunities. A portion of funds is allocated to strategies that offer enhanced returns.",
+      protocols: "Funds are deployed across a mix of lending protocols and yield-bearing positions including staking derivatives and liquidity provision.",
+      rebalancing: "Daily rebalancing with more active management to capture yield opportunities while maintaining a moderate risk profile.",
+      risks: "This profile carries higher risk than Stable. Returns may vary more significantly, and temporary drawdowns are possible during market volatility.",
+    },
+    advanced: {
+      allocations: [
+        { name: "Aave v3 USDC", percentage: "30%" },
+        { name: "Curve stETH/ETH LP", percentage: "25%" },
+        { name: "Lido stETH", percentage: "25%" },
+        { name: "Reserve (liquid)", percentage: "20%" },
+      ],
+      contractAddress: "0xabcd...efgh",
+    },
   },
   "sol-turbo": {
     id: "sol-turbo",
-    name: "Aggressive Vault",
-    description: "High-risk, high-reward liquidity provision strategies.",
-    longDescription: "For experienced DeFi users seeking maximum returns. Our Aggressive Vault employs sophisticated high-frequency strategies and concentrated liquidity positions.",
-    asset: "SOL",
-    apy: "18.9%",
-    tvl: "$3.2M",
-    risk: "High",
-    strategy: [
-      "Concentrated liquidity provision on top Solana DEXs",
-      "High-frequency rebalancing for optimal fee capture",
-      "MEV-protected transaction routing",
-      "Advanced impermanent loss hedging strategies"
-    ],
-    fees: {
-      deposit: "0%",
-      withdrawal: "0.3%",
-      performance: "20%"
-    }
-  }
+    name: "Growth",
+    tagline: "Maximizing yield potential with higher volatility acceptance.",
+    volatility: "Higher volatility",
+    yieldRange: "~8–15%",
+    asset: "USDC",
+    liquidity: "Withdraw anytime",
+    management: "Automated, rule-based",
+    howItWorks: {
+      strategy: "This profile pursues higher yields through concentrated positions in higher-returning opportunities. Suitable for users comfortable with variability.",
+      protocols: "Allocation includes concentrated liquidity positions, yield farming opportunities, and leveraged strategies across multiple DeFi protocols.",
+      rebalancing: "More frequent rebalancing to actively manage positions and capture yield spikes while managing downside.",
+      risks: "This profile carries significant risk. Returns can vary widely, and principal loss is possible during adverse market conditions. Only allocate funds you can afford to have fluctuate.",
+    },
+    advanced: {
+      allocations: [
+        { name: "Uniswap v3 Concentrated LP", percentage: "30%" },
+        { name: "Pendle PT-stETH", percentage: "25%" },
+        { name: "Convex/Curve Pools", percentage: "25%" },
+        { name: "Reserve (liquid)", percentage: "20%" },
+      ],
+      contractAddress: "0x9876...5432",
+    },
+  },
 };
 
-export default function VaultDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ProfileDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [walletBalance] = useState(10000); // Simulated wallet balance
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeAction, setActiveAction] = useState<"deposit" | "withdraw">("deposit");
-  const [vaultId, setVaultId] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<"deposit" | "withdraw">("deposit");
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [profileId, setProfileId] = useState<string | null>(null);
 
-  // Unwrap params in useEffect
   useEffect(() => {
-    params.then((p) => setVaultId(p.id));
+    params.then((p) => setProfileId(p.id));
   }, [params]);
 
-  const vault = vaultId ? vaultsData[vaultId] : null;
+  const profile = profileId ? profilesData[profileId] : null;
 
   useEffect(() => {
-    if (!vaultId) return;
+    if (!profileId) return;
     
     const checkLoginStatus = () => {
       const status = localStorage.getItem("yuki_onboarding_complete");
@@ -114,30 +134,29 @@ export default function VaultDetailPage({ params }: { params: Promise<{ id: stri
       const storedBalances = localStorage.getItem("yuki_balances");
       if (storedBalances) {
         const balances = JSON.parse(storedBalances);
-        setBalance(balances[vaultId] || 0);
+        setBalance(balances[profileId] || 0);
       }
     };
 
     checkLoginStatus();
     window.addEventListener("yuki_login_update", checkLoginStatus);
     return () => window.removeEventListener("yuki_login_update", checkLoginStatus);
-  }, [vaultId]);
+  }, [profileId]);
 
-  // Loading state while params are being resolved
-  if (!vaultId) {
+  if (!profileId) {
     return (
-      <div className="w-full min-h-[50vh] flex flex-col items-center justify-center text-center animate-fade-in">
-        <div className="w-8 h-8 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (!vault) {
+  if (!profile) {
     return (
-      <div className="w-full min-h-[50vh] flex flex-col items-center justify-center text-center animate-fade-in">
-        <h1 className="text-2xl font-medium text-fdfffc mb-4">Vault Not Found</h1>
-        <Link href="/vaults" className="text-accent-primary hover:text-white transition-colors">
-          ← Back to Vaults
+      <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
+        <p className="text-gray-500 mb-4">Profile not found</p>
+        <Link href="/vaults" className="text-sm text-white hover:text-gray-300 transition-colors">
+          ← Back to Savings Profiles
         </Link>
       </div>
     );
@@ -145,294 +164,371 @@ export default function VaultDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleDeposit = () => {
     if (!isLoggedIn) {
-      router.push(`/signin?redirect=/vaults/${vaultId}`);
+      router.push(`/signin?redirect=/vaults/${profileId}`);
       return;
     }
 
     const amount = parseFloat(depositAmount);
-    if (!amount || amount <= 0) {
-      alert("Please enter a valid amount");
-      return;
-    }
-
-    if (!vaultId) return;
+    if (!amount || amount <= 0) return;
+    if (!profileId) return;
     
     setLoading(true);
+    setLoadingMessage("Deploying funds on-chain…");
+    
     setTimeout(() => {
       const storedBalances = localStorage.getItem("yuki_balances");
       const balances = storedBalances ? JSON.parse(storedBalances) : {};
-      const newBalances = { ...balances, [vaultId]: (balances[vaultId] || 0) + amount };
+      const newBalances = { ...balances, [profileId]: (balances[profileId] || 0) + amount };
       
-      setBalance(newBalances[vaultId]);
+      setBalance(newBalances[profileId]);
       localStorage.setItem("yuki_balances", JSON.stringify(newBalances));
       window.dispatchEvent(new Event("yuki_login_update"));
       
       setDepositAmount("");
       setLoading(false);
-    }, 1000);
+      setLoadingMessage("");
+      setSuccess(true);
+      setSuccessMessage(`Funds successfully added to ${profile.name} Savings`);
+      
+      setTimeout(() => setSuccess(false), 3000);
+    }, 1500);
   };
 
   const handleWithdraw = () => {
-    if (!vaultId) return;
+    if (!profileId) return;
     
     const amount = parseFloat(withdrawAmount);
-    if (!amount || amount <= 0) {
-      alert("Please enter a valid amount");
-      return;
-    }
-
-    if (amount > balance) {
-      alert("Insufficient balance");
-      return;
-    }
+    if (!amount || amount <= 0 || amount > balance) return;
 
     setLoading(true);
+    setLoadingMessage("Withdrawing funds…");
+    
     setTimeout(() => {
       const storedBalances = localStorage.getItem("yuki_balances");
       const balances = storedBalances ? JSON.parse(storedBalances) : {};
-      const newBalances = { ...balances, [vaultId]: Math.max(0, (balances[vaultId] || 0) - amount) };
+      const newBalances = { ...balances, [profileId]: Math.max(0, (balances[profileId] || 0) - amount) };
       
-      setBalance(newBalances[vaultId]);
+      setBalance(newBalances[profileId]);
       localStorage.setItem("yuki_balances", JSON.stringify(newBalances));
       window.dispatchEvent(new Event("yuki_login_update"));
       
       setWithdrawAmount("");
       setLoading(false);
-    }, 1000);
-  };
-
-  const getRiskColor = () => {
-    switch (vault.risk) {
-      case "Low": return "text-green-400 bg-green-500/10";
-      case "Medium": return "text-yellow-400 bg-yellow-500/10";
-      case "High": return "text-orange-400 bg-orange-500/10";
-    }
-  };
-
-  const getAssetColor = () => {
-    switch (vault.asset) {
-      case "USDC": return "bg-blue-500/20 text-blue-400";
-      case "ETH": return "bg-purple-500/20 text-purple-400";
-      case "SOL": return "bg-teal-500/20 text-teal-400";
-      default: return "bg-gray-500/20 text-gray-400";
-    }
+      setLoadingMessage("");
+      setSuccess(true);
+      setSuccessMessage("Funds returned to your wallet");
+      
+      setTimeout(() => setSuccess(false), 3000);
+    }, 1500);
   };
 
   return (
-    <div className="w-full space-y-6 animate-fade-in pb-12">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-400">
-        <Link href="/vaults" className="hover:text-fdfffc transition-colors">Vaults</Link>
-        <span>/</span>
-        <span className="text-fdfffc">{vault.name}</span>
+    <div className="w-full mx-auto px-4 pb-24 animate-fade-in">
+      {/* Back link */}
+      <div className="pt-8 pb-4">
+        <Link 
+          href="/vaults" 
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+          </svg>
+          Savings Profiles
+        </Link>
       </div>
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-        <div className="flex items-start gap-4">
-          <div className={`w-16 h-16 rounded-xl flex items-center justify-center shrink-0 ${getAssetColor()}`}>
-            <span className="font-bold text-xl">{vault.asset}</span>
+      {/* Header Section */}
+      <section className="pb-8">
+        <h1 className="text-3xl font-medium text-white mb-2">{profile.name} Savings</h1>
+        <p className="text-gray-500 mb-6">{profile.tagline}</p>
+        
+        {/* Tags */}
+        <div className="flex flex-wrap gap-2">
+          <span className="px-3 py-1.5 text-xs text-gray-400 bg-white/5 rounded-full">
+            {profile.volatility}
+          </span>
+          <span className="px-3 py-1.5 text-xs text-gray-400 bg-white/5 rounded-full">
+            Non-custodial
+          </span>
+          <span className="px-3 py-1.5 text-xs text-gray-400 bg-white/5 rounded-full">
+            Fully on-chain
+          </span>
+        </div>
+      </section>
+
+      {/* Key Stats */}
+      <section className="pb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Current range</p>
+            <p className="text-lg text-white">{profile.yieldRange}</p>
           </div>
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-medium text-fdfffc">{vault.name}</h1>
-              <span className={`px-3 py-1 text-xs uppercase tracking-wider font-medium rounded-full ${getRiskColor()}`}>
-                {vault.risk} Risk
-              </span>
-            </div>
-            <p className="text-gray-400 mb-4">{vault.description}</p>
-            <div className="flex items-center gap-6">
-              <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">APY</div>
-                <div className="text-2xl font-medium text-green-400">{vault.apy}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">TVL</div>
-                <div className="text-2xl font-medium text-fdfffc">{vault.tvl}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Your Balance</div>
-                <div className="text-2xl font-medium text-accent-primary">
-                  ${balance.toLocaleString()}
-                </div>
-              </div>
-            </div>
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Asset</p>
+            <p className="text-lg text-white">{profile.asset}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Liquidity</p>
+            <p className="text-lg text-white">{profile.liquidity}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Management</p>
+            <p className="text-lg text-white">{profile.management}</p>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* About */}
-          <div className="glass p-6 rounded-xl border border-white/5">
-            <h2 className="text-lg font-medium text-fdfffc mb-4">About This Vault</h2>
-            <p className="text-gray-400 leading-relaxed">{vault.longDescription}</p>
+      {/* Your Position (if any) */}
+      {balance > 0 && (
+        <section className="pb-10">
+          <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Your balance</p>
+            <p className="text-3xl font-medium text-white">
+              ${balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Deposit / Withdraw Module */}
+      <section className="pb-10">
+        <div className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden">
+          {/* Tabs */}
+          <div className="flex border-b border-white/5">
+            <button
+              onClick={() => setActiveTab("deposit")}
+              className={`flex-1 py-4 text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "deposit" 
+                  ? "text-white border-b-2 border-white" 
+                  : "text-gray-500 hover:text-gray-400"
+              }`}
+            >
+              Deposit
+            </button>
+            <button
+              onClick={() => setActiveTab("withdraw")}
+              className={`flex-1 py-4 text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === "withdraw" 
+                  ? "text-white border-b-2 border-white" 
+                  : "text-gray-500 hover:text-gray-400"
+              }`}
+            >
+              Withdraw
+            </button>
           </div>
 
-          {/* Strategy */}
-          <div className="glass p-6 rounded-xl border border-white/5">
-            <h2 className="text-lg font-medium text-fdfffc mb-4">Strategy Details</h2>
-            <div className="space-y-3">
-              {vault.strategy.map((item, index) => (
-                <div key={index} className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <svg className="w-3 h-3 text-accent-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-400 text-sm">{item}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Fees */}
-          <div className="glass p-6 rounded-xl border border-white/5">
-            <h2 className="text-lg font-medium text-fdfffc mb-4">Fee Structure</h2>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Deposit Fee</div>
-                <div className="text-lg font-medium text-fdfffc">{vault.fees.deposit}</div>
+          <div className="p-6">
+            {/* Success message */}
+            {success && (
+              <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-sm text-green-400 text-center">
+                {successMessage}
               </div>
-              <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Withdrawal Fee</div>
-                <div className="text-lg font-medium text-fdfffc">{vault.fees.withdrawal}</div>
+            )}
+
+            {/* Loading state */}
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin mb-3" />
+                <p className="text-sm text-gray-400">{loadingMessage}</p>
               </div>
-              <div>
-                <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Performance Fee</div>
-                <div className="text-lg font-medium text-fdfffc">{vault.fees.performance}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+            )}
 
-        {/* Right Column - Actions */}
-        <div className="lg:col-span-1">
-          <div className="glass p-6 rounded-xl border border-white/5 sticky top-32">
-            <h2 className="text-lg font-medium text-fdfffc mb-6">Manage Position</h2>
-
-            {/* Tabs */}
-            <div className="flex gap-2 mb-6 p-1 bg-dark-800/50 rounded-lg border border-white/5">
-              <button
-                onClick={() => setActiveAction("deposit")}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                  activeAction === "deposit"
-                    ? "bg-accent-primary text-white"
-                    : "text-gray-400 hover:text-fdfffc"
-                }`}
-              >
-                Deposit
-              </button>
-              <button
-                onClick={() => setActiveAction("withdraw")}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                  activeAction === "withdraw"
-                    ? "bg-accent-primary text-white"
-                    : "text-gray-400 hover:text-fdfffc"
-                }`}
-              >
-                Withdraw
-              </button>
-            </div>
-
-            {/* Deposit Form */}
-            {activeAction === "deposit" && (
-              <div className="space-y-4">
+            {/* Deposit Tab */}
+            {activeTab === "deposit" && !loading && (
+              <div className="space-y-6">
+                {/* Amount input */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
-                    Amount ({vault.asset})
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-dark-800/50 border border-white/10 rounded-lg px-4 py-3 text-fdfffc placeholder:text-gray-600 focus:outline-none focus:border-accent-primary/50 transition-colors"
-                    />
-                    <button
-                      onClick={() => setDepositAmount("100")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-accent-primary hover:text-white transition-colors cursor-pointer"
-                    >
-                      MAX
-                    </button>
-                  </div>
+                  <label className="block text-sm text-gray-500 mb-2">Amount (USD)</label>
+                  <input
+                    type="number"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-transparent border border-white/10 rounded-xl px-4 py-4 text-xl text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 transition-colors"
+                  />
+                  <p className="text-xs text-gray-600 mt-2">
+                    Wallet balance: ${walletBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
 
+                {/* Confirmation text */}
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Funds remain in your wallet and are deployed on-chain via this profile.
+                </p>
+
+                {/* Checklist */}
+                <div className="space-y-2">
+                  {["No lockup", "No guarantees", "Withdraw anytime"].map((item) => (
+                    <div key={item} className="flex items-center gap-2 text-sm text-gray-400">
+                      <svg className="w-4 h-4 text-green-500/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Deposit button */}
                 {!isLoggedIn ? (
                   <button
-                    onClick={() => router.push(`/signin?redirect=/vaults/${vaultId}`)}
-                    className="w-full py-3 bg-accent-primary text-white rounded-lg font-medium shadow-button-primary hover:shadow-button-primary-hover transition-all cursor-pointer"
+                    onClick={() => router.push(`/signin?redirect=/vaults/${profileId}`)}
+                    className="w-full py-4 bg-white text-black rounded-full font-medium hover:bg-gray-100 transition-all cursor-pointer"
                   >
-                    Sign In to Deposit
+                    Sign in to deposit
                   </button>
                 ) : (
                   <button
                     onClick={handleDeposit}
-                    disabled={loading || !depositAmount}
-                    className="w-full py-3 bg-accent-primary text-white rounded-lg font-medium shadow-button-primary hover:shadow-button-primary-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                    disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                    className="w-full py-4 bg-white text-black rounded-full font-medium hover:bg-gray-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    {loading ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      "Deposit"
-                    )}
+                    Deposit
                   </button>
                 )}
-
-                <p className="text-xs text-gray-500 text-center">
-                  Funds are deposited instantly and start earning immediately
-                </p>
               </div>
             )}
 
-            {/* Withdraw Form */}
-            {activeAction === "withdraw" && (
-              <div className="space-y-4">
+            {/* Withdraw Tab */}
+            {activeTab === "withdraw" && !loading && (
+              <div className="space-y-6">
+                {/* Amount input */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
-                    Amount ({vault.asset})
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-dark-800/50 border border-white/10 rounded-lg px-4 py-3 text-fdfffc placeholder:text-gray-600 focus:outline-none focus:border-accent-primary/50 transition-colors"
-                    />
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm text-gray-500">Amount (USD)</label>
                     <button
                       onClick={() => setWithdrawAmount(balance.toString())}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-accent-primary hover:text-white transition-colors cursor-pointer"
+                      className="text-xs text-gray-400 hover:text-white transition-colors cursor-pointer"
                     >
-                      MAX
+                      Max
                     </button>
                   </div>
+                  <input
+                    type="number"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-transparent border border-white/10 rounded-xl px-4 py-4 text-xl text-white placeholder:text-gray-600 focus:outline-none focus:border-white/20 transition-colors"
+                  />
+                  <p className="text-xs text-gray-600 mt-2">
+                    Available: ${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
 
+                {/* Confirmation text */}
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Funds return to your wallet. You can convert to fiat anytime.
+                </p>
+
+                {/* Timeline */}
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <svg className="w-4 h-4 text-green-500/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Available immediately
+                </div>
+
+                {/* Withdraw button */}
                 <button
                   onClick={handleWithdraw}
-                  disabled={loading || !withdrawAmount || balance === 0}
-                  className="w-full py-3 bg-white/5 text-fdfffc border border-white/10 rounded-lg font-medium hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > balance || balance === 0}
+                  className="w-full py-4 bg-white/5 text-white rounded-full font-medium border border-white/10 hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    "Withdraw"
-                  )}
+                  Withdraw
                 </button>
-
-                <p className="text-xs text-gray-500 text-center">
-                  Withdrawals are processed instantly. {vault.fees.withdrawal} fee applies
-                </p>
               </div>
             )}
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* How This Profile Works */}
+      <section className="pb-6">
+        <button
+          onClick={() => setShowHowItWorks(!showHowItWorks)}
+          className="w-full bg-white/[0.02] rounded-2xl border border-white/5 p-6 text-left cursor-pointer hover:border-white/10 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-white font-medium">How this profile works</span>
+            <svg 
+              className={`w-5 h-5 text-gray-500 transition-transform ${showHowItWorks ? 'rotate-180' : ''}`} 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+        
+        {showHowItWorks && (
+          <div className="mt-2 bg-white/[0.02] rounded-2xl border border-white/5 p-6 space-y-6">
+            <div>
+              <h4 className="text-sm text-gray-400 mb-2">Strategy</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">{profile.howItWorks.strategy}</p>
+            </div>
+            <div>
+              <h4 className="text-sm text-gray-400 mb-2">Protocols used</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">{profile.howItWorks.protocols}</p>
+            </div>
+            <div>
+              <h4 className="text-sm text-gray-400 mb-2">Rebalancing</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">{profile.howItWorks.rebalancing}</p>
+            </div>
+            <div>
+              <h4 className="text-sm text-gray-400 mb-2">Risks</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">{profile.howItWorks.risks}</p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Advanced / On-chain Details */}
+      <section>
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full bg-white/[0.02] rounded-2xl border border-white/5 p-6 text-left cursor-pointer hover:border-white/10 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-white font-medium">On-chain details</span>
+              <span className="text-xs text-gray-600 ml-2">Advanced</span>
+            </div>
+            <svg 
+              className={`w-5 h-5 text-gray-500 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+        
+        {showAdvanced && (
+          <div className="mt-2 bg-white/[0.02] rounded-2xl border border-white/5 p-6 space-y-6">
+            <div>
+              <h4 className="text-sm text-gray-400 mb-3">Allocation breakdown</h4>
+              <div className="space-y-2">
+                {profile.advanced.allocations.map((alloc, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">{alloc.name}</span>
+                    <span className="text-white">{alloc.percentage}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm text-gray-400 mb-2">Contract</h4>
+              <a 
+                href="#" 
+                className="text-sm text-gray-500 hover:text-white transition-colors font-mono"
+              >
+                {profile.advanced.contractAddress}
+              </a>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
-
