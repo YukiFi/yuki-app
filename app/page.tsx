@@ -149,29 +149,34 @@ function GrowthChart({
             />
           ))}
 
-          {/* Hover indicator */}
+          {/* Hover vertical line */}
           {hoveredIndex !== null && chartData.pointsArray[hoveredIndex] && (
-            <>
-              <line
-                x1={chartData.pointsArray[hoveredIndex].x}
-                y1="0"
-                x2={chartData.pointsArray[hoveredIndex].x}
-                y2="100"
-                stroke="white"
-                strokeOpacity="0.1"
-                strokeWidth="0.3"
-              />
-              <circle
-                cx={chartData.pointsArray[hoveredIndex].x}
-                cy={chartData.pointsArray[hoveredIndex].y}
-                r="1.2"
-                fill="#1148D0"
-                stroke="white"
-                strokeWidth="0.4"
-              />
-            </>
+            <line
+              x1={chartData.pointsArray[hoveredIndex].x}
+              y1="0"
+              x2={chartData.pointsArray[hoveredIndex].x}
+              y2="100"
+              stroke="white"
+              strokeOpacity="0.1"
+              strokeWidth="0.3"
+              vectorEffect="non-scaling-stroke"
+            />
           )}
         </svg>
+        
+        {/* Hover dot - positioned absolutely to avoid SVG distortion */}
+        {hoveredIndex !== null && chartData.pointsArray[hoveredIndex] && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: `${chartData.pointsArray[hoveredIndex].x}%`,
+              top: `${chartData.pointsArray[hoveredIndex].y}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <div className="w-2.5 h-2.5 rounded-full bg-[#1148D0] border-2 border-white shadow-lg" />
+          </div>
+        )}
         
         {/* Hovered value tooltip */}
         {hoveredIndex !== null && data[hoveredIndex] && (
