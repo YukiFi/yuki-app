@@ -76,7 +76,7 @@ export default function ActivityPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">{activity.profile} Savings</span>
+                <span className="text-xs text-gray-500">{activity.profile} Strategy</span>
                 <span className="text-xs text-gray-500">{activity.date}</span>
               </div>
             </div>

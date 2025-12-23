@@ -156,7 +156,7 @@ export default function ProfileDetailPage({ params }: { params: Promise<{ id: st
       <div className="min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
         <p className="text-gray-500 mb-4">Profile not found</p>
         <Link href="/vaults" className="text-sm text-white hover:text-gray-300 transition-colors">
-          ← Back to Savings Profiles
+          ← Back to Strategy
         </Link>
       </div>
     );
@@ -188,7 +188,7 @@ export default function ProfileDetailPage({ params }: { params: Promise<{ id: st
       setLoading(false);
       setLoadingMessage("");
       setSuccess(true);
-      setSuccessMessage(`Funds successfully added to ${profile.name} Savings`);
+      setSuccessMessage(`Allocation updated for ${profile.name}`);
       
       setTimeout(() => setSuccess(false), 3000);
     }, 1500);
@@ -233,13 +233,13 @@ export default function ProfileDetailPage({ params }: { params: Promise<{ id: st
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
           </svg>
-          Savings Profiles
+          Strategy
         </Link>
       </div>
 
       {/* Header Section */}
       <section className="pb-8">
-        <h1 className="text-3xl font-medium text-white mb-2">{profile.name} Savings</h1>
+        <h1 className="text-3xl font-medium text-white mb-2">{profile.name} Strategy</h1>
         <p className="text-gray-500 mb-6">{profile.tagline}</p>
         
         {/* Tags */}

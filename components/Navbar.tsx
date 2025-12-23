@@ -6,7 +6,7 @@ import { useAccount, useDisconnect } from "wagmi";
 
 const navigation = [
   { name: "Dashboard", href: "/" },
-  { name: "Savings", href: "/vaults" },
+  { name: "Strategy", href: "/vaults" },
 ];
 
 export default function Navbar() {
@@ -15,6 +15,7 @@ export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [authMethod, setAuthMethod] = useState<string | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   
@@ -30,9 +31,12 @@ export default function Navbar() {
       const status = localStorage.getItem("yuki_onboarding_complete");
       const method = localStorage.getItem("yuki_auth_method");
       const email = localStorage.getItem("yuki_user_email");
+      const storedUsername = localStorage.getItem("yuki_username");
+      
       setIsLoggedIn(status === "true");
       setAuthMethod(method);
       setUserEmail(email);
+      setUsername(storedUsername);
     };
 
     checkLoginStatus();
@@ -60,6 +64,7 @@ export default function Navbar() {
     localStorage.removeItem("yuki_user_email");
     localStorage.removeItem("yuki_wallet_address");
     localStorage.removeItem("yuki_balances");
+    localStorage.removeItem("yuki_username");
     
     if (isConnected) {
       disconnect();
@@ -72,6 +77,9 @@ export default function Navbar() {
 
   // Get first letter for the simple profile icon
   const getInitial = () => {
+    if (username) {
+      return username.replace('@', '').charAt(0).toUpperCase();
+    }
     if (userEmail) {
       return userEmail.charAt(0).toUpperCase();
     }
@@ -147,6 +155,9 @@ export default function Navbar() {
                     >
                       <p className="text-sm text-white mb-2">Account</p>
                       <div className="space-y-1.5">
+                        {username && (
+                          <p className="text-sm text-white font-medium mb-1">{username}</p>
+                        )}
                         {userEmail && (
                           <p className="text-xs text-gray-500">{userEmail}</p>
                         )}
@@ -278,6 +289,9 @@ export default function Navbar() {
             <div className="border-t border-white/5 pt-6 space-y-1">
               {/* Account info */}
               <div className="pb-4 mb-2">
+                {username && (
+                  <p className="text-sm text-white font-medium mb-1">{username}</p>
+                )}
                 {userEmail && (
                   <p className="text-sm text-gray-500">{userEmail}</p>
                 )}

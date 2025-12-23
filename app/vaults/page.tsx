@@ -6,28 +6,28 @@ const savingsProfiles = [
   {
     id: "yuki-stable",
     name: "Stable",
-    description: "Designed to preserve capital with steady, conservative yield.",
-    yieldRange: "Historically ~3–6%",
+    description: "Preserve capital with steady yield.",
+    yieldRange: "~4–6%",
     volatility: "Low",
-    audience: "For users who want minimal surprises",
+    audience: "Conservative",
     isMostCommon: true,
   },
   {
     id: "eth-yield",
     name: "Balanced",
-    description: "A middle ground between stability and growth potential.",
-    yieldRange: "Historically ~5–9%",
+    description: "Balance between stability and growth.",
+    yieldRange: "~6–9%",
     volatility: "Moderate",
-    audience: "For users comfortable with some variability",
+    audience: "Balanced",
     isMostCommon: false,
   },
   {
     id: "sol-turbo",
     name: "Growth",
-    description: "Prioritizes higher returns with increased volatility.",
-    yieldRange: "Historically ~8–15%",
+    description: "Higher returns with increased volatility.",
+    yieldRange: "~8–12%",
     volatility: "Higher",
-    audience: "For users who can accept short-term fluctuations",
+    audience: "Aggressive",
     isMostCommon: false,
   },
 ];
@@ -44,46 +44,31 @@ function ProfileCard({
       className="bg-white/[0.02] rounded-2xl border border-white/5 hover:border-white/10 transition-all cursor-pointer group"
       onClick={onClick}
     >
-      <div className="p-8">
-        {/* Top: Name + Description */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-2xl font-medium text-white">{profile.name}</h2>
-            {profile.isMostCommon && (
-              <span className="px-2.5 py-1 text-xs text-gray-400 bg-white/5 rounded-full">
-                Most common
-              </span>
-            )}
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-lg font-medium text-white">{profile.name}</h2>
+              {profile.isMostCommon && (
+                <span className="px-2 py-0.5 text-[10px] text-gray-400 bg-white/5 rounded-full uppercase tracking-wider">
+                  Popular
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-500">{profile.description}</p>
           </div>
-          <p className="text-gray-500 leading-relaxed">{profile.description}</p>
-        </div>
-
-        {/* Middle: Decision Zone */}
-        <div className="space-y-4 mb-8">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Expected yield</span>
-            <span className="text-sm text-white">{profile.yieldRange}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Volatility</span>
-            <span className="text-sm text-white">{profile.volatility}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Best for</span>
-            <span className="text-sm text-gray-400">{profile.audience}</span>
+          <div className="text-right">
+             <span className="text-sm text-emerald-500/80">{profile.yieldRange}</span>
           </div>
         </div>
 
-        {/* Bottom: CTA + Trust signals */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs text-gray-600">
-            <span>Non-custodial</span>
-            <span className="w-1 h-1 rounded-full bg-gray-700" />
-            <span>On-chain</span>
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center gap-3 text-xs text-gray-600">
+             <span>{profile.volatility} volatility</span>
           </div>
-          <button className="flex items-center gap-2 text-sm text-gray-400 group-hover:text-white transition-colors cursor-pointer">
-            View details
-            <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <button className="text-xs text-gray-400 group-hover:text-white transition-colors flex items-center gap-1">
+            Configure
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -93,21 +78,21 @@ function ProfileCard({
   );
 }
 
-export default function SavingsProfiles() {
+export default function AllocationStrategy() {
   const router = useRouter();
 
   return (
-    <div className="w-full mx-auto px-4 pb-24 animate-fade-in">
+    <div className="w-full max-w-xl mx-auto px-4 pb-24 animate-fade-in">
       {/* Header */}
-      <section className="pt-12 pb-10">
-        <h1 className="text-3xl font-medium text-white mb-3">Savings Profiles</h1>
-        <p className="text-gray-500">
-          Choose how conservatively or aggressively you want your savings managed.
+      <section className="pt-12 pb-8">
+        <h1 className="text-2xl font-medium text-white mb-2">Allocation Strategy</h1>
+        <p className="text-gray-500 text-sm">
+          Configure how your balance behaves.
         </p>
       </section>
 
-      {/* Profile Cards - Stacked Vertically */}
-      <section className="space-y-4">
+      {/* Profile Cards */}
+      <section className="space-y-3">
         {savingsProfiles.map((profile) => (
           <ProfileCard
             key={profile.id}
