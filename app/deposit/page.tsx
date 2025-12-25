@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function VaultsRedirect() {
+export default function DepositRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/deposit");
+    router.replace("/funds");
   }, [router]);
 
   return null;

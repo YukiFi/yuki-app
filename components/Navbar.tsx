@@ -6,7 +6,7 @@ import { useAccount, useDisconnect } from "wagmi";
 
 const navigation = [
   { name: "Dashboard", href: "/" },
-  { name: "Strategy", href: "/vaults" },
+  { name: "Activity", href: "/activity" },
 ];
 
 export default function Navbar() {
@@ -27,16 +27,31 @@ export default function Navbar() {
       setScrolled(window.scrollY > 20);
     };
 
-    const checkLoginStatus = () => {
+    const checkLoginStatus = async () => {
       const status = localStorage.getItem("yuki_onboarding_complete");
       const method = localStorage.getItem("yuki_auth_method");
       const email = localStorage.getItem("yuki_user_email");
-      const storedUsername = localStorage.getItem("yuki_username");
       
       setIsLoggedIn(status === "true");
       setAuthMethod(method);
       setUserEmail(email);
-      setUsername(storedUsername);
+      
+      // Fetch username from server if logged in
+      if (status === "true" && email) {
+        try {
+          const res = await fetch(`/api/auth/username?email=${encodeURIComponent(email)}`);
+          if (res.ok) {
+            const data = await res.json();
+            setUsername(data.username || null);
+          } else {
+            setUsername(null);
+          }
+        } catch {
+          setUsername(null);
+        }
+      } else {
+        setUsername(null);
+      }
     };
 
     checkLoginStatus();
@@ -96,13 +111,13 @@ export default function Navbar() {
 
   return (
     <header
-      className={`fixed top-7 w-full z-50 transition-all duration-300 border-b ${
+      className={`fixed w-full z-50 transition-all duration-300 border-b ${
         scrolled
           ? "bg-dark-900/80 backdrop-blur-md border-white/5 py-3"
           : "bg-transparent border-transparent py-5"
       }`}
     >
-      <div className="max-w-5xl mx-auto px-6">
+      <div className="max-w-2xl mx-auto px-6">
         <div className="flex items-center justify-between relative">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
@@ -115,6 +130,9 @@ export default function Navbar() {
             />
             <span className="font-bold text-xl tracking-tight text-fdfffc">
               Yuki
+            </span>
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+              demo
             </span>
           </Link>
 

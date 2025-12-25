@@ -1,30 +1,73 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import SendFlow from "@/components/SendFlow";
 
-// Savings profile definitions
-const savingsProfiles = [
-  {
-    id: "yuki-stable",
-    name: "Stable",
-    description: "Capital preservation focused",
-    // APY is informational only
-    apyRange: "4–6%",
-  },
-  {
-    id: "eth-yield",
-    name: "Balanced",
-    description: "Balanced exposure",
-    apyRange: "6–9%",
-  },
-  {
-    id: "sol-turbo",
-    name: "Growth",
-    description: "Higher volatility tolerance",
-    apyRange: "8–12%",
-  },
+type ComfortLevel = "steady" | "balanced" | "flexible";
+
+const allocationProfiles = [
+  { id: "yuki-stable", name: "Stable", key: "stable" },
+  { id: "eth-yield", name: "Balanced", key: "balanced" },
+  { id: "sol-turbo", name: "Growth", key: "growth" },
 ];
+
+// Minimal balance chart component
+function BalanceChart({ data }: { data: { value: number; date: string }[] }) {
+  if (data.length < 2) return null;
+  
+  const values = data.map(d => d.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  
+  const width = 100;
+  const height = 40;
+  const padding = 2;
+  
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - padding - ((d.value - min) / range) * (height - padding * 2);
+    return `${x},${y}`;
+  }).join(" ");
+  
+  const lastPoint = data[data.length - 1];
+  const firstPoint = data[0];
+  const isUp = lastPoint.value >= firstPoint.value;
+  
+  return (
+    <div className="w-full h-12">
+      <svg 
+        viewBox={`0 0 ${width} ${height}`} 
+        className="w-full h-full"
+        preserveAspectRatio="none"
+      >
+        {/* Gradient fill */}
+        <defs>
+          <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#0F52FB" stopOpacity="0.1" />
+            <stop offset="100%" stopColor="#0F52FB" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        
+        {/* Area fill */}
+        <polygon
+          points={`0,${height} ${points} ${width},${height}`}
+          fill="url(#chartGradient)"
+        />
+        
+        {/* Line */}
+        <polyline
+          points={points}
+          fill="none"
+          stroke="#0F52FB"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </div>
+  );
+}
 
 // Activity item component - Simplified for secondary focus
 function ActivityItem({ 
@@ -82,7 +125,7 @@ export default function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isSendOpen, setIsSendOpen] = useState(false);
+  const [comfortLevel, setComfortLevel] = useState<ComfortLevel>("balanced");
 
   useEffect(() => {
     const checkLoginStatus = () => {
@@ -92,6 +135,12 @@ export default function Dashboard() {
       
       if (loggedIn) {
         const storedBalances = localStorage.getItem("yuki_balances");
+        const storedComfort = localStorage.getItem("yuki_comfort_level") as ComfortLevel | null;
+        
+        if (storedComfort) {
+          setComfortLevel(storedComfort);
+        }
+        
         if (storedBalances) {
           setBalances(JSON.parse(storedBalances));
         } else {
@@ -113,8 +162,8 @@ export default function Dashboard() {
 
   const totalBalance = Object.values(balances).reduce((acc, val) => acc + val, 0);
 
-  // Calculate allocation percentages
-  const allocations = savingsProfiles.map(profile => {
+  // Calculate allocation percentages based on actual balances
+  const allocations = allocationProfiles.map(profile => {
     const amount = balances[profile.id] || 0;
     const percentage = totalBalance > 0 ? (amount / totalBalance) * 100 : 0;
     return { ...profile, amount, percentage };
@@ -127,65 +176,83 @@ export default function Dashboard() {
     { type: "withdrawal" as const, amount: 500, date: "Nov 10" },
   ];
 
-  const handleUpdateBalances = (newBalances: Record<string, number>) => {
-    setBalances(newBalances);
-    localStorage.setItem("yuki_balances", JSON.stringify(newBalances));
-    window.dispatchEvent(new Event("yuki_login_update"));
-  };
+  // Mock balance history (last 30 days)
+  const balanceHistory = [
+    { value: 10200, date: "Nov 23" },
+    { value: 10350, date: "Nov 26" },
+    { value: 10280, date: "Nov 29" },
+    { value: 10450, date: "Dec 2" },
+    { value: 10520, date: "Dec 5" },
+    { value: 10680, date: "Dec 8" },
+    { value: 10590, date: "Dec 11" },
+    { value: 10820, date: "Dec 14" },
+    { value: 12820, date: "Dec 17" },
+    { value: 12650, date: "Dec 20" },
+    { value: totalBalance, date: "Today" },
+  ];
 
   if (isLoading) return null;
   if (!isLoggedIn) return <LandingHero />;
 
   return (
-    <div className="w-full max-w-xl mx-auto px-6 py-12 animate-fade-in text-center md:text-left">
+    <div className="w-full py-12 animate-fade-in text-center md:text-left">
       
       {/* 1. The Primary Truth: Total Balance */}
-      <section className="mb-16 mt-8">
+      <section className="mb-10 mt-4">
         <p className="text-sm text-gray-500 mb-2 font-medium">Total Balance</p>
-        <h1 className="text-6xl font-medium text-white tracking-tighter mb-2">
+        <h1 className="text-6xl font-medium text-white tracking-tighter mb-1">
           ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h1>
-        <p className="text-sm text-emerald-500/80 flex items-center gap-2 justify-center md:justify-start">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-          Available to use
-        </p>
+        
+        {/* Balance trend */}
+        <div className="mt-4 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-gray-600">Last 30 days</span>
+          </div>
+          <BalanceChart data={balanceHistory} />
+        </div>
       </section>
 
-      {/* 2. Actions (Usability is Global) */}
-      <section className="grid grid-cols-2 gap-3 mb-16">
+      {/* 2. Actions */}
+      <section className="grid grid-cols-2 gap-3 mb-12">
         <Link
-          href="/vaults" 
-          className="py-3 px-4 bg-white text-black rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors text-center"
+          href="/send"
+          className="py-3 px-4 bg-[#0F52FB] text-white rounded-lg text-sm font-medium hover:bg-[#0F52FB]/90 transition-colors text-center"
         >
-          Add Funds
+          Pay or Request
         </Link>
-        <button
-          onClick={() => setIsSendOpen(true)}
-          className="py-3 px-4 bg-white/5 text-white rounded-lg text-sm font-medium hover:bg-white/10 transition-colors border border-white/5 cursor-pointer"
+        <Link
+          href="/funds"
+          className="py-3 px-4 bg-white/5 text-white rounded-lg text-sm font-medium hover:bg-white/10 transition-colors border border-white/10 text-center"
         >
-          Send / Withdraw
-        </button>
+          Add or Withdraw
+        </Link>
       </section>
 
       {/* 3. Allocation (Savings as Behavior/Configuration) */}
-      {allocations.length > 0 && (
-        <section className="mb-16">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Allocation Strategy</h2>
-            <Link href="/vaults" className="text-xs text-gray-500 hover:text-white transition-colors">
-              Configure
-            </Link>
-          </div>
-          
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">
+            {comfortLevel === "steady" ? "Steady" : comfortLevel === "balanced" ? "Balanced" : "Flexible"}
+          </h2>
+          <Link 
+            href="/configure"
+            className="text-xs text-gray-500 hover:text-white transition-colors"
+          >
+            Configure
+          </Link>
+        </div>
+        
+        {allocations.length > 0 ? (
           <div className="space-y-4">
             {/* Visual Bar */}
-            <div className="flex h-2 w-full rounded-full overflow-hidden bg-white/5">
+            <div className="flex h-2 w-full rounded-full overflow-hidden bg-[#0F52FB]/10">
               {allocations.map((alloc, i) => (
                 <div 
                   key={alloc.id}
                   style={{ width: `${alloc.percentage}%` }}
                   className={`h-full ${
-                    i === 0 ? "bg-white/40" : i === 1 ? "bg-white/20" : "bg-white/10"
+                    i === 0 ? "bg-[#0F52FB]" : i === 1 ? "bg-[#0F52FB]/60" : "bg-[#0F52FB]/30"
                   }`}
                 />
               ))}
@@ -197,12 +264,9 @@ export default function Dashboard() {
                 <div key={alloc.id} className="flex items-center justify-between text-sm group">
                   <div className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full ${
-                      i === 0 ? "bg-white/40" : i === 1 ? "bg-white/20" : "bg-white/10"
+                      i === 0 ? "bg-[#0F52FB]" : i === 1 ? "bg-[#0F52FB]/60" : "bg-[#0F52FB]/30"
                     }`} />
                     <span className="text-gray-300">{alloc.name}</span>
-                    <span className="text-xs text-gray-600 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      ~{alloc.apyRange} yield
-                    </span>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-gray-500">{Math.round(alloc.percentage)}%</span>
@@ -214,8 +278,10 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="text-sm text-gray-600">Add funds to get started.</p>
+        )}
+      </section>
 
       {/* 4. Activity (Secondary & Confirmational) */}
       <section>
@@ -232,13 +298,6 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Send Flow Modal */}
-      <SendFlow 
-        isOpen={isSendOpen} 
-        onClose={() => setIsSendOpen(false)}
-        balances={balances}
-        onUpdateBalances={handleUpdateBalances}
-      />
     </div>
   );
 }

@@ -76,6 +76,34 @@ export async function getUserByEmail(email: string): Promise<User | null> {
   return db.users.get(userId) || null;
 }
 
+// Get or create a user by email (for demo purposes)
+export async function getOrCreateUserByEmail(email: string): Promise<User> {
+  const normalizedEmail = email.toLowerCase();
+  let user = await getUserByEmail(normalizedEmail);
+  
+  if (!user) {
+    // Create a new user with the email as ID (simplified for demo)
+    const id = `user_${normalizedEmail.replace(/[^a-z0-9]/g, '_')}`;
+    user = {
+      id,
+      email: normalizedEmail,
+      password_hash: '',
+      created_at: new Date(),
+      updated_at: new Date(),
+      email_verified: true,
+      locked_until: null,
+      failed_attempts: 0,
+      username: null,
+      username_last_changed: null
+    };
+    
+    db.users.set(id, user);
+    db.indices.usersByEmail.set(normalizedEmail, id);
+  }
+  
+  return user;
+}
+
 export async function updateUserFailedAttempts(
   userId: string,
   failedAttempts: number,
