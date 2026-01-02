@@ -163,58 +163,29 @@ export default function Navbar() {
 
                 {/* Dropdown Menu - clean, minimal */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 top-full mt-3 w-64 bg-[#1a1a1a] rounded-lg shadow-2xl animate-fade-in z-50 overflow-hidden">
+                  <div className="absolute right-0 top-full mt-3 w-56 bg-[#1a1a1a] rounded-lg shadow-2xl z-50 overflow-hidden border border-white/5">
                     
-                    {/* Account Section */}
+                    {/* User identity at top */}
+                    <div className="px-4 py-3 border-b border-white/5">
+                      <p className="text-sm text-white font-medium truncate">
+                        {username || (address ? formatAddress(address) : userEmail)}
+                      </p>
+                    </div>
+                    
+                    {/* Settings */}
                     <Link
-                      href="/account"
+                      href="/settings"
                       onClick={() => setIsProfileOpen(false)}
-                      className="block hover:bg-white/[0.03] transition-colors"
+                      className="block px-4 py-3 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
                     >
-                      <div className="px-5 py-3 bg-white/[0.02]">
-                        <p className="text-xs text-gray-500 uppercase tracking-widest">Account</p>
-                      </div>
-                      <div className="px-5 py-4 space-y-1.5">
-                        {username && (
-                          <p className="text-sm text-white font-medium">{username}</p>
-                        )}
-                        {userEmail && (
-                          <p className="text-xs text-gray-500">{userEmail}</p>
-                        )}
-                        {address && (
-                          <p className="text-xs text-gray-500 font-mono">{formatAddress(address)}</p>
-                        )}
-                        <p className="text-xs text-gray-600">Connected (Demo)</p>
-                      </div>
+                      Settings
                     </Link>
-                    
-                    <div className="h-px bg-white/5" />
-                    
-                    {/* Security */}
-                    <Link
-                      href="/security"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
-                    >
-                      Security
-                    </Link>
-                    
-                    {/* Activity */}
-                    <Link
-                      href="/activity"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
-                    >
-                      Activity
-                    </Link>
-                    
-                    <div className="h-px bg-white/5" />
                     
                     {/* Documents */}
                     <Link
                       href="/documents"
                       onClick={() => setIsProfileOpen(false)}
-                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                      className="block px-4 py-3 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
                     >
                       Documents
                     </Link>
@@ -223,17 +194,17 @@ export default function Navbar() {
                     <Link
                       href="/help"
                       onClick={() => setIsProfileOpen(false)}
-                      className="block px-5 py-3.5 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
+                      className="block px-4 py-3 text-sm text-gray-400 hover:text-white hover:bg-white/[0.03] transition-colors"
                     >
                       Help
                     </Link>
                     
                     <div className="h-px bg-white/5" />
                     
-                    {/* Log out - separated, last */}
+                    {/* Log out */}
                     <button 
                       onClick={handleLogout}
-                      className="w-full text-left px-5 py-3.5 text-sm text-gray-500 hover:text-white hover:bg-white/[0.03] transition-colors cursor-pointer"
+                      className="w-full text-left px-4 py-3 text-sm text-gray-500 hover:text-white hover:bg-white/[0.03] transition-colors cursor-pointer"
                     >
                       Log out
                     </button>
@@ -307,39 +278,19 @@ export default function Navbar() {
           
           {isLoggedIn ? (
             <div className="border-t border-white/5 pt-6 space-y-1">
-              {/* Account info */}
+              {/* User identity */}
               <div className="pb-4 mb-2">
-                {username && (
-                  <p className="text-sm text-white font-medium mb-1">{username}</p>
-                )}
-                {userEmail && (
-                  <p className="text-sm text-gray-500">{userEmail}</p>
-                )}
-                {address && (
-                  <p className="text-xs text-gray-600 font-mono mt-1">{formatAddress(address)}</p>
-                )}
+                <p className="text-sm text-white font-medium">
+                  {username || (address ? formatAddress(address) : userEmail)}
+                </p>
               </div>
               
               <Link
-                href="/account"
+                href="/settings"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="block py-3 text-gray-400 hover:text-white text-sm"
               >
-                Account
-              </Link>
-              <Link
-                href="/security"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-3 text-gray-400 hover:text-white text-sm"
-              >
-                Security
-              </Link>
-              <Link
-                href="/activity"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="block py-3 text-gray-400 hover:text-white text-sm"
-              >
-                Activity
+                Settings
               </Link>
               <Link
                 href="/documents"

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 // Minimal balance chart component
 function BalanceChart({ data }: { data: { value: number; date: string }[] }) {
@@ -88,6 +89,7 @@ function ActivityItem({
     </div>
   );
 }
+
 
 // Landing Hero for non-authenticated users
 function LandingHero() {
@@ -245,11 +247,36 @@ export default function Dashboard() {
           <div className="p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#0F52FB]/10 flex items-center justify-center">
-                  <span className="text-sm font-bold text-[#0F52FB]">yUSD</span>
-                </div>
+                <Image
+                  src="/images/yUSD.png"
+                  alt="yUSD"
+                  width={40}
+                  height={40}
+                  className="p-1 bg-white/[0.03] rounded-full"
+                />
                 <div>
-                  <p className="text-base font-medium text-white">yUSD</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-base font-medium text-white">yUSD</p>
+                    <Link
+                      href="/vaults/yuki-stable"
+                      className="text-gray-500 hover:text-gray-300 transition-colors"
+                      aria-label="Learn more about yUSD"
+                    >
+                      <svg 
+                        className="w-3.5 h-3.5" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth={2} 
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                        />
+                      </svg>
+                    </Link>
+                  </div>
                   <p className="text-xs text-gray-500">Yuki USD Vault</p>
                 </div>
               </div>
@@ -261,33 +288,6 @@ export default function Dashboard() {
                   {totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })} yUSD
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Vault Info */}
-      <section className="mb-8">
-        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
-          <div className="px-5 py-3 bg-white/[0.02]">
-            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Vault Strategy</h2>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Strategy</span>
-              <span className="text-sm text-white">Automated Yield Optimization</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Risk Level</span>
-              <span className="text-sm text-emerald-500">Low</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Rebalancing</span>
-              <span className="text-sm text-white">Automatic</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Lock Period</span>
-              <span className="text-sm text-white">None</span>
             </div>
           </div>
         </div>
