@@ -36,9 +36,9 @@ export default function SecurityPage() {
   }
 
   return (
-    <div className="w-full mx-auto px-4 pb-24 animate-fade-in">
+    <div className="w-full py-12 animate-fade-in">
       {/* Back link */}
-      <div className="pt-8 pb-4">
+      <div className="mb-8">
         <Link 
           href="/" 
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-white transition-colors"
@@ -51,37 +51,49 @@ export default function SecurityPage() {
       </div>
 
       {/* Header */}
-      <section className="pb-10">
+      <section className="mb-10">
         <h1 className="text-2xl font-medium text-white mb-2">Security</h1>
         <p className="text-gray-500 text-sm">Your account security settings</p>
       </section>
 
       {/* Security Details */}
-      <section className="space-y-6">
+      <section className="space-y-4">
         {/* Login Method */}
-        <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-6">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Login method</p>
-          <p className="text-white">
-            {authMethod === "email" ? "Email & password" : "Wallet"}
-          </p>
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Login Method</h2>
+          </div>
+          <div className="p-5">
+            <p className="text-white">
+              {authMethod === "email" ? "Email & password" : "Wallet"}
+            </p>
+          </div>
         </div>
 
         {/* Recovery Method */}
-        <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-6">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Recovery method</p>
-          <p className="text-gray-400">Coming soon</p>
-          <p className="text-xs text-gray-600 mt-2">
-            We&apos;re working on additional recovery options for your account.
-          </p>
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Recovery Method</h2>
+          </div>
+          <div className="p-5">
+            <p className="text-gray-400">Coming soon</p>
+            <p className="text-xs text-gray-600 mt-2">
+              We&apos;re working on additional recovery options for your account.
+            </p>
+          </div>
         </div>
 
         {/* Session */}
-        <div className="bg-white/[0.02] rounded-2xl border border-white/5 p-6">
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Session</p>
-          <p className="text-white">You&apos;re signed in on this device</p>
-          <p className="text-xs text-gray-600 mt-2">
-            Your session is active and secure.
-          </p>
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Session</h2>
+          </div>
+          <div className="p-5">
+            <p className="text-white">You&apos;re signed in on this device</p>
+            <p className="text-xs text-gray-600 mt-2">
+              Your session is active and secure.
+            </p>
+          </div>
         </div>
       </section>
     </div>

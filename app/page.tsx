@@ -2,14 +2,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-type ComfortLevel = "steady" | "balanced" | "flexible";
-
-const allocationProfiles = [
-  { id: "yuki-stable", name: "Stable", key: "stable" },
-  { id: "eth-yield", name: "Balanced", key: "balanced" },
-  { id: "sol-turbo", name: "Growth", key: "growth" },
-];
-
 // Minimal balance chart component
 function BalanceChart({ data }: { data: { value: number; date: string }[] }) {
   if (data.length < 2) return null;
@@ -123,9 +115,8 @@ function LandingHero() {
 
 export default function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [totalBalance, setTotalBalance] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [comfortLevel, setComfortLevel] = useState<ComfortLevel>("balanced");
 
   useEffect(() => {
     const checkLoginStatus = () => {
@@ -134,23 +125,18 @@ export default function Dashboard() {
       setIsLoggedIn(loggedIn);
       
       if (loggedIn) {
-        const storedBalances = localStorage.getItem("yuki_balances");
-        const storedComfort = localStorage.getItem("yuki_comfort_level") as ComfortLevel | null;
+        const storedBalance = localStorage.getItem("yuki_balance");
         
-        if (storedComfort) {
-          setComfortLevel(storedComfort);
-        }
-        
-        if (storedBalances) {
-          setBalances(JSON.parse(storedBalances));
+        if (storedBalance) {
+          setTotalBalance(parseFloat(storedBalance));
         } else {
           // Default initial state
-          const initial = { "yuki-stable": 8200, "eth-yield": 4238.72 };
-          setBalances(initial);
-          localStorage.setItem("yuki_balances", JSON.stringify(initial));
+          const initial = 12438.72;
+          setTotalBalance(initial);
+          localStorage.setItem("yuki_balance", initial.toString());
         }
       } else {
-        setBalances({});
+        setTotalBalance(0);
       }
       setIsLoading(false);
     };
@@ -159,15 +145,6 @@ export default function Dashboard() {
     window.addEventListener("yuki_login_update", checkLoginStatus);
     return () => window.removeEventListener("yuki_login_update", checkLoginStatus);
   }, []);
-
-  const totalBalance = Object.values(balances).reduce((acc, val) => acc + val, 0);
-
-  // Calculate allocation percentages based on actual balances
-  const allocations = allocationProfiles.map(profile => {
-    const amount = balances[profile.id] || 0;
-    const percentage = totalBalance > 0 ? (amount / totalBalance) * 100 : 0;
-    return { ...profile, amount, percentage };
-  }).filter(a => a.percentage > 0);
 
   // Mock activity data
   const recentActivity = [
@@ -194,11 +171,18 @@ export default function Dashboard() {
   if (isLoading) return null;
   if (!isLoggedIn) return <LandingHero />;
 
+  // Calculate earnings
+  const thirtyDayChange = totalBalance - balanceHistory[0].value;
+  const thirtyDayPercent = ((thirtyDayChange / balanceHistory[0].value) * 100);
+  const estimatedAPY = 7.8; // Mock APY
+  const estimatedYearlyEarnings = totalBalance * (estimatedAPY / 100);
+  const estimatedMonthlyEarnings = estimatedYearlyEarnings / 12;
+
   return (
-    <div className="w-full py-12 animate-fade-in text-center md:text-left">
+    <div className="w-full py-12 animate-fade-in">
       
       {/* 1. The Primary Truth: Total Balance */}
-      <section className="mb-10 mt-4">
+      <section className="mb-8 mt-4">
         <p className="text-sm text-gray-500 mb-2 font-medium">Total Balance</p>
         <h1 className="text-6xl font-medium text-white tracking-tighter mb-1">
           ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -208,93 +192,126 @@ export default function Dashboard() {
         <div className="mt-4 mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-gray-600">Last 30 days</span>
+            <span className={`text-xs font-medium ${thirtyDayChange >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              {thirtyDayChange >= 0 ? '+' : ''}{thirtyDayPercent.toFixed(2)}%
+            </span>
           </div>
           <BalanceChart data={balanceHistory} />
         </div>
       </section>
 
-      {/* 2. Actions */}
-      <section className="grid grid-cols-2 gap-3 mb-12">
+      {/* 2. Performance Stats */}
+      <section className="grid grid-cols-3 gap-3 mb-8">
+        <div className="bg-white/[0.03] rounded-lg p-4">
+          <p className="text-xs text-gray-500 mb-1">Current APY</p>
+          <p className="text-2xl font-medium text-white">{estimatedAPY}%</p>
+        </div>
+        <div className="bg-white/[0.03] rounded-lg p-4">
+          <p className="text-xs text-gray-500 mb-1">Est. Monthly</p>
+          <p className="text-2xl font-medium text-white">
+            ${estimatedMonthlyEarnings.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+          </p>
+        </div>
+        <div className="bg-white/[0.03] rounded-lg p-4">
+          <p className="text-xs text-gray-500 mb-1">30d Change</p>
+          <p className={`text-2xl font-medium ${thirtyDayChange >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            {thirtyDayChange >= 0 ? '+' : ''}${Math.abs(thirtyDayChange).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+          </p>
+        </div>
+      </section>
+
+      {/* 3. Actions */}
+      <section className="grid grid-cols-2 gap-3 mb-8">
         <Link
           href="/send"
-          className="py-3 px-4 bg-[#0F52FB] text-white rounded-lg text-sm font-medium hover:bg-[#0F52FB]/90 transition-colors text-center"
+          className="py-4 px-4 bg-[#0F52FB] text-white rounded-lg text-sm font-medium hover:bg-[#0F52FB]/90 transition-colors text-center"
         >
-          Pay or Request
+          Send Money
         </Link>
         <Link
           href="/funds"
-          className="py-3 px-4 bg-white/5 text-white rounded-lg text-sm font-medium hover:bg-white/10 transition-colors border border-white/10 text-center"
+          className="py-4 px-4 bg-white/[0.03] text-white rounded-lg text-sm font-medium hover:bg-white/[0.05] transition-colors text-center"
         >
-          Add or Withdraw
+          Add / Withdraw
         </Link>
       </section>
 
-      {/* 3. Allocation (Savings as Behavior/Configuration) */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">
-            {comfortLevel === "steady" ? "Steady" : comfortLevel === "balanced" ? "Balanced" : "Flexible"}
-          </h2>
-          <Link 
-            href="/configure"
-            className="text-xs text-gray-500 hover:text-white transition-colors"
-          >
-            Configure
-          </Link>
-        </div>
-        
-        {allocations.length > 0 ? (
-          <div className="space-y-4">
-            {/* Visual Bar */}
-            <div className="flex h-2 w-full rounded-full overflow-hidden bg-[#0F52FB]/10">
-              {allocations.map((alloc, i) => (
-                <div 
-                  key={alloc.id}
-                  style={{ width: `${alloc.percentage}%` }}
-                  className={`h-full ${
-                    i === 0 ? "bg-[#0F52FB]" : i === 1 ? "bg-[#0F52FB]/60" : "bg-[#0F52FB]/30"
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Legend / Details */}
-            <div className="grid gap-4">
-              {allocations.map((alloc, i) => (
-                <div key={alloc.id} className="flex items-center justify-between text-sm group">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      i === 0 ? "bg-[#0F52FB]" : i === 1 ? "bg-[#0F52FB]/60" : "bg-[#0F52FB]/30"
-                    }`} />
-                    <span className="text-gray-300">{alloc.name}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-gray-500">{Math.round(alloc.percentage)}%</span>
-                    <span className="text-gray-400 w-24 text-right">
-                      ${alloc.amount.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-                    </span>
-                  </div>
+      {/* 4. Holdings */}
+      <section className="mb-8">
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Holdings</h2>
+          </div>
+          <div className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#0F52FB]/10 flex items-center justify-center">
+                  <span className="text-sm font-bold text-[#0F52FB]">yUSD</span>
                 </div>
-              ))}
+                <div>
+                  <p className="text-base font-medium text-white">yUSD</p>
+                  <p className="text-xs text-gray-500">Yuki USD Vault</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-base font-medium text-white">
+                  ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })} yUSD
+                </p>
+              </div>
             </div>
           </div>
-        ) : (
-          <p className="text-sm text-gray-600">Add funds to get started.</p>
-        )}
+        </div>
       </section>
 
-      {/* 4. Activity (Secondary & Confirmational) */}
+      {/* 5. Vault Info */}
+      <section className="mb-8">
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Vault Strategy</h2>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Strategy</span>
+              <span className="text-sm text-white">Automated Yield Optimization</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Risk Level</span>
+              <span className="text-sm text-emerald-500">Low</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Rebalancing</span>
+              <span className="text-sm text-white">Automatic</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Lock Period</span>
+              <span className="text-sm text-white">None</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. Activity */}
       <section>
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-6">Recent Activity</h2>
-        <div className="">
-          {recentActivity.map((activity, index) => (
-            <ActivityItem
-              key={index}
-              type={activity.type}
-              amount={activity.amount}
-              date={activity.date}
-            />
-          ))}
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02] flex items-center justify-between">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Recent Activity</h2>
+            <Link href="/activity" className="text-xs text-gray-500 hover:text-white transition-colors">
+              View All
+            </Link>
+          </div>
+          <div className="px-5">
+            {recentActivity.map((activity, index) => (
+              <ActivityItem
+                key={index}
+                type={activity.type}
+                amount={activity.amount}
+                date={activity.date}
+              />
+            ))}
+          </div>
         </div>
       </section>
 

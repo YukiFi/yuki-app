@@ -12,7 +12,7 @@ export default function FundsPage() {
   const [step, setStep] = useState<"input" | "confirm" | "success">("input");
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [totalBalance, setTotalBalance] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -23,33 +23,21 @@ export default function FundsPage() {
     }
     setIsLoggedIn(true);
 
-    const storedBalances = localStorage.getItem("yuki_balances");
-    if (storedBalances) {
-      setBalances(JSON.parse(storedBalances));
+    const storedBalance = localStorage.getItem("yuki_balance");
+    if (storedBalance) {
+      setTotalBalance(parseFloat(storedBalance));
     }
   }, [router]);
-
-  const totalBalance = Object.values(balances).reduce((acc, val) => acc + val, 0);
 
   const handleAdd = () => {
     setIsLoading(true);
 
     setTimeout(() => {
-      const comfortLevel = localStorage.getItem("yuki_comfort_level") || "balanced";
-      const distribution = {
-        steady: { stable: 80, balanced: 20, growth: 0 },
-        balanced: { stable: 40, balanced: 45, growth: 15 },
-        flexible: { stable: 20, balanced: 35, growth: 45 },
-      }[comfortLevel as "steady" | "balanced" | "flexible"] || { stable: 40, balanced: 45, growth: 15 };
-
       const addAmount = parseFloat(amount);
-      const newBalances = {
-        "yuki-stable": (balances["yuki-stable"] || 0) + (addAmount * distribution.stable / 100),
-        "eth-yield": (balances["eth-yield"] || 0) + (addAmount * distribution.balanced / 100),
-        "sol-turbo": (balances["sol-turbo"] || 0) + (addAmount * distribution.growth / 100),
-      };
+      const newBalance = totalBalance + addAmount;
 
-      localStorage.setItem("yuki_balances", JSON.stringify(newBalances));
+      localStorage.setItem("yuki_balance", newBalance.toString());
+      setTotalBalance(newBalance);
       window.dispatchEvent(new Event("yuki_login_update"));
 
       setIsLoading(false);
@@ -64,21 +52,10 @@ export default function FundsPage() {
     setIsLoading(true);
 
     setTimeout(() => {
-      let remainingToDeduct = withdrawAmount;
-      const newBalances = { ...balances };
-      const deductionOrder = ["yuki-stable", "eth-yield", "sol-turbo"];
-
-      for (const profileId of deductionOrder) {
-        if (remainingToDeduct <= 0) break;
-        const profileBalance = newBalances[profileId] || 0;
-        if (profileBalance > 0) {
-          const deduction = Math.min(profileBalance, remainingToDeduct);
-          newBalances[profileId] = profileBalance - deduction;
-          remainingToDeduct -= deduction;
-        }
-      }
-
-      localStorage.setItem("yuki_balances", JSON.stringify(newBalances));
+      const newBalance = totalBalance - withdrawAmount;
+      
+      localStorage.setItem("yuki_balance", newBalance.toString());
+      setTotalBalance(newBalance);
       window.dispatchEvent(new Event("yuki_login_update"));
 
       setIsLoading(false);
@@ -243,12 +220,6 @@ export default function FundsPage() {
               <span className="text-gray-400 text-sm">Free</span>
             </div>
           </div>
-
-          {mode === "add" && (
-            <p className="text-xs text-gray-600 text-center mb-6">
-              Funds will be distributed based on your comfort level.
-            </p>
-          )}
 
           <div className="flex gap-3">
             <button

@@ -312,142 +312,158 @@ export default function AccountPage() {
 
       {/* Username */}
       <section className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Username</h2>
-          {!isEditingUsername && (
-            <button 
-              onClick={startEditingUsername}
-              disabled={isChecking || daysUntilChange > 0}
-              className={`text-xs transition-colors cursor-pointer ${
-                daysUntilChange > 0 
-                  ? "text-gray-600 cursor-not-allowed" 
-                  : "text-[#0F52FB]/70 hover:text-[#0F52FB] disabled:opacity-50"
-              }`}
-            >
-              {isChecking ? "Loading..." : (username ? "Change" : "Set username")}
-            </button>
-          )}
-        </div>
-        
-        {isEditingUsername ? (
-          <div>
-            {daysUntilChange > 0 ? (
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02] flex items-center justify-between">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Username</h2>
+            {!isEditingUsername && (
+              <button 
+                onClick={startEditingUsername}
+                disabled={isChecking || daysUntilChange > 0}
+                className={`text-xs transition-colors cursor-pointer ${
+                  daysUntilChange > 0 
+                    ? "text-gray-600 cursor-not-allowed" 
+                    : "text-[#0F52FB]/70 hover:text-[#0F52FB] disabled:opacity-50"
+                }`}
+              >
+                {isChecking ? "Loading..." : (username ? "Change" : "Set username")}
+              </button>
+            )}
+          </div>
+          
+          <div className="p-5">
+            {isEditingUsername ? (
               <div>
-                <p className="text-sm text-yellow-500/80 mb-3">
-                  You can change your username again in {daysUntilChange} days.
-                </p>
-                <button 
-                  onClick={() => setIsEditingUsername(false)}
-                  className="text-xs text-gray-500 hover:text-white cursor-pointer"
-                >
-                  Cancel
-                </button>
+                {daysUntilChange > 0 ? (
+                  <div>
+                    <p className="text-sm text-yellow-500/80 mb-3">
+                      You can change your username again in {daysUntilChange} days.
+                    </p>
+                    <button 
+                      onClick={() => setIsEditingUsername(false)}
+                      className="text-xs text-gray-500 hover:text-white cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className={`flex items-center w-full bg-white/[0.02] rounded-lg px-4 py-3 mb-2 transition-colors`}>
+                      <span className="text-gray-500 select-none mr-0.5">@</span>
+                      <input
+                        type="text"
+                        value={newUsername}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/@/g, '');
+                          setNewUsername(value);
+                        }}
+                        onKeyDown={handleKeyDown}
+                        placeholder="username"
+                        className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 p-0"
+                        autoFocus
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    <div className="flex items-center min-h-[20px] mb-3">
+                      {isChecking ? (
+                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                          <span className="w-2 h-2 border border-gray-500 border-t-transparent rounded-full animate-spin"></span>
+                          Checking...
+                        </p>
+                      ) : usernameError ? (
+                        <p className="text-xs text-red-400">{usernameError}</p>
+                      ) : isAvailable === true && newUsername.trim().length >= 3 ? (
+                        <p className="text-xs text-[#0F52FB] flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Available
+                        </p>
+                      ) : null}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={handleSaveUsername}
+                        disabled={!canSubmit}
+                        className="px-4 py-2 bg-[#0F52FB] text-white text-sm font-medium rounded-lg hover:bg-[#0F52FB]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {isSubmitting ? "Saving..." : "Save"}
+                      </button>
+                      <button 
+                        onClick={() => setIsEditingUsername(false)}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 bg-white/[0.02] text-gray-400 text-sm font-medium rounded-lg hover:bg-white/[0.03] transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-3">
+                      Usernames can only be changed once every 30 days.
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
-              <>
-                <div className={`flex items-center w-full bg-white/[0.02] border rounded-xl px-4 py-3 mb-2 transition-colors ${
-                  usernameError ? 'border-red-500/50' : isAvailable === true ? 'border-[#0F52FB]/30' : 'border-white/10 focus-within:border-white/20'
-                }`}>
-                  <span className="text-gray-500 select-none mr-0.5">@</span>
-                  <input
-                    type="text"
-                    value={newUsername}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/@/g, '');
-                      setNewUsername(value);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder="username"
-                    className="bg-transparent border-none outline-none w-full text-white placeholder:text-gray-600 p-0"
-                    autoFocus
-                    disabled={isSubmitting}
-                  />
-                </div>
-                <div className="flex items-center min-h-[20px] mb-3">
-                  {isChecking ? (
-                    <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                      <span className="w-2 h-2 border border-gray-500 border-t-transparent rounded-full animate-spin"></span>
-                      Checking...
-                    </p>
-                  ) : usernameError ? (
-                    <p className="text-xs text-red-400">{usernameError}</p>
-                  ) : isAvailable === true && newUsername.trim().length >= 3 ? (
-                    <p className="text-xs text-[#0F52FB] flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Available
-                    </p>
-                  ) : null}
-                </div>
-                
-                <div className="flex gap-2">
-                  <button 
-                    onClick={handleSaveUsername}
-                    disabled={!canSubmit}
-                    className="px-4 py-2 bg-[#0F52FB] text-white text-sm font-medium rounded-lg hover:bg-[#0F52FB]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    {isSubmitting ? "Saving..." : "Save"}
-                  </button>
-                  <button 
-                    onClick={() => setIsEditingUsername(false)}
-                    disabled={isSubmitting}
-                    className="px-4 py-2 bg-white/5 text-gray-400 text-sm font-medium rounded-lg hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <p className="text-xs text-gray-600 mt-3">
-                  Usernames can only be changed once every 30 days.
+              <div>
+                <p className="text-white text-lg">{username || "Not set"}</p>
+                <p className="text-xs text-gray-600 mt-1">
+                  {username 
+                    ? "Others can use this to send you funds." 
+                    : "Set a username to make it easier to receive funds."}
                 </p>
-              </>
+                {daysUntilChange > 0 && username && (
+                  <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Can change in {daysUntilChange} {daysUntilChange === 1 ? 'day' : 'days'}
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        ) : (
-          <div>
-            <p className="text-white text-lg">{username || "Not set"}</p>
-            <p className="text-xs text-gray-600 mt-1">
-              {username 
-                ? "Others can use this to send you funds." 
-                : "Set a username to make it easier to receive funds."}
-            </p>
-            {daysUntilChange > 0 && username && (
-              <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Can change in {daysUntilChange} {daysUntilChange === 1 ? 'day' : 'days'}
-              </p>
-            )}
-          </div>
-        )}
+        </div>
       </section>
-
-      <div className="border-t border-white/5 my-8" />
 
       {/* Email */}
       <section className="mb-8">
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-3">Email</h2>
-        <p className="text-white">{userEmail || "Not set"}</p>
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Email</h2>
+          </div>
+          <div className="p-5">
+            <p className="text-white">{userEmail || "Not set"}</p>
+          </div>
+        </div>
       </section>
 
       {/* Wallet Address */}
       <section className="mb-8">
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-3">Wallet Address</h2>
-        <p className="text-white font-mono text-sm">
-          {walletAddress ? formatAddress(walletAddress) : "0x1234...5678"}
-        </p>
-        <p className="text-xs text-gray-600 mt-1">Managed by your login method.</p>
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Wallet Address</h2>
+          </div>
+          <div className="p-5">
+            <p className="text-white font-mono text-sm">
+              {walletAddress ? formatAddress(walletAddress) : "0x1234...5678"}
+            </p>
+            <p className="text-xs text-gray-600 mt-1">Managed by your login method.</p>
+          </div>
+        </div>
       </section>
 
       {/* Fiat Provider */}
       <section className="mb-8">
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-3">Fiat Provider</h2>
-        <p className="text-white">Connected</p>
-        <p className="text-xs text-gray-600 mt-1">Enables deposits and withdrawals.</p>
+        <div className="bg-white/[0.03] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 bg-white/[0.02]">
+            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">Fiat Provider</h2>
+          </div>
+          <div className="p-5">
+            <p className="text-white">Connected</p>
+            <p className="text-xs text-gray-600 mt-1">Enables deposits and withdrawals.</p>
+          </div>
+        </div>
       </section>
-
-      <div className="border-t border-white/5 my-8" />
 
       {/* Links */}
       <section className="space-y-4">

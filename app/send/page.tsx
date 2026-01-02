@@ -13,7 +13,7 @@ export default function SendPage() {
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [balances, setBalances] = useState<Record<string, number>>({});
+  const [totalBalance, setTotalBalance] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -24,13 +24,11 @@ export default function SendPage() {
     }
     setIsLoggedIn(true);
 
-    const storedBalances = localStorage.getItem("yuki_balances");
-    if (storedBalances) {
-      setBalances(JSON.parse(storedBalances));
+    const storedBalance = localStorage.getItem("yuki_balance");
+    if (storedBalance) {
+      setTotalBalance(parseFloat(storedBalance));
     }
   }, [router]);
-
-  const totalBalance = Object.values(balances).reduce((acc, val) => acc + val, 0);
 
   const isValidRecipient = (val: string) => {
     if (!val) return false;
@@ -47,21 +45,9 @@ export default function SendPage() {
     setIsLoading(true);
 
     setTimeout(() => {
-      let remainingToDeduct = sendAmount;
-      const newBalances = { ...balances };
-      const deductionOrder = ["yuki-stable", "eth-yield", "sol-turbo"];
-
-      for (const profileId of deductionOrder) {
-        if (remainingToDeduct <= 0) break;
-        const profileBalance = newBalances[profileId] || 0;
-        if (profileBalance > 0) {
-          const deduction = Math.min(profileBalance, remainingToDeduct);
-          newBalances[profileId] = profileBalance - deduction;
-          remainingToDeduct -= deduction;
-        }
-      }
-
-      localStorage.setItem("yuki_balances", JSON.stringify(newBalances));
+      const newBalance = totalBalance - sendAmount;
+      localStorage.setItem("yuki_balance", newBalance.toString());
+      setTotalBalance(newBalance);
       window.dispatchEvent(new Event("yuki_login_update"));
 
       setIsLoading(false);

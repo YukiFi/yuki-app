@@ -153,28 +153,30 @@ export default function Navbar() {
           <div className="hidden md:flex items-center">
             {isLoggedIn ? (
               <div className="relative" ref={profileRef}>
-                {/* Simple circular profile button - muted gray, just initial */}
+                {/* Simple profile button - muted gray, just initial */}
                 <button 
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-white/20 transition-all cursor-pointer"
+                  className="w-9 h-9 rounded-lg bg-white/[0.03] flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer"
                 >
                   <span className="text-sm font-medium">{getInitial()}</span>
                 </button>
 
-                {/* Dropdown Menu - calm, minimal, intentional */}
+                {/* Dropdown Menu - clean, minimal */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 top-full mt-3 w-64 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl animate-fade-in z-50 overflow-hidden">
+                  <div className="absolute right-0 top-full mt-3 w-64 bg-[#1a1a1a] rounded-lg shadow-2xl animate-fade-in z-50 overflow-hidden">
                     
                     {/* Account Section */}
                     <Link
                       href="/account"
                       onClick={() => setIsProfileOpen(false)}
-                      className="block px-5 py-4 hover:bg-white/[0.03] transition-colors"
+                      className="block hover:bg-white/[0.03] transition-colors"
                     >
-                      <p className="text-sm text-white mb-2">Account</p>
-                      <div className="space-y-1.5">
+                      <div className="px-5 py-3 bg-white/[0.02]">
+                        <p className="text-xs text-gray-500 uppercase tracking-widest">Account</p>
+                      </div>
+                      <div className="px-5 py-4 space-y-1.5">
                         {username && (
-                          <p className="text-sm text-white font-medium mb-1">{username}</p>
+                          <p className="text-sm text-white font-medium">{username}</p>
                         )}
                         {userEmail && (
                           <p className="text-xs text-gray-500">{userEmail}</p>
@@ -248,7 +250,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/signin"
-                  className="px-4 py-2 bg-white text-black rounded-full text-sm font-medium hover:bg-gray-100 transition-all duration-200 cursor-pointer"
+                  className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium hover:bg-gray-100 transition-all duration-200 cursor-pointer"
                 >
                   Get Started
                 </Link>
@@ -370,7 +372,7 @@ export default function Navbar() {
             <div className="border-t border-white/5 pt-6 flex flex-col gap-3">
               <Link
                 href="/signin"
-                className="w-full py-3 bg-white text-black rounded-full text-sm font-medium text-center"
+                className="w-full py-3 bg-white text-black rounded-lg text-sm font-medium text-center"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Get Started
