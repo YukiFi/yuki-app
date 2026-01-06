@@ -110,12 +110,15 @@ function LoginContent() {
             identifier: fullPhoneNumber,
           });
           
-          await signIn?.prepareFirstFactor({
-            strategy: "phone_code",
-            phoneNumberId: signIn.supportedFirstFactors.find(
-              (f) => f.strategy === "phone_code"
-            )?.phoneNumberId,
-          });
+          const phoneFactor = signIn?.supportedFirstFactors?.find(
+            (f): f is typeof f & { phoneNumberId: string } => f.strategy === "phone_code"
+          );
+          if (phoneFactor?.phoneNumberId) {
+            await signIn?.prepareFirstFactor({
+              strategy: "phone_code",
+              phoneNumberId: phoneFactor.phoneNumberId,
+            });
+          }
         }
       } else {
         // Email flow
@@ -138,12 +141,15 @@ function LoginContent() {
             identifier: email,
           });
           
-          await signIn?.prepareFirstFactor({
-            strategy: "email_code",
-            emailAddressId: signIn.supportedFirstFactors.find(
-              (f) => f.strategy === "email_code"
-            )?.emailAddressId,
-          });
+          const emailFactor = signIn?.supportedFirstFactors?.find(
+            (f): f is typeof f & { emailAddressId: string } => f.strategy === "email_code"
+          );
+          if (emailFactor?.emailAddressId) {
+            await signIn?.prepareFirstFactor({
+              strategy: "email_code",
+              emailAddressId: emailFactor.emailAddressId,
+            });
+          }
         }
       }
       
@@ -198,7 +204,7 @@ function LoginContent() {
         
         if (result?.status === "complete") {
           console.log("Sign up verification complete, setting active session...");
-          await setActiveSignUp({ session: result.createdSessionId });
+          await setActiveSignUp?.({ session: result.createdSessionId });
           console.log("Session activated, redirecting to app...");
           window.location.href = "/";
           return;
@@ -210,7 +216,7 @@ function LoginContent() {
           if (signUp?.createdSessionId) {
             console.log("Attempting to activate session despite missing requirements...");
             try {
-              await setActiveSignUp({ session: signUp.createdSessionId });
+              await setActiveSignUp?.({ session: signUp.createdSessionId });
               console.log("Session activated successfully, redirecting to app...");
               window.location.href = "/";
               return;
@@ -225,7 +231,7 @@ function LoginContent() {
             const updateResult = await signUp?.update({});
             
             if (updateResult?.status === "complete") {
-              await setActiveSignUp({ session: updateResult.createdSessionId });
+              await setActiveSignUp?.({ session: updateResult.createdSessionId });
               console.log("Sign up completed after update, redirecting...");
               window.location.href = "/";
               return;
@@ -260,7 +266,7 @@ function LoginContent() {
         
         if (result?.status === "complete") {
           console.log("Sign in verification complete, setting active session...");
-          await setActiveSignIn({ session: result.createdSessionId });
+          await setActiveSignIn?.({ session: result.createdSessionId });
           console.log("Session activated, redirecting...");
           // Use window.location for hard redirect to ensure middleware picks up the new session
           window.location.href = "/";
@@ -284,11 +290,11 @@ function LoginContent() {
         // Try to complete the session anyway
         try {
           if (isSignUp && signUp?.createdSessionId) {
-            await setActiveSignUp({ session: signUp.createdSessionId });
+            await setActiveSignUp?.({ session: signUp.createdSessionId });
             window.location.href = "/";
             return;
           } else if (!isSignUp && signIn?.createdSessionId) {
-            await setActiveSignIn({ session: signIn.createdSessionId });
+            await setActiveSignIn?.({ session: signIn.createdSessionId });
             window.location.href = "/";
             return;
           }
@@ -324,12 +330,15 @@ function LoginContent() {
             strategy: "phone_code",
           });
         } else {
-          await signIn?.prepareFirstFactor({
-            strategy: "phone_code",
-            phoneNumberId: signIn?.supportedFirstFactors.find(
-              (f) => f.strategy === "phone_code"
-            )?.phoneNumberId,
-          });
+          const phoneFactor = signIn?.supportedFirstFactors?.find(
+            (f): f is typeof f & { phoneNumberId: string } => f.strategy === "phone_code"
+          );
+          if (phoneFactor?.phoneNumberId) {
+            await signIn?.prepareFirstFactor({
+              strategy: "phone_code",
+              phoneNumberId: phoneFactor.phoneNumberId,
+            });
+          }
         }
       } else {
         if (isSignUp) {
@@ -337,12 +346,15 @@ function LoginContent() {
             strategy: "email_code",
           });
         } else {
-          await signIn?.prepareFirstFactor({
-            strategy: "email_code",
-            emailAddressId: signIn?.supportedFirstFactors.find(
-              (f) => f.strategy === "email_code"
-            )?.emailAddressId,
-          });
+          const emailFactor = signIn?.supportedFirstFactors?.find(
+            (f): f is typeof f & { emailAddressId: string } => f.strategy === "email_code"
+          );
+          if (emailFactor?.emailAddressId) {
+            await signIn?.prepareFirstFactor({
+              strategy: "email_code",
+              emailAddressId: emailFactor.emailAddressId,
+            });
+          }
         }
       }
       
