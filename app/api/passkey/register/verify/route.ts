@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { getUserById, getWalletByUserId, updateWalletPasskey } from '@/lib/db';
+import { getUserById, getWalletByUserId, updateWalletPasskey, updateUserPasskey } from '@/lib/db';
 import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 
@@ -70,21 +70,32 @@ export async function POST(request: NextRequest) {
     
     const { credential: verifiedCredential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
     
-    // Store passkey credential metadata
-    const passkeyMeta = {
+    // Store passkey credential on user
+    const passkeyData = {
       credentialId: Buffer.from(verifiedCredential.id).toString('base64url'),
       publicKey: Buffer.from(verifiedCredential.publicKey).toString('base64'),
       counter: verifiedCredential.counter,
       deviceType: credentialDeviceType,
       backedUp: credentialBackedUp,
       transports: credential.response.transports || [],
-      createdAt: new Date().toISOString(),
     };
     
-    // If wallet upgrade data is provided, update the wallet
+    await updateUserPasskey(session.userId, passkeyData);
+    
+    // If wallet upgrade data is provided, update the wallet too
     if (walletUpgradeData) {
       const wallet = await getWalletByUserId(session.userId);
       if (wallet) {
+        const passkeyMeta = {
+          credentialId: passkeyData.credentialId,
+          publicKey: passkeyData.publicKey,
+          counter: passkeyData.counter,
+          deviceType: passkeyData.deviceType,
+          backedUp: passkeyData.backedUp,
+          transports: passkeyData.transports,
+          createdAt: new Date().toISOString(),
+        };
+        
         await updateWalletPasskey(session.userId, {
           cipherPriv: walletUpgradeData.cipherPriv,
           ivPriv: walletUpgradeData.ivPriv,
@@ -100,12 +111,13 @@ export async function POST(request: NextRequest) {
     
     // Clear challenge from session
     delete session.passkeyChallenge;
+    delete session.passkeyUserId;
     await session.save();
     
     return NextResponse.json({
       success: true,
       verified: true,
-      credentialId: passkeyMeta.credentialId,
+      credentialId: passkeyData.credentialId,
     });
   } catch (error) {
     console.error('Passkey verification error:', error);

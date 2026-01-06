@@ -220,7 +220,7 @@ export function WalletSettings({ isOpen, onClose }: WalletSettingsProps) {
               <button
                 onClick={async () => {
                   await logout();
-                  window.location.href = '/signin';
+                  window.location.href = '/login';
                 }}
                 className="flex-1 py-2.5 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-all"
               >

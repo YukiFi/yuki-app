@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
-import { getUserById, getWalletByUserId } from '@/lib/db';
+import { getUserById } from '@/lib/db';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 
 const rpName = 'Yuki';
@@ -18,12 +18,13 @@ export async function POST() {
     
     if (!session.isLoggedIn || !session.userId) {
       return NextResponse.json(
-        { error: 'Not authenticated' },
+        { error: 'Not authenticated. Please log in first.' },
         { status: 401 }
       );
     }
     
     const user = await getUserById(session.userId);
+    
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
@@ -32,8 +33,7 @@ export async function POST() {
     }
     
     // Check if user already has passkey enabled
-    const wallet = await getWalletByUserId(session.userId);
-    if (wallet?.security_level === 'passkey_enabled') {
+    if (user.passkey_credential_id) {
       return NextResponse.json(
         { error: 'Passkey already enabled' },
         { status: 409 }
@@ -46,7 +46,7 @@ export async function POST() {
       rpID,
       userID: new TextEncoder().encode(user.id),
       userName: user.email,
-      userDisplayName: user.email.split('@')[0],
+      userDisplayName: user.username || user.email.split('@')[0],
       attestationType: 'none',
       authenticatorSelection: {
         residentKey: 'preferred',
@@ -58,6 +58,7 @@ export async function POST() {
     
     // Store challenge in session for verification
     session.passkeyChallenge = options.challenge;
+    session.passkeyUserId = user.id;
     await session.save();
     
     return NextResponse.json(options);

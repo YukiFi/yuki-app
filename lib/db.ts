@@ -34,6 +34,13 @@ export interface User {
   failed_attempts: number;
   username: string | null;
   username_last_changed: Date | null;
+  passkey_credential_id: string | null;
+  passkey_public_key: string | null;
+  passkey_counter: number;
+  passkey_device_type: string | null;
+  passkey_backed_up: boolean;
+  passkey_transports: string | null;
+  passkey_created_at: Date | null;
 }
 
 export async function createUser(
@@ -43,7 +50,12 @@ export async function createUser(
 ): Promise<User | null> {
   const normalizedEmail = email.toLowerCase();
   
+  console.log('[DB] createUser - Normalized email:', normalizedEmail);
+  console.log('[DB] createUser - Email exists in index?', db.indices.usersByEmail.has(normalizedEmail));
+  console.log('[DB] createUser - Current users in DB:', Array.from(db.indices.usersByEmail.keys()));
+  
   if (db.indices.usersByEmail.has(normalizedEmail)) {
+    console.log('[DB] createUser - BLOCKED: Email already exists');
     return null; // Email already exists
   }
   
@@ -57,11 +69,20 @@ export async function createUser(
     locked_until: null,
     failed_attempts: 0,
     username: null,
-    username_last_changed: null
+    username_last_changed: null,
+    passkey_credential_id: null,
+    passkey_public_key: null,
+    passkey_counter: 0,
+    passkey_device_type: null,
+    passkey_backed_up: false,
+    passkey_transports: null,
+    passkey_created_at: null,
   };
   
   db.users.set(id, user);
   db.indices.usersByEmail.set(normalizedEmail, id);
+  
+  console.log('[DB] createUser - SUCCESS: User created with ID:', id);
   
   return user;
 }
@@ -71,9 +92,14 @@ export async function getUserById(id: string): Promise<User | null> {
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const userId = db.indices.usersByEmail.get(email.toLowerCase());
+  const normalizedEmail = email.toLowerCase();
+  console.log('[DB] getUserByEmail - Looking up:', normalizedEmail);
+  const userId = db.indices.usersByEmail.get(normalizedEmail);
+  console.log('[DB] getUserByEmail - Found userId:', userId || 'NOT FOUND');
   if (!userId) return null;
-  return db.users.get(userId) || null;
+  const user = db.users.get(userId) || null;
+  console.log('[DB] getUserByEmail - User object exists:', !!user);
+  return user;
 }
 
 // Get or create a user by email (for demo purposes)
@@ -94,7 +120,14 @@ export async function getOrCreateUserByEmail(email: string): Promise<User> {
       locked_until: null,
       failed_attempts: 0,
       username: null,
-      username_last_changed: null
+      username_last_changed: null,
+      passkey_credential_id: null,
+      passkey_public_key: null,
+      passkey_counter: 0,
+      passkey_device_type: null,
+      passkey_backed_up: false,
+      passkey_transports: null,
+      passkey_created_at: null,
     };
     
     db.users.set(id, user);
@@ -129,10 +162,79 @@ export async function resetUserFailedAttempts(userId: string): Promise<void> {
 }
 
 export async function updateUsername(userId: string, username: string): Promise<void> {
+  // Check if username is already taken by another user
+  const existingUser = Array.from(db.users.values()).find(
+    u => u.username?.toLowerCase() === username.toLowerCase() && u.id !== userId
+  );
+  
+  if (existingUser) {
+    throw new Error("Username is already taken");
+  }
+  
   const user = db.users.get(userId);
   if (user) {
     user.username = username;
     user.username_last_changed = new Date();
+    user.updated_at = new Date();
+    db.users.set(userId, user);
+  }
+}
+
+export async function getUserByUsername(username: string): Promise<User | null> {
+  const user = Array.from(db.users.values()).find(
+    u => u.username?.toLowerCase() === username.toLowerCase()
+  );
+  return user || null;
+}
+
+export async function updateUserPasskey(
+  userId: string,
+  passkeyData: {
+    credentialId: string;
+    publicKey: string;
+    counter: number;
+    deviceType: string;
+    backedUp: boolean;
+    transports: string[];
+  }
+): Promise<void> {
+  const user = db.users.get(userId);
+  if (user) {
+    user.passkey_credential_id = passkeyData.credentialId;
+    user.passkey_public_key = passkeyData.publicKey;
+    user.passkey_counter = passkeyData.counter;
+    user.passkey_device_type = passkeyData.deviceType;
+    user.passkey_backed_up = passkeyData.backedUp;
+    user.passkey_transports = JSON.stringify(passkeyData.transports);
+    user.passkey_created_at = new Date();
+    user.updated_at = new Date();
+    db.users.set(userId, user);
+  }
+}
+
+export async function getUserPasskeyCredential(userId: string): Promise<{
+  credentialId: string;
+  publicKey: Uint8Array;
+  counter: number;
+  transports?: string[];
+} | null> {
+  const user = db.users.get(userId);
+  if (!user || !user.passkey_credential_id || !user.passkey_public_key) {
+    return null;
+  }
+  
+  return {
+    credentialId: user.passkey_credential_id,
+    publicKey: Buffer.from(user.passkey_public_key, 'base64'),
+    counter: user.passkey_counter,
+    transports: user.passkey_transports ? JSON.parse(user.passkey_transports) : undefined,
+  };
+}
+
+export async function updatePasskeyCounter(userId: string, newCounter: number): Promise<void> {
+  const user = db.users.get(userId);
+  if (user) {
+    user.passkey_counter = newCounter;
     user.updated_at = new Date();
     db.users.set(userId, user);
   }

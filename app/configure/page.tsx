@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 type ComfortLevel = "steady" | "balanced" | "flexible";
@@ -47,26 +46,18 @@ const comfortToAllocation: Record<ComfortLevel, { stable: number; balanced: numb
 };
 
 export default function ConfigurePage() {
-  const router = useRouter();
   const [step, setStep] = useState<"select" | "confirm" | "success">("select");
   const [currentLevel, setCurrentLevel] = useState<ComfortLevel>("balanced");
   const [selected, setSelected] = useState<ComfortLevel>("balanced");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const status = localStorage.getItem("yuki_onboarding_complete");
-    if (status !== "true") {
-      router.push("/signin");
-      return;
-    }
-    setIsLoggedIn(true);
-
+    // Load comfort level from localStorage
     const storedComfort = localStorage.getItem("yuki_comfort_level") as ComfortLevel | null;
     if (storedComfort) {
       setCurrentLevel(storedComfort);
       setSelected(storedComfort);
     }
-  }, [router]);
+  }, []);
 
   const selectedLevel = comfortLevels.find(l => l.id === selected)!;
   const hasChanged = selected !== currentLevel;
@@ -93,14 +84,6 @@ export default function ConfigurePage() {
     setCurrentLevel(selected);
     setStep("success");
   };
-
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="w-full py-12 animate-fade-in">

@@ -2,38 +2,27 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function SecurityPage() {
-  const router = useRouter();
-  const [authMethod, setAuthMethod] = useState<string | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authMethod, setAuthMethod] = useState<string | null>("email");
 
   useEffect(() => {
-    const checkLoginStatus = () => {
-      const status = localStorage.getItem("yuki_onboarding_complete");
-      const method = localStorage.getItem("yuki_auth_method");
-      
-      setIsLoggedIn(status === "true");
-      setAuthMethod(method);
-      
-      if (status !== "true") {
-        router.push("/signin");
+    const fetchAuthMethod = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) {
+          const data = await response.json();
+          setAuthMethod(data.user.hasWallet ? "wallet" : "email");
+        }
+      } catch (error) {
+        console.error("Failed to fetch auth method", error);
       }
     };
 
-    checkLoginStatus();
-    window.addEventListener("yuki_login_update", checkLoginStatus);
-    return () => window.removeEventListener("yuki_login_update", checkLoginStatus);
-  }, [router]);
-
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
-      </div>
-    );
-  }
+    fetchAuthMethod();
+    window.addEventListener("yuki_login_update", fetchAuthMethod);
+    return () => window.removeEventListener("yuki_login_update", fetchAuthMethod);
+  }, []);
 
   return (
     <div className="w-full py-12 animate-fade-in">

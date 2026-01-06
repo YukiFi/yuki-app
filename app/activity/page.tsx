@@ -1,19 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
-// Activity categories with plain language descriptions
-type ActivityCategory = "received" | "sent" | "added" | "withdrawn";
+// Activity categories
+type ActivityCategory = "received" | "sent" | "added" | "withdrawn" | "earned";
 
 interface ActivityEntry {
   id: string;
   category: ActivityCategory;
   description: string;
+  recipient?: string;
   amount: number;
   date: Date;
-  balanceAfter?: number;
+  isHighlight?: boolean;
 }
 
 // Mock activity data - in production this would come from an API
@@ -22,66 +22,78 @@ const generateMockActivity = (): ActivityEntry[] => {
     {
       id: "1",
       category: "sent",
-      description: "Sent to @alex",
+      description: "Sent to Alex",
+      recipient: "Alex",
       amount: -250.00,
       date: new Date("2024-12-18T14:32:00"),
-      balanceAfter: 12438.72,
     },
     {
       id: "2",
       category: "added",
-      description: "Deposited",
+      description: "Deposited funds",
       amount: 2000.00,
       date: new Date("2024-12-15T09:15:00"),
-      balanceAfter: 12688.72,
     },
     {
       id: "3",
-      category: "received",
-      description: "Received from @mike",
-      amount: 75.00,
-      date: new Date("2024-12-10T18:45:00"),
-      balanceAfter: 10688.72,
+      category: "earned",
+      description: "Interest earned today",
+      amount: 12.43,
+      date: new Date("2024-12-15T00:00:00"),
+      isHighlight: true,
     },
     {
       id: "4",
-      category: "added",
-      description: "Deposited",
-      amount: 5000.00,
-      date: new Date("2024-11-28T11:20:00"),
-      balanceAfter: 10613.72,
+      category: "received",
+      description: "Received from Mike",
+      recipient: "Mike",
+      amount: 75.00,
+      date: new Date("2024-12-10T18:45:00"),
     },
     {
       id: "5",
-      category: "withdrawn",
-      description: "Withdrew",
-      amount: -500.00,
-      date: new Date("2024-11-10T16:08:00"),
-      balanceAfter: 5613.72,
+      category: "added",
+      description: "Deposited funds",
+      amount: 5000.00,
+      date: new Date("2024-11-28T11:20:00"),
     },
     {
       id: "6",
-      category: "received",
-      description: "Received from @sarah",
-      amount: 150.00,
-      date: new Date("2024-10-25T20:30:00"),
-      balanceAfter: 6113.72,
+      category: "withdrawn",
+      description: "Withdrew to bank",
+      amount: -500.00,
+      date: new Date("2024-11-10T16:08:00"),
     },
     {
       id: "7",
-      category: "sent",
-      description: "Sent to @jordan",
-      amount: -36.28,
-      date: new Date("2024-10-15T12:55:00"),
-      balanceAfter: 5963.72,
+      category: "earned",
+      description: "Interest earned",
+      amount: 8.32,
+      date: new Date("2024-11-10T00:00:00"),
+      isHighlight: true,
     },
     {
       id: "8",
+      category: "received",
+      description: "Received from Sarah",
+      recipient: "Sarah",
+      amount: 150.00,
+      date: new Date("2024-10-25T20:30:00"),
+    },
+    {
+      id: "9",
+      category: "sent",
+      description: "Sent to Jordan",
+      recipient: "Jordan",
+      amount: -36.28,
+      date: new Date("2024-10-15T12:55:00"),
+    },
+    {
+      id: "10",
       category: "added",
-      description: "Deposited",
+      description: "Initial deposit",
       amount: 6000.00,
       date: new Date("2024-10-01T10:00:00"),
-      balanceAfter: 6000.00,
     },
   ];
 };
@@ -91,147 +103,199 @@ function formatDate(date: Date): string {
   const diff = now.getTime() - date.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   
-  const time = date.toLocaleTimeString("en-US", { 
-    hour: "numeric", 
-    minute: "2-digit",
-    hour12: true 
-  });
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
   
-  if (days === 0) return `Today at ${time}`;
-  if (days === 1) return `Yesterday at ${time}`;
-  
-  const dateStr = date.toLocaleDateString("en-US", { 
+  return date.toLocaleDateString("en-US", { 
     month: "short", 
     day: "numeric",
     year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined
   });
-  
-  return `${dateStr} at ${time}`;
 }
 
-function getCategoryLabel(category: ActivityCategory): string {
-  switch (category) {
-    case "received": return "Received";
-    case "sent": return "Sent";
-    case "added": return "Deposited";
-    case "withdrawn": return "Withdrew";
-  }
-}
-
-function getCategoryColor(category: ActivityCategory): string {
+function getActivityIcon(category: ActivityCategory) {
   switch (category) {
     case "received":
-    case "added":
-      return "text-emerald-500/80";
+      return (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
+      );
     case "sent":
+      return (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+      );
+    case "added":
+      return (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      );
     case "withdrawn":
-      return "text-white";
+      return (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+        </svg>
+      );
+    case "earned":
+      return (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+      );
   }
 }
 
 export default function ActivityPage() {
-  const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
 
   useEffect(() => {
-    const checkLoginStatus = () => {
-      const status = localStorage.getItem("yuki_onboarding_complete");
-      setIsLoggedIn(status === "true");
-      
-      if (status !== "true") {
-        router.push("/signin");
-        return;
-      }
-      
-      // Load mock activity
-      setActivity(generateMockActivity());
-    };
-
-    checkLoginStatus();
-    window.addEventListener("yuki_login_update", checkLoginStatus);
-    return () => window.removeEventListener("yuki_login_update", checkLoginStatus);
-  }, [router]);
-
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  // Group activities by month
-  const groupedActivity = activity.reduce((groups, entry) => {
-    const monthKey = entry.date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-    if (!groups[monthKey]) {
-      groups[monthKey] = [];
-    }
-    groups[monthKey].push(entry);
-    return groups;
-  }, {} as Record<string, ActivityEntry[]>);
+    // Load mock activity
+    setActivity(generateMockActivity());
+  }, []);
 
   return (
-    <div className="w-full py-12 animate-fade-in">
-      {/* Header */}
-      <section className="mb-8 mt-4">
-        <p className="text-sm text-gray-500 mb-2 font-medium">Activity</p>
-        <h1 className="text-4xl font-medium text-white tracking-tight">
-          Transaction History
-        </h1>
-      </section>
+    <div className="w-full min-h-screen pt-24 pb-12 relative">
+      {/* Ambient glow */}
+      <motion.div
+        animate={{ opacity: [0.1, 0.2, 0.1], scale: [1, 1.05, 1] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#004BAD]/15 rounded-full blur-[150px] pointer-events-none"
+      />
 
-      {/* Activity List */}
-      {activity.length === 0 ? (
-        <div className="bg-white/[0.03] rounded-lg p-12 text-center">
-          <p className="text-gray-500">No activity yet.</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedActivity).map(([month, entries]) => (
-            <section key={month}>
-              <div className="bg-white/[0.03] rounded-lg overflow-hidden">
-                <div className="px-5 py-3 bg-white/[0.02]">
-                  <h2 className="text-xs font-medium text-gray-500 uppercase tracking-widest">{month}</h2>
-                </div>
-                <div className="px-5">
-                  {entries.map((entry) => (
-                    <div 
-                      key={entry.id}
-                      className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 group"
+      <div className="max-w-[800px] mx-auto px-4 sm:px-6 relative z-10">
+        {/* Header */}
+        <motion.section 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-10"
+        >
+          <h1 
+            className="font-display text-4xl sm:text-5xl text-white tracking-tight mb-3"
+            style={{ 
+              WebkitFontSmoothing: "antialiased",
+              textRendering: "geometricPrecision",
+            }}
+          >
+            ACTIVITY
+          </h1>
+          <p className="text-white/40">Your complete transaction history</p>
+        </motion.section>
+
+        {/* Activity Feed */}
+        {activity.length === 0 ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.1 }}
+            className="bg-white/5 rounded-2xl p-12 text-center"
+          >
+            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <p className="text-white/60 font-medium">No activity yet</p>
+            <p className="text-sm text-white/30 mt-1">Your transactions will appear here</p>
+          </motion.div>
+        ) : (
+          <div className="space-y-3">
+            {activity.map((entry, index) => (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + index * 0.03, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                className={`p-5 sm:p-6 rounded-2xl transition-all hover:scale-[1.01] cursor-pointer ${
+                  entry.isHighlight
+                    ? "bg-[#004BAD]/30"
+                    : "bg-white/5 hover:bg-white/10"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Icon */}
+                  <div
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      entry.isHighlight
+                        ? "bg-[#004BAD]/50"
+                        : entry.category === "received"
+                        ? "bg-[#004BAD]/20"
+                        : entry.category === "sent"
+                        ? "bg-white/10"
+                        : entry.category === "added"
+                        ? "bg-emerald-500/20"
+                        : entry.category === "withdrawn"
+                        ? "bg-white/10"
+                        : "bg-[#004BAD]/20"
+                    }`}
+                  >
+                    <div
+                      className={
+                        entry.isHighlight 
+                          ? "text-white" 
+                          : entry.category === "added" 
+                          ? "text-emerald-400" 
+                          : entry.category === "received"
+                          ? "text-[#004BAD]"
+                          : "text-white/60"
+                      }
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className={`w-2 h-2 rounded-full ${
-                          entry.amount > 0 ? "bg-emerald-500/50" : "bg-white/20"
-                        }`} />
-                        <div>
-                          <p className="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">{entry.description}</p>
-                          <p className="text-[10px] text-gray-600">{formatDate(entry.date)}</p>
-                        </div>
-                      </div>
-                      <div className="text-right ml-4">
-                        <p className={`text-sm font-mono ${getCategoryColor(entry.category)}`}>
-                          {entry.amount > 0 ? "+" : ""}${Math.abs(entry.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                        </p>
-                        {entry.balanceAfter !== undefined && (
-                          <p className="text-[10px] text-gray-600">
-                            balance: ${entry.balanceAfter.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </p>
-                        )}
-                      </div>
+                      {getActivityIcon(entry.category)}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
+                  </div>
 
-      {/* Footer */}
-      <p className="text-xs text-gray-600 text-center mt-8">
-        All times in your local timezone.
-      </p>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`font-medium mb-0.5 truncate ${
+                        entry.isHighlight ? "text-white" : "text-white"
+                      }`}
+                    >
+                      {entry.description}
+                    </p>
+                    <p
+                      className={`text-sm truncate ${
+                        entry.isHighlight ? "text-white/50" : "text-white/40"
+                      }`}
+                    >
+                      {formatDate(entry.date)}
+                    </p>
+                  </div>
+
+                  {/* Amount */}
+                  <div
+                    className={`text-lg font-display flex-shrink-0 ${
+                      entry.isHighlight
+                        ? "text-white"
+                        : entry.amount > 0
+                        ? "text-emerald-400"
+                        : "text-white/60"
+                    }`}
+                  >
+                    {entry.amount > 0 ? "+" : ""}${Math.abs(entry.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* Footer Info */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-10 text-center"
+        >
+          <p className="text-sm text-white/30">
+            Showing all activity · Sorted by most recent
+          </p>
+        </motion.div>
+      </div>
     </div>
   );
 }

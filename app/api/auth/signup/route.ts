@@ -7,32 +7,45 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createUser, getUserByEmail, checkRateLimit } from '@/lib/db';
-import { hashPassword, validateEmail, generateId } from '@/lib/auth';
+import { hashPassword, validateEmail, validatePassword, generateId, sanitizeInput } from '@/lib/auth';
 import { createUserSession } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== SIGNUP ATTEMPT START ===');
     const body = await request.json();
     const { email, password } = body;
     
-    // Validate input
+    console.log('Signup attempt for email:', email);
+    
+    // Validate input presence
     if (!email || !password) {
+      console.log('Signup failed: Missing email or password');
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
       );
     }
     
-    if (!validateEmail(email)) {
+    // Sanitize and validate email
+    const sanitizedEmail = sanitizeInput(email);
+    console.log('Original email:', email, '| Sanitized email:', sanitizedEmail);
+    
+    if (!validateEmail(sanitizedEmail)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400 }
       );
     }
     
-    if (password.length < 8) {
+    // Validate password with security requirements
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
+        { 
+          error: 'Password does not meet requirements',
+          details: passwordValidation.errors 
+        },
         { status: 400 }
       );
     }
@@ -49,28 +62,40 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if user exists
-    const existingUser = await getUserByEmail(email);
+    console.log('Checking if user exists with email:', sanitizedEmail);
+    const existingUser = await getUserByEmail(sanitizedEmail);
+    console.log('Existing user found:', existingUser ? 'YES - ' + existingUser.id : 'NO');
+    
     if (existingUser) {
+      console.log('Signup failed: Email already exists:', sanitizedEmail);
       return NextResponse.json(
         { error: 'An account with this email already exists' },
         { status: 409 }
       );
     }
     
+    console.log('Email available, creating user...');
+    
     // Hash password and create user
     const passwordHash = await hashPassword(password);
     const userId = generateId();
-    const user = await createUser(userId, email, passwordHash);
+    console.log('Attempting to create user with ID:', userId, 'Email:', sanitizedEmail);
+    const user = await createUser(userId, sanitizedEmail, passwordHash);
+    
+    console.log('User creation result:', user ? 'SUCCESS' : 'FAILED (email exists?)');
     
     if (!user) {
+      console.log('Signup failed: Database error creating user (likely duplicate email)');
       return NextResponse.json(
-        { error: 'Failed to create account' },
+        { error: 'Failed to create account. Email may already be in use.' },
         { status: 500 }
       );
     }
     
     // Create session
-    await createUserSession(userId, email);
+    await createUserSession(userId, sanitizedEmail);
+    
+    console.log('=== SIGNUP SUCCESS - Session created for:', sanitizedEmail, '===');
     
     return NextResponse.json({
       success: true,

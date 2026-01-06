@@ -69,7 +69,7 @@ app/
 
 ### Accessing the Auth Page
 
-Users can access the authentication page at `/signin` or by clicking "Get Started" or "Sign In" from the dashboard.
+Users can access the authentication page at `/login` or by clicking "Get Started" or "Sign In" from the dashboard.
 
 ### Checking Authentication Status
 

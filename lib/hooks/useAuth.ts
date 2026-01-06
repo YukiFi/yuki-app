@@ -12,6 +12,7 @@ export interface User {
   hasWallet: boolean;
   walletAddress?: string;
   securityLevel?: 'password_only' | 'passkey_enabled';
+  passkey_credential_id?: string | null;
 }
 
 export interface AuthState {
@@ -31,7 +32,9 @@ export function useAuth() {
 
   const fetchUser = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me');
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
       
       if (response.ok) {
         const data = await response.json();
@@ -71,6 +74,7 @@ export function useAuth() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
       
       const data = await response.json();
@@ -84,8 +88,13 @@ export function useAuth() {
         });
         return { success: true };
       } else {
-        setState(prev => ({ ...prev, isLoading: false, error: data.error }));
-        return { success: false, error: data.error };
+        // Handle detailed password validation errors
+        let errorMessage = data.error;
+        if (data.details && Array.isArray(data.details) && data.details.length > 0) {
+          errorMessage = data.details.join('. ');
+        }
+        setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
+        return { success: false, error: errorMessage };
       }
     } catch (error) {
       const errorMessage = 'Network error. Please try again.';
@@ -102,6 +111,7 @@ export function useAuth() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
       
       const data = await response.json();
@@ -127,7 +137,10 @@ export function useAuth() {
 
   const logout = async (): Promise<void> => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include',
+      });
     } finally {
       setState({
         user: null,

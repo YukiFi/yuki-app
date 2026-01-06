@@ -62,6 +62,53 @@ export function validateEmail(email: string): boolean {
 }
 
 /**
+ * Password validation with security requirements
+ */
+export interface PasswordValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+export function validatePassword(password: string): PasswordValidationResult {
+  const errors: string[] = [];
+  
+  // Minimum length
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters long');
+  }
+  
+  // Maximum length (prevent DoS)
+  if (password.length > 128) {
+    errors.push('Password must not exceed 128 characters');
+  }
+  
+  // Must contain at least one uppercase letter
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+  
+  // Must contain at least one lowercase letter
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+  
+  // Must contain at least one number
+  if (!/[0-9]/.test(password)) {
+    errors.push('Password must contain at least one number');
+  }
+  
+  // Must contain at least one special character
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push('Password must contain at least one special character');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
  * Generate a secure random ID
  */
 export function generateId(): string {

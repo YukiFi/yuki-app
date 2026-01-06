@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 type Mode = "add" | "withdraw";
@@ -13,21 +12,14 @@ export default function FundsPage() {
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [totalBalance, setTotalBalance] = useState(0);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const status = localStorage.getItem("yuki_onboarding_complete");
-    if (status !== "true") {
-      router.push("/signin");
-      return;
-    }
-    setIsLoggedIn(true);
-
+    // Load balance from localStorage
     const storedBalance = localStorage.getItem("yuki_balance");
     if (storedBalance) {
       setTotalBalance(parseFloat(storedBalance));
     }
-  }, [router]);
+  }, []);
 
   const handleAdd = () => {
     setIsLoading(true);
@@ -67,14 +59,6 @@ export default function FundsPage() {
     setStep("input");
     setAmount("");
   };
-
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="w-full py-12 animate-fade-in">

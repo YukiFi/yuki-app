@@ -95,7 +95,7 @@ The navbar now shows:
 ## Dashboard Updates
 
 The dashboard now:
-- Redirects to `/signin` instead of `/onboarding`
+- Redirects to `/login` instead of `/onboarding`
 - Shows "Get Started" and "Sign In" buttons
 - Works with both auth methods
 

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, getWalletByUserId, checkRateLimit, updateUserFailedAttempts, resetUserFailedAttempts, resetRateLimit } from '@/lib/db';
-import { verifyPassword, validateEmail } from '@/lib/auth';
+import { verifyPassword, validateEmail, sanitizeInput } from '@/lib/auth';
 import { createUserSession } from '@/lib/session';
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -15,18 +15,24 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== LOGIN ATTEMPT START ===');
     const body = await request.json();
     const { email, password } = body;
     
+    console.log('Login attempt for email:', email);
+    
     // Validate input
     if (!email || !password) {
+      console.log('Login failed: Missing email or password');
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
       );
     }
     
-    if (!validateEmail(email)) {
+    // Sanitize and validate email
+    const sanitizedEmail = sanitizeInput(email);
+    if (!validateEmail(sanitizedEmail)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
         { status: 400 }
@@ -45,13 +51,16 @@ export async function POST(request: NextRequest) {
     }
     
     // Find user
-    const user = await getUserByEmail(email);
+    const user = await getUserByEmail(sanitizedEmail);
     if (!user) {
+      console.log('Login failed: User not found for email:', sanitizedEmail);
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       );
     }
+    
+    console.log('User found:', user.id);
     
     // Check if account is locked
     if (user.locked_until) {
@@ -71,6 +80,8 @@ export async function POST(request: NextRequest) {
     // Verify password
     const isValid = await verifyPassword(password, user.password_hash);
     
+    console.log('Password verification result:', isValid);
+    
     if (!isValid) {
       // Increment failed attempts
       const newFailedAttempts = user.failed_attempts + 1;
@@ -81,6 +92,8 @@ export async function POST(request: NextRequest) {
       }
       
       await updateUserFailedAttempts(user.id, newFailedAttempts, lockedUntil);
+      
+      console.log('Login failed: Invalid password. Failed attempts:', newFailedAttempts);
       
       return NextResponse.json(
         { error: 'Invalid email or password' },
@@ -96,7 +109,9 @@ export async function POST(request: NextRequest) {
     const wallet = await getWalletByUserId(user.id);
     
     // Create session
-    await createUserSession(user.id, user.email, wallet?.address);
+    await createUserSession(user.id, sanitizedEmail, wallet?.address);
+    
+    console.log('=== LOGIN SUCCESS - Session created for:', sanitizedEmail, '===');
     
     return NextResponse.json({
       success: true,

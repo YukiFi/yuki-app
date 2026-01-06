@@ -1,36 +1,11 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono&display=swap");
 @import "tailwindcss";
 
-@font-face {
-  font-family: "Vacay";
-  src: url("/fonts/Vacay-Demo.ttf") format("truetype");
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Inter";
-  src: url("/fonts/Inter.ttf") format("truetype");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Albra";
-  src: url("/fonts/Albra-Grotesk-Regular.otf") format("opentype");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "PowerGrotesk";
-  src: url("/fonts/PowerGrotesk-Regular.ttf") format("truetype");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
+/* Tailwind v4 Theme Configuration */
+@theme {
+  --font-mabrypro: "MabryPro", system-ui, sans-serif;
+  --font-display: "TanBuster", system-ui, sans-serif;
+  --color-brand: #004BAD;
+  --color-brand-blue: #004BAD;
 }
 
 /* Mabry Pro Font Family */
@@ -60,7 +35,7 @@
 
 @font-face {
   font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-RegularItalic.ttf") format("truetype");
+  src: url("/fonts/Mabry/MabryPro-Italic.ttf") format("truetype");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
@@ -114,180 +89,68 @@
   font-display: swap;
 }
 
-@theme {
-  --font-vacay: "Vacay", "sans-serif";
-  --font-albra: "Albra", "system-ui", "sans-serif";
-  --font-jetbrains: "JetBrainsMono", "monospace";
-  --font-power: "PowerGrotesk", "sans-serif";
-  --font-mabrypro: "MabryPro", "system-ui", "sans-serif";
-
-  --color-fdfffc: #FDFFFC;
-  --color-0f52fb: #0F52FB;
-  --color-303130: #303130;
-  --color-cfd0ce: #CFD0CE;
-
-  --color-accent: #FFFFFF;
-  --color-accent-dim: #AAAAAA;
-  --color-accent-dimmer: #666666;
-  --color-dark-black: #000000;
-  --color-dark-900: #121212;
-  --color-dark-800: #1a1a1a;
-  --color-dark-700: #222222;
-  --color-dark-600: #2a2a2a;
-  --color-dark-500: #282828;
-  --color-dark-400: #383838;
-  --color-dark-300: #585858;
-  --color-dark-200: #787878;
-  --color-dark-100: #A0A0A0;
-  --color-dark-50: #C0C0C0;
-  --color-glass-white: rgba(255, 255, 255, 0.1);
-  --color-glass-black: rgba(0, 0, 0, 0.3);
-  --color-accent-primary: #0F52FB;
-  --color-accent-secondary: #CFD0CE;
-
-  --text-caption: 0.75rem;
-  --text-body-compact: 0.875rem;
-  --text-body: 1rem;
-  --text-heading-compact: 1.25rem;
-  --text-heading: 1.5rem;
-  --text-title: 2rem;
-  --text-display: 3rem;
-
-  --spacing-01: 0.125rem;
-  --spacing-02: 0.25rem;
-  --spacing-03: 0.5rem;
-  --spacing-04: 0.75rem;
-  --spacing-05: 1rem;
-  --spacing-06: 1.5rem;
-  --spacing-07: 2rem;
-  --spacing-08: 2.5rem;
-  --spacing-09: 3rem;
-
-  --radius-glass: 0.5rem;
-  --radius-sharp: 0 0 16px 0;
-  --radius-asymmetric-1: 0 8px 0 8px;
-  --radius-asymmetric-2: 8px 0 8px 0;
-
-  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.1);
-  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
-  --shadow-button-primary: 0 4px 15px rgba(15, 82, 251, 0.2), inset 0 1px 1px rgba(253, 255, 252, 0.1);
-  --shadow-button-primary-hover: 0 6px 20px rgba(15, 82, 251, 0.3), inset 0 1px 1px rgba(253, 255, 252, 0.15);
-  --shadow-button-secondary: 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(253, 255, 252, 0.05);
-  --shadow-button-secondary-hover: 0 6px 20px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(253, 255, 252, 0.1);
-
-  --animate-float: float 5s ease-in-out infinite;
-  --animate-pulse-slow: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-delay-200: fadeIn 0.7s ease forwards 0.2s;
-  --animate-delay-400: fadeIn 0.7s ease forwards 0.4s;
-  --animate-delay-600: fadeIn 0.7s ease forwards 0.6s;
-  --animate-delay-800: fadeIn 0.7s ease forwards 0.8s;
+@font-face {
+  font-family: "TanBuster";
+  src: url("/fonts/TAN-BUSTER-Regular.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
 }
 
 :root {
-  --foreground: 253, 255, 252;
-  --background-start: 18, 18, 18;
-  --background-end: 26, 26, 26;
-  --accent-primary: 15, 82, 251;
-  --accent-secondary: 207, 208, 206;
+  --foreground: 253, 255, 252; /* FDFFFC - off-white text */
+  --background: 10, 10, 10; /* #0a0a0a - dark background */
+  --accent-primary: 0, 75, 173; /* 004BAD - brand blue */
+  --accent-secondary: 207, 208, 206; /* CFD0CE - light gray */
 }
 
 body {
-  color: rgb(var(--foreground));
-  background: #121212;
+  color: #ffffff;
+  background: #0a0a0a;
   letter-spacing: -0.01em;
   line-height: 1.6;
 }
 
-* {
-  font-family: "MabryPro", system-ui, sans-serif;
+/* Grain texture overlay - apply to elements that need it */
+.grain-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  opacity: 0.25;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  z-index: 9999;
 }
 
-/* Animations */
+/* Only animations that can't be done with Tailwind */
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
 }
 
 @keyframes fadeIn {
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-@keyframes fade-in {
-  from { 
-    opacity: 0; 
-    transform: translateY(10px); 
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
   }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@utility animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
-/* Utilities */
-@utility glass {
-  background: rgba(207, 208, 206, 0.03);
-  border: 1px solid rgba(253, 255, 252, 0.05);
-  backdrop-filter: blur(16px) saturate(180%);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-}
-
-@utility glass-dark {
-  background: rgba(48, 49, 48, 0.7);
-  border: 1px solid rgba(253, 255, 252, 0.03);
-  backdrop-filter: blur(16px) saturate(180%);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-}
-
-@utility glow-border {
-  border: 1px solid rgba(15, 82, 251, 0.2);
-  box-shadow: 0 0 10px rgba(15, 82, 251, 0.1), 0 0 20px rgba(15, 82, 251, 0.05);
-}
-
-@utility glow-text {
-  text-shadow: 0 0 5px rgba(15, 82, 251, 0.2);
-}
-
-@utility backdrop-blur-glass {
-  backdrop-filter: blur(16px) saturate(180%);
-}
-
-@utility backdrop-blur-glass-sm {
-  backdrop-filter: blur(8px) saturate(150%);
-}
-
-@utility gradient-text {
-  background: linear-gradient(to right, #FDFFFC, #CFD0CE);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-@utility shadow-glow {
-  box-shadow: 0 0 10px rgba(15, 82, 251, 0.15), 0 0 20px rgba(15, 82, 251, 0.1);
-}
-
-@utility scrollbar-thin {
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-  &::-webkit-scrollbar-track {
-    background: #303130;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(207, 208, 206, 0.5);
-    border-radius: 4px;
-  }
-  &::-webkit-scrollbar-thumb:hover {
-    background: rgba(207, 208, 206, 0.7);
-  }
+.animate-fade-in {
+  animation: fadeIn 0.7s ease forwards;
 }
