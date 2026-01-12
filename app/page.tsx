@@ -146,7 +146,7 @@ export default function Dashboard() {
         className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#004BAD]/20 rounded-full blur-[150px] pointer-events-none"
       />
 
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 relative z-10">
+      <div className="px-4 sm:px-6 relative z-10">
         
         {/* Hero Balance Section */}
         <motion.section 
@@ -155,10 +155,10 @@ export default function Dashboard() {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="mb-10 sm:mb-12"
         >
-          <p className="text-white/40 text-sm uppercase tracking-widest mb-4">Total Balance</p>
-          <div className='h-5 ' />
+          <p className="text-white/40 text-sm uppercase tracking-widest">Total Balance</p>
+          <div className='h-2 ' />
           <h1 
-            className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white mb-6"
+            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-white mb-2 font-finder"
             style={{ 
               WebkitFontSmoothing: "antialiased",
               textRendering: "geometricPrecision",
@@ -239,7 +239,7 @@ export default function Dashboard() {
               <div className="w-2 h-2 rounded-full bg-[#004BAD]" />
               <p className="text-xs font-medium text-white/40 uppercase tracking-wider">APY</p>
             </div>
-            <p className="text-2xl sm:text-3xl font-display text-white">{estimatedAPY}%</p>
+            <p className="text-2xl sm:text-3xl font-finder text-white">{estimatedAPY}%</p>
           </div>
           
           <div className="bg-white/5 rounded-2xl p-5 sm:p-6">
@@ -247,7 +247,7 @@ export default function Dashboard() {
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
               <p className="text-xs font-medium text-white/40 uppercase tracking-wider">Monthly</p>
             </div>
-            <p className="text-2xl sm:text-3xl font-display text-white">
+            <p className="text-2xl sm:text-3xl font-finder text-white">
               ${estimatedMonthlyEarnings.toLocaleString("en-US", { maximumFractionDigits: 0 })}
             </p>
           </div>
@@ -257,7 +257,7 @@ export default function Dashboard() {
               <div className={`w-2 h-2 rounded-full ${thirtyDayChange >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`} />
               <p className="text-xs font-medium text-white/40 uppercase tracking-wider">30d</p>
             </div>
-            <p className={`text-2xl sm:text-3xl font-display ${thirtyDayChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <p className={`text-2xl sm:text-3xl font-finder ${thirtyDayChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               {thirtyDayChange >= 0 ? '+' : ''}${Math.abs(thirtyDayChange).toLocaleString("en-US", { maximumFractionDigits: 0 })}
             </p>
           </div>
@@ -296,7 +296,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-display text-white">
+                  <p className="text-lg font-finder text-white">
                     ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="text-sm text-white/40">

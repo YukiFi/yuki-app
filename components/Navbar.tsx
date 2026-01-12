@@ -109,7 +109,7 @@ export default function Navbar() {
         }}
       />
       
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 relative z-10">
+      <div className="max-w-[1100px] mx-auto px-4 sm:px-6 relative z-10">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">

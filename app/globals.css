@@ -4,6 +4,7 @@
 @theme {
   --font-mabrypro: "MabryPro", system-ui, sans-serif;
   --font-display: "TanBuster", system-ui, sans-serif;
+  --font-finder: "Finder", system-ui, sans-serif;
   --color-brand: #004BAD;
   --color-brand-blue: #004BAD;
 }
@@ -92,6 +93,14 @@
 @font-face {
   font-family: "TanBuster";
   src: url("/fonts/TAN-BUSTER-Regular.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Finder";
+  src: url("/fonts/Finder.otf") format("opentype");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;

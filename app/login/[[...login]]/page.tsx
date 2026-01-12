@@ -455,7 +455,7 @@ function LoginContent() {
           className="mb-10"
         >
           <Image
-            src="/images/Logo.svg"
+            src="/images/LogoBlack.svg"
             alt="Yuki Logo"
             width={80}
             height={32}
