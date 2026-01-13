@@ -2,7 +2,21 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import LayoutContent from "@/components/LayoutContent";
 import { Providers } from "./providers";
+import { Geist, Geist_Mono } from 'next/font/google'
 import "./globals.css";
+
+const geist = Geist({
+  subsets: ['latin'],
+  variable: '--font-geist',
+  display: 'swap',
+})
+
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  variable: '--font-geist-mono',
+  display: 'swap',
+})
+
 
 export const metadata: Metadata = {
   title: "Yuki - Your Money, Always Working",
@@ -55,7 +69,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className="scroll-smooth">
-        <body className="font-mabrypro min-h-screen bg-[#0a0a0a] text-white grain-overlay">
+        <body className={`${geist.className} min-h-screen bg-[#222528] text-white grain-overlay`}>
           <Providers>
             <LayoutContent>{children}</LayoutContent>
           </Providers>

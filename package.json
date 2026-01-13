@@ -25,6 +25,7 @@
     "@walletconnect/ethereum-provider": "^2.23.1",
     "argon2-browser": "^1.18.0",
     "framer-motion": "^12.24.0",
+    "geist": "^1.5.1",
     "iron-session": "^8.0.4",
     "next": "^16.1.1",
     "pg": "^8.16.3",

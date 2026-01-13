@@ -10,7 +10,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   return (
     <div className="relative z-10">
       {!isLoginPage && <Navbar />}
-      <main className={isLoginPage ? "" : "pt-8 px-6 max-w-[1100px] mx-auto"}>
+      <main className={isLoginPage ? "" : "pt-8 px-2 mx-auto"}>
         {children}
       </main>
     </div>

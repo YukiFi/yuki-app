@@ -96,50 +96,52 @@ export default function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        scrolled ? "py-2 sm:py-3" : "py-3 sm:py-5"
-      }`}
+      className={`fixed top-0 w-full z-50 transition-all duration-500`}
     >
-      {/* Background with blur - only shows when scrolled */}
+  
       <div 
-        className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-xl transition-opacity duration-400"
+        className="absolute inset-0 bg-[#222528]"
         style={{ 
           opacity: scrolled ? 1 : 0,
           pointerEvents: "none",
         }}
       />
       
-      <div className="max-w-[1100px] mx-auto px-4 sm:px-6 relative z-10">
+      <div className="mx-auto px-4 sm:px-6 py-3 relative z-10">
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <Image
-              src="/images/Logo.svg"
-              alt="Yuki Logo"
-              width={80}
-              height={32}
-              className="h-7 sm:h-8 w-auto transition-transform duration-300 group-hover:scale-105"
-            />
-          </Link>
+          {/* Left section: Logo and Desktop Navigation (nav options are now left aligned) */}
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2 group">
+              <Image
+                src="/images/Logo.svg"
+                alt="Yuki Logo"
+                width={80}
+                height={32}
+                className="h-7 w-auto transition-transform duration-300 group-hover:scale-105"
+              />
+              <span className="text-white text-2xl font-display hidden sm:block mt-3">Yuki</span>
+            </Link>
 
-          {/* Desktop Navigation */}
-          {isSignedIn && (
-            <nav className="hidden md:flex items-center gap-1">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                    isActive(item.href)
-                      ? "bg-white text-black"
-                      : "text-white/70 hover:text-white hover:bg-white/10"
-                  }`}
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
-          )}
+            {/* Desktop Navigation (immediately next to logo, left aligned) */}
+            {isSignedIn && (
+              <nav className="hidden md:flex items-center gap-1 ml-2">
+                {navigation.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                      isActive(item.href)
+                        ? "bg-white/80 text-black"
+                        : "text-white/70 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+            )}
+          </div>
 
           {/* Right Side Actions */}
           <div className="hidden md:flex items-center gap-2">

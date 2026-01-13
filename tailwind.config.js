@@ -10,11 +10,6 @@ module.exports = {
       maxWidth: {
         'page': '1500px',
       },
-      fontFamily: {
-        mabrypro: ["MabryPro", "system-ui", "sans-serif"],
-        display: ["TanBuster", "system-ui", "sans-serif"],
-        finder: ["Finder", "system-ui", "sans-serif"],
-      },
       colors: {
         // Brand colors
         fdfffc: "#FDFFFC", // off-white

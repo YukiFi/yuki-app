@@ -2,92 +2,10 @@
 
 /* Tailwind v4 Theme Configuration */
 @theme {
-  --font-mabrypro: "MabryPro", system-ui, sans-serif;
   --font-display: "TanBuster", system-ui, sans-serif;
   --font-finder: "Finder", system-ui, sans-serif;
-  --color-brand: #004BAD;
+  --color-brand: #C8F800;
   --color-brand-blue: #004BAD;
-}
-
-/* Mabry Pro Font Family */
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-Light.ttf") format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-LightItalic.ttf") format("truetype");
-  font-weight: 300;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-Italic.ttf") format("truetype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-Medium.ttf") format("truetype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-MediumItalic.ttf") format("truetype");
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-BoldItalic.ttf") format("truetype");
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-Black.ttf") format("truetype");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "MabryPro";
-  src: url("/fonts/Mabry/MabryPro-BlackItalic.ttf") format("truetype");
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
 }
 
 @font-face {
@@ -108,16 +26,15 @@
 
 :root {
   --foreground: 253, 255, 252; /* FDFFFC - off-white text */
-  --background: 10, 10, 10; /* #0a0a0a - dark background */
+  --background: 34, 37, 40; /* #222528 - dark background */
   --accent-primary: 0, 75, 173; /* 004BAD - brand blue */
   --accent-secondary: 207, 208, 206; /* CFD0CE - light gray */
+  font-family: sans-serif;
 }
 
 body {
   color: #ffffff;
-  background: #0a0a0a;
-  letter-spacing: -0.01em;
-  line-height: 1.6;
+  background: #222528;
 }
 
 /* Grain texture overlay - apply to elements that need it */
