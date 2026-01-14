@@ -471,7 +471,7 @@ function LoginContent() {
           className="mb-8"
         >
           <h1 
-            className="font-display text-4xl sm:text-5xl text-black tracking-tight mb-3"
+            className="font-headline text-4xl sm:text-5xl text-black tracking-tight mb-3"
             style={{
               WebkitFontSmoothing: "antialiased",
               textRendering: "geometricPrecision",

@@ -18,8 +18,9 @@ const geistMono = Geist_Mono({
 })
 
 
+
 export const metadata: Metadata = {
-  title: "Yuki - Your Money, Always Working",
+  title: "Yuki | Your Money, Always Working",
   description: "A new kind of money app. Your balance earns while you spend, send, and live. Non-custodial and transparent by design.",
   metadataBase: new URL("https://app.yuki.fi"),
   keywords: ["savings", "yield", "crypto", "DeFi", "money app", "earn", "non-custodial"],
@@ -43,7 +44,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Yuki - Your Money, Always Working",
+    title: "Yuki | Your Money, Always Working",
     description: "A new kind of money app. Your balance earns while you spend, send, and live.",
     images: ["/images/OG.png"],
     creator: "@yukiprotocol",
@@ -59,6 +60,21 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  icons: {
+    icon: [
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180" },
+    ],
+    other: [
+      {
+        rel: "manifest",
+        url: "/site.webmanifest",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -69,7 +85,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className="scroll-smooth">
-        <body className={`${geist.className} min-h-screen bg-[#222528] text-white grain-overlay`}>
+        <body className={`${geist.className} min-h-screen bg-[#222528] text-white`}>
           <Providers>
             <LayoutContent>{children}</LayoutContent>
           </Providers>

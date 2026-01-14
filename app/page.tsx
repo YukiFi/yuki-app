@@ -66,9 +66,8 @@ function BalanceChart({
     })
     .join(" ");
 
-  const lastPoint = data[data.length - 1];
-  const firstPoint = data[0];
-  const isUp = lastPoint.value >= firstPoint.value;
+  // Always use #1612d3 for color
+  const chartColor = "#1612d3";
 
   return (
     <div className="w-full h-16">
@@ -87,12 +86,12 @@ function BalanceChart({
           >
             <stop
               offset="0%"
-              stopColor={isUp ? "#10b981" : "#ef4444"}
+              stopColor={chartColor}
               stopOpacity="0.3"
             />
             <stop
               offset="100%"
-              stopColor={isUp ? "#10b981" : "#ef4444"}
+              stopColor={chartColor}
               stopOpacity="0"
             />
           </linearGradient>
@@ -108,7 +107,7 @@ function BalanceChart({
         <polyline
           points={points}
           fill="none"
-          stroke={isUp ? "#10b981" : "#ef4444"}
+          stroke={chartColor}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -165,16 +164,6 @@ export default function Dashboard() {
 
   return (
     <div className="w-full min-h-screen mt-12 relative bg-[#15181A] rounded-3xl px-3 py-3">
-      {/* Ambient glow */}
-      <motion.div
-        animate={{ opacity: [0.15, 0.25, 0.15], scale: [1, 1.05, 1] }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#004BAD]/20 rounded-full blur-[150px] pointer-events-none"
-      />
 
       <div className="mx-auto relative z-10 p-3">
         {/* Hero Balance Section */}
@@ -223,7 +212,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
                   <Image
-                    src="/images/yUSD.png"
+                    src="/images/yUSD.svg"
                     alt="yUSD"
                     width={28}
                     height={28}
@@ -241,7 +230,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-lg font-finder text-white">
+                <p className="text-lg font-headline text-white">
                   $
                   {totalBalance.toLocaleString("en-US", {
                     minimumFractionDigits: 2,

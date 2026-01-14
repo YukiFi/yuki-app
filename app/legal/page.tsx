@@ -55,7 +55,7 @@ export default function LegalPage() {
           className="mb-10"
         >
           <h1 
-            className="font-finder text-4xl sm:text-5xl text-white tracking-tight mb-3"
+            className="font-headline text-4xl sm:text-5xl text-white tracking-tight mb-3"
             style={{ 
               WebkitFontSmoothing: "antialiased",
               textRendering: "geometricPrecision",

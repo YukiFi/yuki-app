@@ -158,7 +158,7 @@ export default function ActivityPage() {
   }, []);
 
   return (
-    <div className="w-full min-h-screen pt-24 pb-12 relative">
+    <div className="mt-12 relative bg-[#15181A] rounded-3xl px-3 py-3">
       {/* Ambient glow */}
       <motion.div
         animate={{ opacity: [0.1, 0.2, 0.1], scale: [1, 1.05, 1] }}
@@ -166,7 +166,7 @@ export default function ActivityPage() {
         className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#004BAD]/15 rounded-full blur-[150px] pointer-events-none"
       />
 
-      <div className="px-4 sm:px-6 relative z-10">
+      <div className="p-3">
         {/* Header */}
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
@@ -175,13 +175,9 @@ export default function ActivityPage() {
           className="mb-10"
         >
           <h1 
-            className="font-finder text-4xl sm:text-5xl text-white tracking-tight mb-3"
-            style={{ 
-              WebkitFontSmoothing: "antialiased",
-              textRendering: "geometricPrecision",
-            }}
+            className="text-lg"
           >
-            ACTIVITY
+            Activity
           </h1>
           <p className="text-white/40">Your complete transaction history</p>
         </motion.section>
@@ -268,7 +264,7 @@ export default function ActivityPage() {
 
                   {/* Amount */}
                   <div
-                    className={`text-lg font-finder flex-shrink-0 ${
+                    className={`text-lg flex-shrink-0 ${
                       entry.isHighlight
                         ? "text-white"
                         : entry.amount > 0

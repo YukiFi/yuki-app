@@ -114,13 +114,12 @@ export default function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
               <Image
-                src="/images/Logo.svg"
+                src="/images/Yuki.svg"
                 alt="Yuki Logo"
                 width={80}
                 height={32}
-                className="h-7 w-auto transition-transform duration-300 group-hover:scale-105"
+                className="h-6 w-auto transition-transform duration-300 group-hover:scale-105 invert"
               />
-              <span className="text-white text-2xl font-display hidden sm:block mt-3">Yuki</span>
             </Link>
 
             {/* Desktop Navigation (immediately next to logo, left aligned) */}
