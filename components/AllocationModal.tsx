@@ -95,7 +95,7 @@ export default function AllocationModal({
       
       {/* Modal */}
       <div 
-        className="relative w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-md bg-[#121215] border border-white/10 rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {step === "select" ? (

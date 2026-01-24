@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export interface Country {
   code: string;
@@ -257,17 +258,25 @@ export default function CountryCodeSelector({ value, onChange }: CountryCodeSele
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="h-[52px] w-[120px] bg-white rounded-xl px-3 flex items-center gap-2 hover:bg-gray-50 transition-all focus:outline-none focus:bg-gray-50 cursor-pointer justify-between"
+        className={cn(
+          "h-12 w-[120px] rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 flex items-center gap-2 transition-colors duration-200 outline-none cursor-pointer justify-between",
+          "hover:bg-white/[0.05] hover:border-white/[0.12]",
+          isOpen && "bg-white/[0.05] border-[#e1a8f0]/30"
+        )}
       >
         <span className="text-xl">{selectedCountry.flag}</span>
-        <span className="text-sm font-medium text-black">{selectedCountry.code}</span>
+        <span className="text-sm font-medium text-white">{selectedCountry.code}</span>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={cn(
+            "w-4 h-4 text-white/40 transition-transform duration-200",
+            isOpen && "rotate-180"
+          )}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
+          strokeWidth={1.5}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
@@ -277,18 +286,18 @@ export default function CountryCodeSelector({ value, onChange }: CountryCodeSele
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute top-full mt-2 left-0 w-80 bg-white rounded-2xl shadow-2xl z-50 overflow-hidden"
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute top-full mt-2 left-0 w-80 bg-[#121215] border border-white/[0.08] rounded-xl z-50 overflow-hidden"
           >
             {/* Search */}
-            <div className="p-3 border-b border-gray-100">
+            <div className="p-3 border-b border-white/[0.06]">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search countries..."
                 autoFocus
-                className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-black placeholder:text-gray-400 focus:outline-none focus:bg-gray-200 transition-all"
+                className="w-full bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.08] rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:bg-white/[0.05] focus:border-[#e1a8f0]/30 transition-colors duration-200 outline-none"
               />
             </div>
 
@@ -300,22 +309,21 @@ export default function CountryCodeSelector({ value, onChange }: CountryCodeSele
                     key={`${country.code}-${country.country}-${idx}`}
                     type="button"
                     onClick={() => handleSelect(country)}
-                    className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-100 transition-colors text-left cursor-pointer ${
-                      country.code === value && country.country === selectedCountry.country
-                        ? "bg-gray-100"
-                        : ""
-                    }`}
+                    className={cn(
+                      "w-full px-4 py-3 flex items-center gap-3 hover:bg-white/[0.05] transition-colors duration-200 text-left cursor-pointer",
+                      country.code === value && country.country === selectedCountry.country && "bg-white/[0.03]"
+                    )}
                   >
                     <span className="text-2xl">{country.flag}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-black truncate">{country.name}</div>
-                      <div className="text-xs text-gray-500">{country.country}</div>
+                      <div className="text-sm font-medium text-white truncate">{country.name}</div>
+                      <div className="text-xs text-white/40">{country.country}</div>
                     </div>
-                    <span className="text-sm text-gray-600 font-mono">{country.code}</span>
+                    <span className="text-sm text-white/60 font-mono">{country.code}</span>
                   </button>
                 ))
               ) : (
-                <div className="px-4 py-8 text-center text-sm text-gray-400">No countries found</div>
+                <div className="px-4 py-8 text-center text-sm text-white/30">No countries found</div>
               )}
             </div>
           </motion.div>
@@ -324,4 +332,3 @@ export default function CountryCodeSelector({ value, onChange }: CountryCodeSele
     </div>
   );
 }
-

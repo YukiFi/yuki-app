@@ -3,20 +3,27 @@ import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/login(.*)",
+  "/documents(.*)",
+  "/legal(.*)",
+  "/help(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
   const { userId } = await auth();
   
   // If user is logged in and tries to access login page, redirect to dashboard
-  if (userId && isPublicRoute(request)) {
+  if (userId && request.nextUrl.pathname.startsWith("/login")) {
     return NextResponse.redirect(new URL("/", request.url));
   }
   
-  // Protect all other routes
-  if (!isPublicRoute(request)) {
-    await auth.protect();
+  // Protect all non-public routes - redirect to custom login page
+  if (!isPublicRoute(request) && !userId) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect_url", request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
+  
+  return NextResponse.next();
 });
 
 export const config = {
@@ -27,4 +34,3 @@ export const config = {
     "/(api|trpc)(.*)",
   ],
 };
-

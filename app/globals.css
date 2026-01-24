@@ -1,44 +1,100 @@
 @import "tailwindcss";
 
+@plugin "tailwindcss-animate";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
 /* Tailwind v4 Theme Configuration */
 @theme {
-  --font-headline: "TanHeadline", system-ui, sans-serif;
-  --color-brand: #1612d3;
+  --color-brand: #e1a8f0;
+  --color-brand-light: #edc4f5;
+  --color-brand-dark: #c47de0;
 }
 
-@font-face {
-  font-family: "TanHeadline";
-  src: url("/fonts/TANHEADLINE-Regular.ttf") format("truetype");
-  font-weight: 100 900;
-  font-style: normal;
-  font-headline: swap;
-}
-
+/* Yuki Dark Glassmorphic Theme - Default */
 :root {
-  --foreground: 253, 255, 252; /* FDFFFC - off-white text */
-  --background: 34, 37, 40; /* #222528 - dark background */
-  --accent-primary: 200, 248, 0; /* #C8F800 - bright accent */
-  font-family: sans-serif;
+  --radius: 0.75rem;
+
+  /* Dark glassmorphic colors - softer than pure black */
+  --background: oklch(0.11 0.005 270);
+  --foreground: oklch(0.98 0 0);
+
+  /* Card - glassmorphic surface */
+  --card: oklch(0.14 0.005 270 / 50%);
+  --card-foreground: oklch(0.98 0 0);
+
+  /* Popover */
+  --popover: oklch(0.12 0.005 270 / 95%);
+  --popover-foreground: oklch(0.98 0 0);
+
+  /* Primary - brand lavender */
+  --primary: oklch(0.78 0.12 320);
+  --primary-foreground: oklch(0.15 0.05 320);
+
+  /* Secondary - subtle glass */
+  --secondary: oklch(1 0 0 / 5%);
+  --secondary-foreground: oklch(0.98 0 0);
+
+  /* Muted */
+  --muted: oklch(1 0 0 / 5%);
+  --muted-foreground: oklch(0.7 0 0);
+
+  /* Accent - brand tinted glass */
+  --accent: oklch(0.78 0.12 320 / 15%);
+  --accent-foreground: oklch(0.98 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.65 0.2 25);
+
+  /* Border - subtle white */
+  --border: oklch(1 0 0 / 6%);
+  --input: oklch(1 0 0 / 5%);
+  --ring: oklch(0.78 0.12 320 / 50%);
+
+  /* Charts */
+  --chart-1: oklch(0.78 0.12 320);
+  --chart-2: oklch(0.7 0.15 180);
+  --chart-3: oklch(0.65 0.1 60);
+  --chart-4: oklch(0.75 0.18 280);
+  --chart-5: oklch(0.8 0.15 40);
+
+  /* Sidebar - slightly darker for depth */
+  --sidebar: oklch(0.09 0.005 270);
+  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar-primary: oklch(0.78 0.12 320);
+  --sidebar-primary-foreground: oklch(0.15 0.05 320);
+  --sidebar-accent: oklch(1 0 0 / 5%);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(1 0 0 / 6%);
+  --sidebar-ring: oklch(0.78 0.12 320 / 50%);
+}
+
+/* Prevent flash of white background */
+html {
+  background-color: #0f0f12;
+  color-scheme: dark;
 }
 
 body {
   color: #ffffff;
-  background: #222528;
+  background: #0f0f12;
+  /* Prevent font flash */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  /* Invert foreground and background on selection */
-  color: #222528;
-  background: #fdfffc;
+  color: #1a0a1f;
+  background: #e1a8f0;
 }
-
 
 /* Grain texture overlay - apply to elements that need it */
 .grain-overlay::before {
   content: "";
   position: fixed;
   inset: 0;
-  opacity: 0.25;
+  opacity: 0.15;
   pointer-events: none;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
@@ -75,4 +131,87 @@ body {
 
 .animate-fade-in {
   animation: fadeIn 0.7s ease forwards;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Remove all outlines and rings globally */
+  *:focus,
+  *:focus-visible,
+  *:focus-within {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  /* Override any ring utilities */
+  .ring-0,
+  [class*="focus-visible:ring"],
+  [class*="focus:ring"] {
+    --tw-ring-shadow: none !important;
+  }
+}
+
+.dark {
+  --sidebar: oklch(0.09 0.005 270);
+  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar-primary: oklch(0.78 0.12 320);
+  --sidebar-primary-foreground: oklch(0.15 0.05 320);
+  --sidebar-accent: oklch(1 0 0 / 5%);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(1 0 0 / 6%);
+  --sidebar-ring: oklch(0.78 0.12 320 / 50%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

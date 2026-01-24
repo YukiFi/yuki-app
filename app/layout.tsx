@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 
 export const metadata: Metadata = {
-  title: "Yuki | Your Money, Always Working",
+  title: "Yuki | App",
   description: "A new kind of money app. Your balance earns while you spend, send, and live. Non-custodial and transparent by design.",
   metadataBase: new URL("https://app.yuki.fi"),
   keywords: ["savings", "yield", "crypto", "DeFi", "money app", "earn", "non-custodial"],
@@ -83,9 +83,48 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en" className="scroll-smooth">
-        <body className={`${geist.className} min-h-screen bg-[#222528] text-white`}>
+    <ClerkProvider
+      signInUrl="/login"
+      signUpUrl="/login?su"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+    >
+      <html 
+        lang="en" 
+        className="scroll-smooth"
+        style={{ backgroundColor: '#0f0f12', colorScheme: 'dark' }}
+      >
+        <head>
+          {/* Prevent background flash - set background before any CSS loads */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  document.documentElement.style.backgroundColor = '#0f0f12';
+                  document.documentElement.style.colorScheme = 'dark';
+                })();
+              `,
+            }}
+          />
+          {/* Preload critical CSS */}
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+                html, body { 
+                  background-color: #0f0f12; 
+                  color: #ffffff;
+                  color-scheme: dark;
+                }
+                /* Prevent layout shift - pre-allocate sidebar width */
+                :root {
+                  --sidebar-width: 16rem;
+                  --sidebar-width-collapsed: 3rem;
+                }
+              `,
+            }}
+          />
+        </head>
+        <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-[#0f0f12] text-white antialiased`}>
           <Providers>
             <LayoutContent>{children}</LayoutContent>
           </Providers>

@@ -5,7 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useSignIn, useSignUp, useUser } from "@clerk/nextjs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import CountryCodeSelector from "@/components/CountryCodeSelector";
+
+const easeOut = [0.22, 1, 0.36, 1] as const;
 
 function LoginContent() {
   const router = useRouter();
@@ -23,7 +31,7 @@ function LoginContent() {
     }
   }, [userLoaded, isSignedIn, router]);
   
-  const [authMethod, setAuthMethod] = useState<"phone" | "email">("phone");
+  const [authMethod, setAuthMethod] = useState<"phone" | "email">("email");
   const [countryCode, setCountryCode] = useState("+1");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
@@ -41,11 +49,21 @@ function LoginContent() {
     }
   }, [resendCooldown]);
 
+  // Auto-submit when OTP is complete
+  useEffect(() => {
+    if (verificationCode.length === 6 && step === "verify") {
+      const form = document.getElementById("verify-form") as HTMLFormElement;
+      if (form) {
+        form.requestSubmit();
+      }
+    }
+  }, [verificationCode, step]);
+
   // Show loading while checking auth status
   if (!userLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f8f6f3] via-[#eae8e4] to-[#e0ddd8]">
-        <div className="w-8 h-8 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0f0f12]">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-[#e1a8f0] rounded-full animate-spin" />
       </div>
     );
   }
@@ -58,9 +76,7 @@ function LoginContent() {
   const formatPhoneNumber = (value: string, code: string): string => {
     const numbers = value.replace(/\D/g, "");
     
-    // Format based on country code
     if (code === "+1") {
-      // US/Canada formatting
       if (numbers.length <= 3) {
         return numbers;
       } else if (numbers.length <= 6) {
@@ -69,7 +85,6 @@ function LoginContent() {
         return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
       }
     } else {
-      // International formatting - just return the numbers
       return numbers;
     }
   };
@@ -82,46 +97,68 @@ function LoginContent() {
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
     setLoading(true);
     
     try {
       if (authMethod === "phone") {
-        const numbers = phoneNumber.replace(/\D/g, "");
+        // Extract only digits from the phone number
+        let numbers = phoneNumber.replace(/\D/g, "");
         
-        if (numbers.length < 7) {
+        // Get the country code digits (without the +)
+        const countryCodeDigits = countryCode.replace(/\D/g, "");
+        
+        // For US/Canada (+1), if user entered 11 digits starting with 1, strip the leading 1
+        // to avoid doubling the country code
+        if (countryCodeDigits === "1" && numbers.length === 11 && numbers.startsWith("1")) {
+          numbers = numbers.slice(1);
+        }
+        
+        // For US/Canada, we need exactly 10 digits for the subscriber number
+        if (countryCodeDigits === "1" && numbers.length !== 10) {
+          setError(`Please enter a 10-digit phone number (you entered ${numbers.length} digits)`);
+          setLoading(false);
+          return;
+        }
+        
+        // For other countries, minimum 7 digits
+        if (countryCodeDigits !== "1" && numbers.length < 7) {
           setError("Please enter a valid phone number");
           setLoading(false);
           return;
         }
 
-        const fullPhoneNumber = `${countryCode}${numbers}`;
+        // Create E.164 format: +[country code][subscriber number]
+        // Ensure country code starts with + and has no extra characters
+        const fullPhoneNumber = `+${countryCodeDigits}${numbers}`;
+        
+        console.log("Attempting auth with phone:", fullPhoneNumber);
+        console.log("Country code:", countryCode, "-> digits:", countryCodeDigits);
+        console.log("Phone digits:", numbers, "length:", numbers.length);
         
         if (isSignUp) {
-          await signUp?.create({
-            phoneNumber: fullPhoneNumber,
-          });
-          
-          await signUp?.preparePhoneNumberVerification({
-            strategy: "phone_code",
-          });
+          await signUp?.create({ phoneNumber: fullPhoneNumber });
+          await signUp?.preparePhoneNumberVerification({ strategy: "phone_code" });
         } else {
-          await signIn?.create({
-            identifier: fullPhoneNumber,
-          });
+          const signInAttempt = await signIn?.create({ identifier: fullPhoneNumber });
           
-          const phoneFactor = signIn?.supportedFirstFactors?.find(
+          if (!signInAttempt) {
+            throw new Error("Failed to create sign-in attempt");
+          }
+          
+          const phoneFactor = signInAttempt.supportedFirstFactors?.find(
             (f): f is typeof f & { phoneNumberId: string } => f.strategy === "phone_code"
           );
+          
           if (phoneFactor?.phoneNumberId) {
             await signIn?.prepareFirstFactor({
               strategy: "phone_code",
               phoneNumberId: phoneFactor.phoneNumberId,
             });
+          } else {
+            throw new Error("Phone verification not available for this account");
           }
         }
       } else {
-        // Email flow
         if (!email || !email.includes("@")) {
           setError("Please enter a valid email address");
           setLoading(false);
@@ -129,44 +166,67 @@ function LoginContent() {
         }
 
         if (isSignUp) {
-          await signUp?.create({
-            emailAddress: email,
-          });
-          
-          await signUp?.prepareEmailAddressVerification({
-            strategy: "email_code",
-          });
+          await signUp?.create({ emailAddress: email });
+          await signUp?.prepareEmailAddressVerification({ strategy: "email_code" });
         } else {
-          await signIn?.create({
-            identifier: email,
-          });
+          const signInAttempt = await signIn?.create({ identifier: email });
           
-          const emailFactor = signIn?.supportedFirstFactors?.find(
+          if (!signInAttempt) {
+            throw new Error("Failed to create sign-in attempt");
+          }
+          
+          const emailFactor = signInAttempt.supportedFirstFactors?.find(
             (f): f is typeof f & { emailAddressId: string } => f.strategy === "email_code"
           );
+          
           if (emailFactor?.emailAddressId) {
             await signIn?.prepareFirstFactor({
               strategy: "email_code",
               emailAddressId: emailFactor.emailAddressId,
             });
+          } else {
+            throw new Error("Email verification not available for this account");
           }
         }
       }
       
       setStep("verify");
-      setResendCooldown(60); // 60 second cooldown after sending code
-    } catch (err: any) {
+      setResendCooldown(60);
+    } catch (err: unknown) {
       console.error("Error sending code:", err);
-      let errorMessage = err.errors?.[0]?.message || "Failed to send verification code. Please try again.";
+      const clerkError = err as { errors?: { message?: string; code?: string; longMessage?: string; meta?: { paramName?: string } }[]; status?: number };
       
-      // Handle specific error cases
-      if (errorMessage.includes("email_address is not a valid parameter")) {
+      // Log full error for debugging
+      console.log("Clerk error details:", JSON.stringify(clerkError.errors, null, 2));
+      
+      let errorMessage = clerkError.errors?.[0]?.longMessage || clerkError.errors?.[0]?.message || "Failed to send verification code. Please try again.";
+      const errorCode = clerkError.errors?.[0]?.code;
+      
+      // Handle specific Clerk errors
+      if (errorCode === "form_identifier_not_found") {
+        // User doesn't exist
+        errorMessage = "No account found. Please sign up first.";
+      } else if (errorCode === "form_param_format_invalid" || errorMessage.includes("Identifier is invalid")) {
+        // This usually means phone auth isn't enabled in Clerk, or the identifier type isn't allowed
+        let debugNumbers = phoneNumber.replace(/\D/g, "");
+        const debugCountryDigits = countryCode.replace(/\D/g, "");
+        if (debugCountryDigits === "1" && debugNumbers.length === 11 && debugNumbers.startsWith("1")) {
+          debugNumbers = debugNumbers.slice(1);
+        }
+        const debugFullNumber = `+${debugCountryDigits}${debugNumbers}`;
+        console.log("Phone number that was rejected:", debugFullNumber);
+        errorMessage = isSignUp 
+          ? "Phone sign-up may not be enabled. Try email or check Clerk settings."
+          : "Could not sign in with this phone. Try email, or check if phone sign-in is enabled in Clerk.";
+      } else if (errorMessage.includes("email_address is not a valid parameter")) {
         errorMessage = "Email authentication is not enabled. Please use phone authentication or contact support.";
       } else if (errorMessage.includes("too many") || errorMessage.includes("rate limit") || 
-                 err.errors?.[0]?.code === "too_many_requests" ||
-                 err.status === 429) {
+                 clerkError.errors?.[0]?.code === "too_many_requests" ||
+                 clerkError.status === 429) {
         errorMessage = "Too many requests. Please wait a few minutes before trying again.";
-        setResendCooldown(120); // 2 minute cooldown for rate limit
+        setResendCooldown(120);
+      } else if (clerkError.errors?.[0]?.code === "form_param_format_invalid") {
+        errorMessage = "Invalid phone number format. Please enter a valid phone number.";
       }
       
       setError(errorMessage);
@@ -188,36 +248,21 @@ function LoginContent() {
     
     try {
       if (isSignUp) {
-        // Verify sign up
         let result;
         if (authMethod === "phone") {
-          result = await signUp?.attemptPhoneNumberVerification({
-            code: verificationCode,
-          });
+          result = await signUp?.attemptPhoneNumberVerification({ code: verificationCode });
         } else {
-          result = await signUp?.attemptEmailAddressVerification({
-            code: verificationCode,
-          });
+          result = await signUp?.attemptEmailAddressVerification({ code: verificationCode });
         }
         
-        console.log("Sign up verification result:", result);
-        
         if (result?.status === "complete") {
-          console.log("Sign up verification complete, setting active session...");
           await setActiveSignUp?.({ session: result.createdSessionId });
-          console.log("Session activated, redirecting to app...");
           window.location.href = "/";
           return;
         } else if (result?.status === "missing_requirements") {
-          console.log("Missing requirements:", result.missingFields);
-          
-          // Clerk verified the email/phone but needs more info
-          // Since we only collect phone/email, we should still try to activate the session
           if (signUp?.createdSessionId) {
-            console.log("Attempting to activate session despite missing requirements...");
             try {
               await setActiveSignUp?.({ session: signUp.createdSessionId });
-              console.log("Session activated successfully, redirecting to app...");
               window.location.href = "/";
               return;
             } catch (sessionErr) {
@@ -225,14 +270,10 @@ function LoginContent() {
             }
           }
           
-          // Last resort: Try to complete the sign up by updating with minimal info
           try {
-            console.log("Attempting to update sign up to complete status...");
             const updateResult = await signUp?.update({});
-            
             if (updateResult?.status === "complete") {
               await setActiveSignUp?.({ session: updateResult.createdSessionId });
-              console.log("Sign up completed after update, redirecting...");
               window.location.href = "/";
               return;
             }
@@ -240,54 +281,33 @@ function LoginContent() {
             console.error("Could not update sign up:", updateErr);
           }
           
-          // If nothing worked, something is wrong with Clerk config
           setError("Account verification successful! Please check your Clerk settings or try signing in.");
-          setTimeout(() => {
-            window.location.href = "/login";
-          }, 3000);
+          setTimeout(() => { window.location.href = "/login"; }, 3000);
           return;
-        } else {
-          console.log("Unexpected sign up result status:", result?.status, result);
         }
       } else {
-        // Verify sign in
         let result;
         if (authMethod === "phone") {
-          result = await signIn?.attemptFirstFactor({
-            strategy: "phone_code",
-            code: verificationCode,
-          });
+          result = await signIn?.attemptFirstFactor({ strategy: "phone_code", code: verificationCode });
         } else {
-          result = await signIn?.attemptFirstFactor({
-            strategy: "email_code",
-            code: verificationCode,
-          });
+          result = await signIn?.attemptFirstFactor({ strategy: "email_code", code: verificationCode });
         }
         
         if (result?.status === "complete") {
-          console.log("Sign in verification complete, setting active session...");
           await setActiveSignIn?.({ session: result.createdSessionId });
-          console.log("Session activated, redirecting...");
-          // Use window.location for hard redirect to ensure middleware picks up the new session
           window.location.href = "/";
           return;
-        } else {
-          console.log("Unexpected sign in result status:", result?.status);
         }
       }
       
-      // If we get here without returning, something unexpected happened
       setError("Verification completed but unable to proceed. Please try signing in again.");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error verifying code:", err);
+      const clerkError = err as { errors?: { message?: string; code?: string }[] };
       
-      // Check if already verified
-      if (err.errors?.[0]?.code === "verification_already_verified" || 
-          err.errors?.[0]?.message?.includes("already verified") ||
-          err.errors?.[0]?.message?.includes("Already verified")) {
-        console.log("User already verified, attempting to complete session...");
-        
-        // Try to complete the session anyway
+      if (clerkError.errors?.[0]?.code === "verification_already_verified" || 
+          clerkError.errors?.[0]?.message?.includes("already verified") ||
+          clerkError.errors?.[0]?.message?.includes("Already verified")) {
         try {
           if (isSignUp && signUp?.createdSessionId) {
             await setActiveSignUp?.({ session: signUp.createdSessionId });
@@ -299,16 +319,14 @@ function LoginContent() {
             return;
           }
         } catch {
-          // If that fails, just redirect to login to try again
           setError("Already verified! Please sign in.");
-          setTimeout(() => {
-            window.location.href = "/login";
-          }, 1500);
+          setTimeout(() => { window.location.href = "/login"; }, 1500);
           return;
         }
       }
       
-      setError(err.errors?.[0]?.message || "Invalid verification code. Please try again.");
+      setError(clerkError.errors?.[0]?.message || "Invalid verification code. Please try again.");
+      setVerificationCode("");
     } finally {
       setLoading(false);
     }
@@ -326,9 +344,7 @@ function LoginContent() {
     try {
       if (authMethod === "phone") {
         if (isSignUp) {
-          await signUp?.preparePhoneNumberVerification({
-            strategy: "phone_code",
-          });
+          await signUp?.preparePhoneNumberVerification({ strategy: "phone_code" });
         } else {
           const phoneFactor = signIn?.supportedFirstFactors?.find(
             (f): f is typeof f & { phoneNumberId: string } => f.strategy === "phone_code"
@@ -342,9 +358,7 @@ function LoginContent() {
         }
       } else {
         if (isSignUp) {
-          await signUp?.prepareEmailAddressVerification({
-            strategy: "email_code",
-          });
+          await signUp?.prepareEmailAddressVerification({ strategy: "email_code" });
         } else {
           const emailFactor = signIn?.supportedFirstFactors?.find(
             (f): f is typeof f & { emailAddressId: string } => f.strategy === "email_code"
@@ -358,16 +372,16 @@ function LoginContent() {
         }
       }
       
-      setResendCooldown(60); // 60 second cooldown after resending
-    } catch (err: any) {
-      let errorMessage = err.errors?.[0]?.message || "Failed to resend code. Please try again.";
+      setResendCooldown(60);
+    } catch (err: unknown) {
+      const clerkError = err as { errors?: { message?: string; code?: string }[]; status?: number };
+      let errorMessage = clerkError.errors?.[0]?.message || "Failed to resend code. Please try again.";
       
-      // Handle rate limit errors
       if (errorMessage.includes("too many") || errorMessage.includes("rate limit") || 
-          err.errors?.[0]?.code === "too_many_requests" ||
-          err.status === 429) {
+          clerkError.errors?.[0]?.code === "too_many_requests" ||
+          clerkError.status === 429) {
         errorMessage = "Too many requests. Please wait a few minutes before trying again.";
-        setResendCooldown(120); // 2 minute cooldown for rate limit
+        setResendCooldown(120);
       }
       
       setError(errorMessage);
@@ -379,365 +393,230 @@ function LoginContent() {
   // Show loading while Clerk hooks initialize
   if (!signInLoaded || !signUpLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f8f6f3] via-[#eae8e4] to-[#e0ddd8]">
-        <div className="w-8 h-8 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0f0f12]">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-[#e1a8f0] rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center">
-      {/* Gradient background - matching landing page */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#f8f6f3] via-[#eae8e4] to-[#e0ddd8]" />
-      
-      {/* Grain overlay */}
-      <div 
-        className="absolute inset-0 opacity-[0.4] pointer-events-none mix-blend-overlay"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-        }}
-      />
-
-      {/* Floating color accents - matching landing page */}
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center bg-[#0f0f12]">
+      {/* Subtle brand glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          initial={{ scale: 0, opacity: 0, x: 0, y: 0 }}
-          animate={{ 
-            scale: 1, 
-            opacity: 0.12,
-            x: [0, 30, -20, 0],
-            y: [0, -40, 20, 0],
-          }}
-          transition={{ 
-            scale: { duration: 1.5, delay: 0.5 },
-            opacity: { duration: 1.5, delay: 0.5 },
-            x: { duration: 20, repeat: Infinity, ease: "easeInOut", delay: 1 },
-            y: { duration: 25, repeat: Infinity, ease: "easeInOut", delay: 1 },
-          }}
-          className="absolute -top-20 -right-20 sm:-top-40 sm:-right-40 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] rounded-full bg-gradient-to-br from-[#004BAD]/30 to-transparent blur-3xl"
-        />
-        <motion.div
-          initial={{ scale: 0, opacity: 0, x: 0, y: 0 }}
-          animate={{ 
-            scale: 1, 
-            opacity: 0.08,
-            x: [0, -25, 35, 0],
-            y: [0, 30, -25, 0],
-          }}
-          transition={{ 
-            scale: { duration: 1.5, delay: 0.7 },
-            opacity: { duration: 1.5, delay: 0.7 },
-            x: { duration: 22, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
-            y: { duration: 18, repeat: Infinity, ease: "easeInOut", delay: 1.2 },
-          }}
-          className="absolute -bottom-20 -left-20 sm:-bottom-40 sm:-left-40 w-[250px] h-[250px] sm:w-[400px] sm:h-[400px] rounded-full bg-gradient-to-tr from-amber-200/20 to-transparent blur-3xl"
-        />
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ 
-            scale: [1, 1.1, 1],
-            opacity: [0.06, 0.1, 0.06],
-          }}
-          transition={{ 
-            scale: { duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.9 },
-            opacity: { duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.9 },
-          }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] sm:w-[600px] sm:h-[600px] rounded-full bg-gradient-radial from-white/40 to-transparent"
-        />
+        <div className="absolute -top-[300px] -right-[300px] w-[600px] h-[600px] rounded-full bg-[#e1a8f0]/[0.04]" />
+        <div className="absolute -bottom-[200px] -left-[200px] w-[400px] h-[400px] rounded-full bg-[#e1a8f0]/[0.02]" />
       </div>
 
-      <div className="w-full max-w-lg mx-auto px-6 py-12 relative z-10">
-        {/* Logo */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-10"
-        >
+      <div className="w-full max-w-md mx-auto px-4 sm:px-6 py-12 relative z-10">
+        {/* Logo - immediately visible */}
+        <div className="mb-8">
           <Image
-            src="/images/LogoBlack.svg"
+            src="/images/Logo.svg"
             alt="Yuki Logo"
             width={80}
             height={32}
-            className="transition-transform duration-300 hover:scale-105"
+            className="transition-transform duration-200 hover:scale-105"
           />
-        </motion.div>
+        </div>
 
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-8"
-        >
-          <h1 
-            className="font-headline text-4xl sm:text-5xl text-black tracking-tight mb-3"
-            style={{
-              WebkitFontSmoothing: "antialiased",
-              textRendering: "geometricPrecision",
-            }}
-          >
-            {isSignUp ? (
-              <>
-                GET
-                <div className="h-2" />
-                STARTED
-              </>
-            ) : (
-              <>
-                WELCOME
-                <div className="h-2" />
-                BACK
-              </>
-            )}
-          </h1>
-          <p className="text-gray-600 text-base sm:text-lg">
-            {step === "input" 
-              ? isSignUp 
-                ? `Enter your ${authMethod === "phone" ? "phone number" : "email"} to create your account`
-                : `Enter your ${authMethod === "phone" ? "phone number" : "email"} to sign in`
-              : `Enter the 6-digit code sent to your ${authMethod === "phone" ? "phone" : "email"}`
-            }
-          </p>
-        </motion.div>
-
-        {/* Form Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-white/70 backdrop-blur-xl rounded-3xl p-8"
-        >
-          {step === "input" ? (
-            <form onSubmit={handleSendCode} className="space-y-6">
-              {/* Auth Method Toggle */}
-              <div className="flex gap-2 p-1.5 bg-black/5 rounded-2xl">
-                <button
-                  type="button"
-                  onClick={() => setAuthMethod("phone")}
-                  className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                    authMethod === "phone"
-                      ? "bg-black text-white"
-                      : "text-gray-600 hover:text-black"
-                  }`}
-                >
-                  Phone
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAuthMethod("email")}
-                  className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                    authMethod === "email"
-                      ? "bg-black text-white"
-                      : "text-gray-600 hover:text-black"
-                  }`}
-                >
-                  Email
-                </button>
+        {/* Login Card - immediately visible */}
+        <div>
+          <Card>
+            <CardHeader className="space-y-2 pb-2">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#e1a8f0]" />
+                <span className="text-xs text-white/40 uppercase tracking-widest">
+                  {isSignUp ? "Create Account" : "Sign In"}
+                </span>
               </div>
+              <CardTitle className="text-3xl sm:text-4xl">
+                {isSignUp ? "Get Started" : "Welcome Back"}
+              </CardTitle>
+              <CardDescription className="text-base">
+                {step === "input" 
+                  ? isSignUp 
+                    ? `Enter your ${authMethod === "phone" ? "phone number" : "email"} to create your account`
+                    : `Enter your ${authMethod === "phone" ? "phone number" : "email"} to sign in`
+                  : `Enter the 6-digit code sent to your ${authMethod === "phone" ? "phone" : "email"}`
+                }
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent>
+              {step === "input" ? (
+                <form onSubmit={handleSendCode} className="space-y-5">
+                  {/* Auth Method Tabs */}
+                  <Tabs value={authMethod} onValueChange={(v) => setAuthMethod(v as "phone" | "email")}>
+                    <TabsList className="w-full">
+                      <TabsTrigger value="phone">Phone</TabsTrigger>
+                      <TabsTrigger value="email">Email</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="phone">
+                      <div className="space-y-2.5 mt-5">
+                        <Label htmlFor="phone" className="text-white/70 block">Phone Number</Label>
+                        <div className="flex items-stretch gap-3">
+                          <CountryCodeSelector
+                            value={countryCode}
+                            onChange={(code) => {
+                              setCountryCode(code);
+                              setPhoneNumber(formatPhoneNumber(phoneNumber, code));
+                            }}
+                          />
+                          <Input
+                            id="phone"
+                            type="tel"
+                            value={phoneNumber}
+                            onChange={handlePhoneChange}
+                            placeholder={countryCode === "+1" ? "(555) 123-4567" : "Phone number"}
+                            required
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="email">
+                      <div className="space-y-2.5">
+                        <Label htmlFor="email" className="text-white/70 block">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          required
+                        />
+                      </div>
+                    </TabsContent>
+                  </Tabs>
 
-              {/* Phone Input */}
-              {authMethod === "phone" ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number
-                  </label>
-                  <div className="flex items-stretch gap-3">
-                    <CountryCodeSelector
-                      value={countryCode}
-                      onChange={(code) => {
-                        setCountryCode(code);
-                        setPhoneNumber(formatPhoneNumber(phoneNumber, code));
-                      }}
-                    />
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={handlePhoneChange}
-                      placeholder={countryCode === "+1" ? "(555) 123-4567" : "Phone number"}
-                      required
-                      className="flex-1 h-[52px] bg-white/80 rounded-xl px-4 text-black placeholder:text-gray-400 focus:outline-none focus:bg-white transition-all"
-                    />
-                  </div>
-                </div>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="p-4 bg-red-500/10 rounded-xl border border-red-500/20"
+                    >
+                      <p className="text-sm text-red-400">{error}</p>
+                    </motion.div>
+                  )}
+
+                  {/* Clerk CAPTCHA */}
+                  <div id="clerk-captcha" className="flex justify-center" />
+
+                  <Button type="submit" disabled={loading} className="w-full" size="lg">
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-5 h-5 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full animate-spin" />
+                        Sending...
+                      </span>
+                    ) : (
+                      "Continue"
+                    )}
+                  </Button>
+                </form>
               ) : (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    className="w-full h-[52px] bg-white/80 rounded-xl px-4 text-black placeholder:text-gray-400 focus:outline-none focus:bg-white transition-all"
-                  />
-                </div>
-              )}
+                <form id="verify-form" onSubmit={handleVerifyCode} className="space-y-5">
+                  <div className="space-y-4">
+                    <Label className="text-white/70">Verification Code</Label>
+                    <div className="flex justify-center mt-2">
+                      <InputOTP
+                        maxLength={6}
+                        value={verificationCode}
+                        onChange={setVerificationCode}
+                        autoFocus
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                    <p className="text-sm text-white/40 text-center">
+                      Sent to {authMethod === "phone" ? `${countryCode} ${phoneNumber}` : email}
+                    </p>
+                  </div>
 
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-red-50 rounded-xl"
-                >
-                  <p className="text-sm text-red-600">{error}</p>
-                </motion.div>
-              )}
-
-              {/* Clerk CAPTCHA - will be shown by Clerk when needed */}
-              <div id="clerk-captcha" className="flex justify-center" />
-
-              <motion.button
-                type="submit"
-                disabled={loading}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="group relative w-full py-4 bg-black text-white rounded-full text-base font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer overflow-hidden"
-              >
-                <span className="relative z-10">
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Sending...
-                    </span>
-                  ) : (
-                    "Continue"
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="p-4 bg-red-500/10 rounded-xl border border-red-500/20"
+                    >
+                      <p className="text-sm text-red-400">{error}</p>
+                    </motion.div>
                   )}
-                </span>
-                <motion.div
-                  className="absolute inset-0 bg-[#004BAD]"
-                  initial={{ x: "-100%" }}
-                  whileHover={{ x: 0 }}
-                  transition={{ duration: 0.3 }}
-                />
-                <span className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white font-semibold">
-                  Continue
-                </span>
-              </motion.button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyCode} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Verification Code
-                </label>
-                <input
-                  type="text"
-                  value={verificationCode}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, "");
-                    setVerificationCode(value.slice(0, 6));
-                  }}
-                  placeholder="000000"
-                  required
-                  maxLength={6}
-                  autoFocus
-                  className="w-full bg-white/80 rounded-xl px-4 py-4 text-black text-2xl tracking-[0.3em] placeholder:text-gray-400 focus:outline-none focus:bg-white transition-all font-mono text-center"
-                />
-                <p className="text-sm text-gray-600 mt-2">
-                  Sent to {authMethod === "phone" ? `${countryCode} ${phoneNumber}` : email}
-                </p>
-              </div>
 
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-red-50 rounded-xl"
-                >
-                  <p className="text-sm text-red-600">{error}</p>
-                </motion.div>
+                  <Button type="submit" disabled={loading || verificationCode.length !== 6} className="w-full" size="lg">
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-5 h-5 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full animate-spin" />
+                        Verifying...
+                      </span>
+                    ) : (
+                      "Verify & Continue"
+                    )}
+                  </Button>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setStep("input");
+                        setVerificationCode("");
+                        setError(null);
+                      }}
+                    >
+                      ← Change {authMethod === "phone" ? "number" : "email"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResendCode}
+                      disabled={loading || resendCooldown > 0}
+                    >
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+                    </Button>
+                  </div>
+                </form>
               )}
+            </CardContent>
+          </Card>
+        </div>
 
-              <motion.button
-                type="submit"
-                disabled={loading}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="group relative w-full py-4 bg-black text-white rounded-full text-base font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer overflow-hidden"
-              >
-                <span className="relative z-10">
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Verifying...
-                    </span>
-                  ) : (
-                    "Verify & Continue"
-                  )}
-                </span>
-                <motion.div
-                  className="absolute inset-0 bg-[#004BAD]"
-                  initial={{ x: "-100%" }}
-                  whileHover={{ x: 0 }}
-                  transition={{ duration: 0.3 }}
-                />
-                <span className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white font-semibold">
-                  Verify & Continue
-                </span>
-              </motion.button>
-
-              <div className="flex items-center justify-between text-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("input");
-                    setVerificationCode("");
-                    setError(null);
-                  }}
-                  className="text-gray-600 hover:text-black transition-colors cursor-pointer font-medium"
-                >
-                  ← Change {authMethod === "phone" ? "number" : "email"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResendCode}
-                  disabled={loading || resendCooldown > 0}
-                  className="text-gray-600 hover:text-black transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed font-medium"
-                >
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
-                </button>
-              </div>
-            </form>
-          )}
-        </motion.div>
-
-        {/* Footer */}
+        {/* Footer - immediately visible */}
         {step === "input" && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-sm text-gray-600 mt-6"
-          >
+          <p className="text-sm text-white/40 mt-6 text-center">
             {isSignUp ? (
               <>
                 Already have an account?{" "}
-                <a href="/login" className="text-black hover:underline font-semibold cursor-pointer">
+                <a href="/login" className="text-[#e1a8f0] hover:text-[#edc4f5] transition-colors duration-200 font-medium">
                   Sign in
                 </a>
               </>
             ) : (
               <>
-                Don't have an account?{" "}
-                <a href="/login?su" className="text-black hover:underline font-semibold cursor-pointer">
+                Don&apos;t have an account?{" "}
+                <a href="/login?su" className="text-[#e1a8f0] hover:text-[#edc4f5] transition-colors duration-200 font-medium">
                   Sign up
                 </a>
               </>
             )}
-          </motion.p>
+          </p>
         )}
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-xs text-gray-500 mt-8"
-        >
-          By continuing, you agree to Yuki's Terms of Service and Privacy Policy
-        </motion.p>
+        <p className="text-xs text-white/25 mt-8 text-center">
+          By continuing, you agree to Yuki&apos;s Terms of Service and Privacy Policy
+        </p>
       </div>
     </div>
   );
@@ -747,8 +626,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f8f6f3] via-[#eae8e4] to-[#e0ddd8]">
-          <div className="w-8 h-8 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+        <div className="min-h-screen flex items-center justify-center bg-[#0f0f12]">
+          <div className="w-8 h-8 border-2 border-white/20 border-t-[#e1a8f0] rounded-full animate-spin" />
         </div>
       }
     >

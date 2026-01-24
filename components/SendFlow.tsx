@@ -70,7 +70,7 @@ export default function SendFlow({ isOpen, onClose, balances, onUpdateBalances }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div className="bg-[#121215] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
