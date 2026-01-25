@@ -478,7 +478,7 @@ function LoginContent() {
                     
                     <TabsContent value="email">
                       <div className="space-y-2.5">
-                        <Label htmlFor="email" className="text-white/70 block">Email Address</Label>
+                        <Label htmlFor="email" className="text-white/70 block mt-5">Email Address</Label>
                         <Input
                           id="email"
                           type="email"

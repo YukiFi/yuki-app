@@ -29,7 +29,7 @@ const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH_ICON = "3.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
@@ -229,24 +229,24 @@ const Sidebar = React.forwardRef<
         {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
-            "relative w-64 bg-transparent transition-[width] duration-200 ease-linear",
+            "relative w-64 bg-transparent transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
-              ? "group-data-[collapsible=icon]:w-16"
-              : "group-data-[collapsible=icon]:w-12"
+              ? "group-data-[collapsible=icon]:w-[4.5rem]"
+              : "group-data-[collapsible=icon]:w-14"
           )}
         />
         <div
           className={cn(
-            "fixed inset-y-0 z-10 hidden h-screen w-64 transition-[left,right,width] duration-200 ease-linear md:flex",
+            "fixed inset-y-0 z-10 hidden h-screen w-64 transition-[left,right,width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:-left-64"
               : "right-0 group-data-[collapsible=offcanvas]:-right-64",
             // Adjust the padding for floating and inset variants.
             variant === "floating" || variant === "inset"
-              ? "p-2 group-data-[collapsible=icon]:w-16"
-              : "group-data-[collapsible=icon]:w-12 group-data-[side=left]:border-r group-data-[side=right]:border-l",
+              ? "p-2 group-data-[collapsible=icon]:w-[4.5rem]"
+              : "group-data-[collapsible=icon]:w-14 group-data-[side=left]:border-r group-data-[side=right]:border-l",
             className
           )}
           {...props}
@@ -363,7 +363,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 px-3 pt-4 pb-2 group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:items-center", className)}
+      className={cn("flex flex-col gap-2 px-3 pt-4 pb-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:items-center", className)}
       {...props}
     />
   )
@@ -378,7 +378,7 @@ const SidebarFooter = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 px-3 pb-4 pt-2 group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:items-center", className)}
+      className={cn("flex flex-col gap-2 px-3 pb-4 pt-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:items-center", className)}
       {...props}
     />
   )
@@ -409,7 +409,7 @@ const SidebarContent = React.forwardRef<
       ref={ref}
       data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-1 overflow-auto group-data-[collapsible=icon]:overflow-hidden px-2 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center",
+        "flex min-h-0 flex-1 flex-col gap-1 overflow-auto group-data-[collapsible=icon]:overflow-hidden px-2 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center",
         className
       )}
       {...props}
@@ -444,7 +444,7 @@ const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar="group-label"
       className={cn(
-        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-[margin,opacity] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
         className
       )}
@@ -517,7 +517,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-lg p-2 text-left text-sm outline-none ring-sidebar-ring transition-all duration-150 ease-out hover:bg-white/[0.04] focus-visible:ring-2 active:bg-white/[0.06] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white/[0.06] data-[state=open]:hover:bg-white/[0.04] group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!w-10 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-xl p-2 text-left text-sm outline-none ring-sidebar-ring transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-white/[0.04] focus-visible:ring-2 active:bg-white/[0.06] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white/[0.06] data-[state=open]:hover:bg-white/[0.04] group-data-[collapsible=icon]:!size-11 group-data-[collapsible=icon]:!w-11 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:transition-all [&>svg]:duration-300 [&>svg]:ease-[cubic-bezier(0.4,0,0.2,1)]",
   {
     variants: {
       variant: {
@@ -526,9 +526,9 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-white/[0.04] hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-9 text-[13px]",
-        sm: "h-7 text-xs",
-        lg: "h-11 text-[13px] group-data-[collapsible=icon]:!p-0",
+        default: "h-11 text-sm",
+        sm: "h-9 text-xs",
+        lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
       },
     },
     defaultVariants: {

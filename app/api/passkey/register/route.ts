@@ -5,32 +5,29 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
-import { getUserById } from '@/lib/db';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { getOrCreateUserByClerkId } from '@/lib/db';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
 
 const rpName = 'Yuki';
 const rpID = process.env.NEXT_PUBLIC_RP_ID || 'localhost';
 
+// Store challenges temporarily (in production, use Redis or similar)
+const challengeStore = new Map<string, string>();
+
 export async function POST() {
   try {
-    const session = await getSession();
+    const { userId: clerkUserId } = await auth();
     
-    if (!session.isLoggedIn || !session.userId) {
+    if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Not authenticated. Please log in first.' },
         { status: 401 }
       );
     }
     
-    const user = await getUserById(session.userId);
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const clerkUser = await currentUser();
+    const user = await getOrCreateUserByClerkId(clerkUserId);
     
     // Check if user already has passkey enabled
     if (user.passkey_credential_id) {
@@ -45,8 +42,8 @@ export async function POST() {
       rpName,
       rpID,
       userID: new TextEncoder().encode(user.id),
-      userName: user.email,
-      userDisplayName: user.username || user.email.split('@')[0],
+      userName: clerkUser?.primaryEmailAddress?.emailAddress || clerkUser?.primaryPhoneNumber?.phoneNumber || user.id,
+      userDisplayName: user.username || clerkUser?.firstName || 'Yuki User',
       attestationType: 'none',
       authenticatorSelection: {
         residentKey: 'preferred',
@@ -56,10 +53,13 @@ export async function POST() {
       timeout: 60000,
     });
     
-    // Store challenge in session for verification
-    session.passkeyChallenge = options.challenge;
-    session.passkeyUserId = user.id;
-    await session.save();
+    // Store challenge for verification
+    challengeStore.set(user.id, options.challenge);
+    
+    // Clean up old challenges after 5 minutes
+    setTimeout(() => {
+      challengeStore.delete(user.id);
+    }, 5 * 60 * 1000);
     
     return NextResponse.json(options);
   } catch (error) {
@@ -70,3 +70,6 @@ export async function POST() {
     );
   }
 }
+
+// Export for use in verify route
+export { challengeStore };

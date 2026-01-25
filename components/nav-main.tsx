@@ -33,7 +33,7 @@ export function NavMain({
   return (
     <SidebarGroup className="px-1">
       <SidebarGroupContent>
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu className="gap-1">
           {items.map((item) => {
             const active = isActive(item.url)
             return (
@@ -42,14 +42,14 @@ export function NavMain({
                   asChild
                   isActive={active}
                   tooltip={item.title}
-                  className="h-9 px-3 rounded-lg transition-colors duration-150"
+                  className="h-11 px-3 rounded-xl"
                 >
                   <Link href={item.url}>
                     <item.icon 
-                      className={`!size-[18px] shrink-0 ${active ? 'text-white' : 'text-white/50'}`}
+                      className={`!size-5 shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:!size-6 ${active ? 'text-white' : 'text-white/50'}`}
                       strokeWidth={active ? 2 : 1.5}
                     />
-                    <span className={`text-[13px] group-data-[collapsible=icon]:hidden ${active ? 'font-medium text-white' : 'font-normal text-white/60'}`}>
+                    <span className={`text-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden ${active ? 'font-medium text-white' : 'font-normal text-white/60'}`}>
                       {item.title}
                     </span>
                   </Link>

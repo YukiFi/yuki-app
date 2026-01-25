@@ -10,7 +10,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -88,40 +87,40 @@ export function NavUser() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="h-12 px-2 rounded-lg data-[state=open]:bg-white/[0.04] cursor-pointer transition-colors duration-150"
+              className="h-14 px-2 rounded-xl data-[state=open]:bg-white/[0.04] cursor-pointer"
             >
-              {/* Avatar - refined sizing, centered in collapsed state */}
-              <div className="flex size-7 items-center justify-center rounded-full bg-white/90 text-[#0f0f12] shrink-0">
-                <span className="text-xs font-semibold">{getInitial()}</span>
+              {/* Avatar - bigger in collapsed state */}
+              <div className="flex size-8 items-center justify-center rounded-full bg-white/90 text-black shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:size-9">
+                <span className="text-sm font-semibold transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:text-base">{getInitial()}</span>
               </div>
               {/* Info - hidden in collapsed state */}
-              <div className="grid flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-[13px] font-medium text-white/80">{getDisplayName()}</span>
+              <div className="grid flex-1 text-left leading-tight transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden">
+                <span className="truncate text-sm font-medium text-white/80">{getDisplayName()}</span>
                 {getSubtitle() && (
-                  <span className="truncate text-[11px] text-white/40">{getSubtitle()}</span>
+                  <span className="truncate text-xs text-white/40">{getSubtitle()}</span>
                 )}
               </div>
-              <IconDotsVertical className="ml-auto size-3.5 text-white/30 group-data-[collapsible=icon]:hidden" />
+              <IconDotsVertical className="ml-auto size-4 text-white/30 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-52 rounded-xl bg-[#121215] border border-white/[0.06]"
+            className="w-[--radix-dropdown-menu-trigger-width] min-w-52 rounded-2xl bg-black border-0"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={8}
           >
-            {/* User info header - refined */}
-            <div className="px-3 py-3 border-b border-white/[0.05]">
+            {/* User info header */}
+            <div className="px-4 py-4 border-b border-white/[0.04]">
               <div className="flex items-center gap-3">
-                <div className="flex size-9 items-center justify-center rounded-full bg-white/90 text-[#0f0f12]">
-                  <span className="text-sm font-semibold">{getInitial()}</span>
+                <div className="flex size-10 items-center justify-center rounded-full bg-white/90 text-black">
+                  <span className="text-base font-semibold">{getInitial()}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-white/90 truncate">
+                  <p className="text-sm font-medium text-white truncate">
                     {getDisplayName()}
                   </p>
                   {getSubtitle() && (
-                    <p className="text-[11px] text-white/40 truncate">
+                    <p className="text-xs text-white/40 truncate">
                       {getSubtitle()}
                     </p>
                   )}
@@ -129,12 +128,12 @@ export function NavUser() {
               </div>
             </div>
             {/* Actions */}
-            <div className="p-1.5">
+            <div className="p-2">
               <DropdownMenuItem 
                 onClick={handleSignOut}
-                className="h-8 px-2 rounded-lg cursor-pointer text-[13px] text-red-400/80 hover:text-red-400 focus:text-red-400 focus:bg-red-500/[0.08]"
+                className="h-10 px-3 rounded-xl cursor-pointer text-sm text-red-400/80 hover:text-red-400 focus:text-red-400 focus:bg-red-500/[0.08]"
               >
-                <IconLogout className="mr-2 size-3.5" />
+                <IconLogout className="mr-2 size-4" />
                 Sign Out
               </DropdownMenuItem>
             </div>

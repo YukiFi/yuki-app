@@ -5,44 +5,36 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
-import { getUserById, getWalletByUserId, updateWalletPasskey, updateUserPasskey } from '@/lib/db';
+import { auth } from '@clerk/nextjs/server';
+import { getOrCreateUserByClerkId, getWalletByUserId, updateWalletPasskey, updateUserPasskey } from '@/lib/db';
 import { verifyRegistrationResponse } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON } from '@simplewebauthn/types';
 
 const rpID = process.env.NEXT_PUBLIC_RP_ID || 'localhost';
 const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+// Import challenge store from parent route
+// Note: In production, use Redis or a shared store
+const challengeStore = new Map<string, string>();
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const { userId: clerkUserId } = await auth();
     
-    if (!session.isLoggedIn || !session.userId) {
+    if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
     
-    const challenge = session.passkeyChallenge;
-    if (!challenge) {
-      return NextResponse.json(
-        { error: 'No registration challenge found' },
-        { status: 400 }
-      );
-    }
+    const user = await getOrCreateUserByClerkId(clerkUserId);
     
-    const user = await getUserById(session.userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-    
+    // Get challenge from request body (since we can't share state between routes easily)
     const body = await request.json();
-    const { credential, walletUpgradeData } = body as {
+    const { credential, walletUpgradeData, expectedChallenge } = body as {
       credential: RegistrationResponseJSON;
+      expectedChallenge: string;
       walletUpgradeData?: {
         cipherPriv: string;
         ivPriv: string;
@@ -53,10 +45,17 @@ export async function POST(request: NextRequest) {
       };
     };
     
+    if (!expectedChallenge) {
+      return NextResponse.json(
+        { error: 'No registration challenge provided' },
+        { status: 400 }
+      );
+    }
+    
     // Verify the registration
     const verification = await verifyRegistrationResponse({
       response: credential,
-      expectedChallenge: challenge,
+      expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
     });
@@ -80,11 +79,11 @@ export async function POST(request: NextRequest) {
       transports: credential.response.transports || [],
     };
     
-    await updateUserPasskey(session.userId, passkeyData);
+    await updateUserPasskey(user.id, passkeyData);
     
     // If wallet upgrade data is provided, update the wallet too
     if (walletUpgradeData) {
-      const wallet = await getWalletByUserId(session.userId);
+      const wallet = await getWalletByUserId(user.id);
       if (wallet) {
         const passkeyMeta = {
           credentialId: passkeyData.credentialId,
@@ -96,7 +95,7 @@ export async function POST(request: NextRequest) {
           createdAt: new Date().toISOString(),
         };
         
-        await updateWalletPasskey(session.userId, {
+        await updateWalletPasskey(user.id, {
           cipherPriv: walletUpgradeData.cipherPriv,
           ivPriv: walletUpgradeData.ivPriv,
           securityLevel: 'passkey_enabled',
@@ -108,11 +107,6 @@ export async function POST(request: NextRequest) {
         });
       }
     }
-    
-    // Clear challenge from session
-    delete session.passkeyChallenge;
-    delete session.passkeyUserId;
-    await session.save();
     
     return NextResponse.json({
       success: true,

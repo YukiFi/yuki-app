@@ -80,14 +80,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   alt="Yuki"
                   width={72}
                   height={28}
-                  className="h-[40px] w-auto group-data-[collapsible=icon]:hidden opacity-90"
+                  className="h-[40px] w-auto transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden opacity-90"
                 />
                 <Image
                   src="/images/applet.svg"
                   alt="Yuki"
-                  width={24}
-                  height={24}
-                  className="h-6 w-6 hidden group-data-[collapsible=icon]:block opacity-80"
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hidden group-data-[collapsible=icon]:block opacity-80"
                 />
               </Link>
             </SidebarMenuButton>

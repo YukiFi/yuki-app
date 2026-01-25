@@ -16,8 +16,8 @@
 :root {
   --radius: 0.75rem;
 
-  /* Dark glassmorphic colors - softer than pure black */
-  --background: oklch(0.11 0.005 270);
+  /* Dark colors - pure black */
+  --background: oklch(0 0 0);
   --foreground: oklch(0.98 0 0);
 
   /* Card - glassmorphic surface */
@@ -59,8 +59,8 @@
   --chart-4: oklch(0.75 0.18 280);
   --chart-5: oklch(0.8 0.15 40);
 
-  /* Sidebar - slightly darker for depth */
-  --sidebar: oklch(0.09 0.005 270);
+  /* Sidebar - pure black */
+  --sidebar: oklch(0 0 0);
   --sidebar-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.78 0.12 320);
   --sidebar-primary-foreground: oklch(0.15 0.05 320);
@@ -72,13 +72,13 @@
 
 /* Prevent flash of white background */
 html {
-  background-color: #0f0f12;
+  background-color: #000000;
   color-scheme: dark;
 }
 
 body {
   color: #ffffff;
-  background: #0f0f12;
+  background: #000000;
   /* Prevent font flash */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -197,7 +197,7 @@ body {
 }
 
 .dark {
-  --sidebar: oklch(0.09 0.005 270);
+  --sidebar: oklch(0 0 0);
   --sidebar-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.78 0.12 320);
   --sidebar-primary-foreground: oklch(0.15 0.05 320);

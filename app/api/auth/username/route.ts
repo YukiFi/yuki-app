@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateUserByEmail, updateUsername, getUserByEmail, getUserByUsername, getUserById } from "@/lib/db";
-import { getSession } from "@/lib/session";
+import { auth } from "@clerk/nextjs/server";
+import { getOrCreateUserByClerkId, updateUsername, getUserByUsername } from "@/lib/db";
 
 const RESERVED_USERNAMES = [
   "admin", "root", "support", "help", "yuki", "system", "wallet", "haruxe",
@@ -10,9 +10,9 @@ const RESERVED_USERNAMES = [
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession();
+    const { userId: clerkUserId } = await auth();
     
-    if (!session.isLoggedIn || !session.userId) {
+    if (!clerkUserId) {
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
@@ -28,15 +28,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get user from session
-    const user = await getUserById(session.userId);
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
+    // Get user from Clerk ID
+    const user = await getOrCreateUserByClerkId(clerkUserId);
 
     // Validate username format
     const cleanUsername = username.startsWith("@") ? username : `@${username}`;
@@ -114,20 +107,16 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const session = await getSession();
+    const { userId: clerkUserId } = await auth();
     
-    if (!session.isLoggedIn || !session.userId) {
+    if (!clerkUserId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Get user by session
-    const user = await getUserById(session.userId);
-    
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    // Get user by Clerk ID
+    const user = await getOrCreateUserByClerkId(clerkUserId);
     
     // Calculate if they can change username
     let canChange = true;

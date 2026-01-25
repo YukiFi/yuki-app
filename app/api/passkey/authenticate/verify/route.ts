@@ -1,12 +1,13 @@
 /**
  * POST /api/passkey/authenticate/verify
  * 
- * Verify passkey authentication and create session.
+ * Verify passkey authentication for wallet unlock.
+ * Returns success if passkey is valid, allowing client to derive DEK.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, createUserSession } from '@/lib/session';
-import { getUserById, getWalletByUserId } from '@/lib/db';
+import { auth } from '@clerk/nextjs/server';
+import { getOrCreateUserByClerkId, getWalletByUserId, updatePasskeyCounter } from '@/lib/db';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import type { AuthenticationResponseJSON } from '@simplewebauthn/types';
 
@@ -15,27 +16,18 @@ const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const { userId: clerkUserId } = await auth();
     
-    const challenge = session.passkeyChallenge;
-    const userId = session.passkeyUserId;
-    
-    if (!challenge || !userId) {
+    if (!clerkUserId) {
       return NextResponse.json(
-        { error: 'No authentication challenge found' },
-        { status: 400 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
     
-    const user = await getUserById(userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const user = await getOrCreateUserByClerkId(clerkUserId);
+    const wallet = await getWalletByUserId(user.id);
     
-    const wallet = await getWalletByUserId(userId);
     if (!wallet || !wallet.passkey_meta) {
       return NextResponse.json(
         { error: 'Passkey not found' },
@@ -46,12 +38,22 @@ export async function POST(request: NextRequest) {
     const passkeyMeta = JSON.parse(wallet.passkey_meta);
     
     const body = await request.json();
-    const credential = body as AuthenticationResponseJSON;
+    const { credential, expectedChallenge } = body as {
+      credential: AuthenticationResponseJSON;
+      expectedChallenge: string;
+    };
+    
+    if (!expectedChallenge) {
+      return NextResponse.json(
+        { error: 'No authentication challenge provided' },
+        { status: 400 }
+      );
+    }
     
     // Verify the authentication
     const verification = await verifyAuthenticationResponse({
       response: credential,
-      expectedChallenge: challenge,
+      expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
       credential: {
@@ -69,22 +71,22 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Clear passkey challenge
-    delete session.passkeyChallenge;
-    delete session.passkeyUserId;
-    await session.save();
-    
-    // Create user session
-    await createUserSession(user.id, user.email, wallet.address);
+    // Update counter to prevent replay attacks
+    if (verification.authenticationInfo) {
+      await updatePasskeyCounter(user.id, verification.authenticationInfo.newCounter);
+    }
     
     return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        hasWallet: true,
-        walletAddress: wallet.address,
+      verified: true,
+      // Return wallet data needed for client-side decryption
+      wallet: {
+        address: wallet.address,
         securityLevel: wallet.security_level,
+        wrappedDekPasskey: wallet.wrapped_dek_passkey,
+        ivDekPasskey: wallet.iv_dek_passkey,
+        cipherPriv: wallet.cipher_priv,
+        ivPriv: wallet.iv_priv,
       },
     });
   } catch (error) {

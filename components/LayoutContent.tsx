@@ -54,7 +54,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
       <SidebarInset>
         {/* Header - always visible, provides visual stability */}
         <header 
-          className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.04] bg-[#0f0f12] px-4 transition-opacity duration-150"
+          className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.04] bg-black px-4 transition-opacity duration-150"
           style={{ opacity: isLoaded && isSignedIn ? 1 : 0 }}
         >
           <SidebarTrigger className="-ml-1 text-white/50 hover:text-white/80 hover:bg-white/[0.04]" />

@@ -9,8 +9,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
-import { getWalletByUserId, createWallet, getUserById } from '@/lib/db';
+import { auth } from '@clerk/nextjs/server';
+import { getWalletByUserId, createWallet, getOrCreateUserByClerkId } from '@/lib/db';
 import { generateId } from '@/lib/auth';
 import type { EncryptedWalletData } from '@/lib/crypto';
 
@@ -22,16 +22,18 @@ import type { EncryptedWalletData } from '@/lib/crypto';
  */
 export async function GET() {
   try {
-    const session = await getSession();
+    const { userId } = await auth();
     
-    if (!session.isLoggedIn || !session.userId) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
     
-    const wallet = await getWalletByUserId(session.userId);
+    // Get or create internal user from Clerk ID
+    const user = await getOrCreateUserByClerkId(userId);
+    const wallet = await getWalletByUserId(user.id);
     
     if (!wallet) {
       return NextResponse.json(
@@ -82,17 +84,20 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const { userId } = await auth();
     
-    if (!session.isLoggedIn || !session.userId) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
     
+    // Get or create internal user from Clerk ID
+    const user = await getOrCreateUserByClerkId(userId);
+    
     // Check if user already has a wallet
-    const existingWallet = await getWalletByUserId(session.userId);
+    const existingWallet = await getWalletByUserId(user.id);
     if (existingWallet) {
       return NextResponse.json(
         { error: 'Wallet already exists' },
@@ -139,7 +144,7 @@ export async function POST(request: NextRequest) {
     
     // Create wallet record
     const walletId = generateId();
-    const newWallet = await createWallet(walletId, session.userId, {
+    const newWallet = await createWallet(walletId, user.id, {
       address: encryptedWallet.address,
       chainId: encryptedWallet.chainId,
       version: encryptedWallet.version || 1,
@@ -155,13 +160,6 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create wallet' },
         { status: 500 }
       );
-    }
-    
-    // Update session with wallet address
-    const user = await getUserById(session.userId);
-    if (user) {
-      session.walletAddress = encryptedWallet.address;
-      await session.save();
     }
     
     return NextResponse.json({

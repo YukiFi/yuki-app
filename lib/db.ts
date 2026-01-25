@@ -1,11 +1,24 @@
 /**
  * Database layer for Yuki Embedded Wallet
  * 
- * Replaces PostgreSQL with an in-memory storage for development/demo purposes.
- * This avoids the need for a running database during the hackathon/demo phase.
+ * Uses PostgreSQL when DATABASE_URL is set, otherwise falls back to
+ * in-memory storage for development/demo purposes.
  */
 
-// In-memory storage
+import * as pgDb from './db-postgres';
+
+// Check if PostgreSQL is available
+const USE_POSTGRES = !!process.env.DATABASE_URL;
+
+if (USE_POSTGRES) {
+  console.log('[DB] Using PostgreSQL database');
+  // Initialize PostgreSQL schema on first import
+  pgDb.initializeDatabase().catch(console.error);
+} else {
+  console.log('[DB] Using in-memory database (set DATABASE_URL for PostgreSQL)');
+}
+
+// In-memory storage (fallback for development)
 const db = {
   users: new Map<string, any>(),
   wallets: new Map<string, any>(),
@@ -13,6 +26,7 @@ const db = {
   rateLimits: new Map<string, any>(),
   indices: {
     usersByEmail: new Map<string, string>(),
+    usersByClerkId: new Map<string, string>(),
     walletsByUserId: new Map<string, string>(),
     walletsByAddress: new Map<string, string>(),
     sessionsByUserId: new Map<string, Set<string>>()
@@ -25,7 +39,9 @@ const db = {
 
 export interface User {
   id: string;
+  clerk_user_id: string | null;
   email: string;
+  phone_number: string | null;
   password_hash: string;
   created_at: Date;
   updated_at: Date;
@@ -61,7 +77,9 @@ export async function createUser(
   
   const user: User = {
     id,
+    clerk_user_id: null,
     email: normalizedEmail,
+    phone_number: null,
     password_hash: passwordHash,
     created_at: new Date(),
     updated_at: new Date(),
@@ -112,7 +130,9 @@ export async function getOrCreateUserByEmail(email: string): Promise<User> {
     const id = `user_${normalizedEmail.replace(/[^a-z0-9]/g, '_')}`;
     user = {
       id,
+      clerk_user_id: null,
       email: normalizedEmail,
+      phone_number: null,
       password_hash: '',
       created_at: new Date(),
       updated_at: new Date(),
@@ -135,6 +155,66 @@ export async function getOrCreateUserByEmail(email: string): Promise<User> {
   }
   
   return user;
+}
+
+/**
+ * Get or create a user by Clerk user ID
+ * This is the primary method for binding Clerk auth to our internal user system
+ */
+export async function getOrCreateUserByClerkId(clerkUserId: string): Promise<User> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    const pgUser = await pgDb.getOrCreateUserByClerkIdPg(clerkUserId);
+    if (pgUser) return pgUser;
+  }
+  
+  // Fallback to in-memory storage
+  // Check if user already exists with this Clerk ID
+  const existingUserId = db.indices.usersByClerkId.get(clerkUserId);
+  if (existingUserId) {
+    const user = db.users.get(existingUserId);
+    if (user) return user;
+  }
+  
+  // Create a new user linked to this Clerk ID
+  const id = `user_${clerkUserId}`;
+  const user: User = {
+    id,
+    clerk_user_id: clerkUserId,
+    email: '',
+    phone_number: null,
+    password_hash: '',
+    created_at: new Date(),
+    updated_at: new Date(),
+    email_verified: true,
+    locked_until: null,
+    failed_attempts: 0,
+    username: null,
+    username_last_changed: null,
+    passkey_credential_id: null,
+    passkey_public_key: null,
+    passkey_counter: 0,
+    passkey_device_type: null,
+    passkey_backed_up: false,
+    passkey_transports: null,
+    passkey_created_at: null,
+  };
+  
+  db.users.set(id, user);
+  db.indices.usersByClerkId.set(clerkUserId, id);
+  
+  console.log('[DB] getOrCreateUserByClerkId - Created new user:', id, 'for Clerk ID:', clerkUserId);
+  
+  return user;
+}
+
+/**
+ * Get user by Clerk ID
+ */
+export async function getUserByClerkId(clerkUserId: string): Promise<User | null> {
+  const userId = db.indices.usersByClerkId.get(clerkUserId);
+  if (!userId) return null;
+  return db.users.get(userId) || null;
 }
 
 export async function updateUserFailedAttempts(
@@ -162,6 +242,18 @@ export async function resetUserFailedAttempts(userId: string): Promise<void> {
 }
 
 export async function updateUsername(userId: string, username: string): Promise<void> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    // Check if taken
+    const existing = await pgDb.getUserByUsernamePg(username);
+    if (existing && existing.id !== userId) {
+      throw new Error("Username is already taken");
+    }
+    await pgDb.updateUsernamePg(userId, username);
+    return;
+  }
+  
+  // Fallback to in-memory storage
   // Check if username is already taken by another user
   const existingUser = Array.from(db.users.values()).find(
     u => u.username?.toLowerCase() === username.toLowerCase() && u.id !== userId
@@ -181,6 +273,12 @@ export async function updateUsername(userId: string, username: string): Promise<
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    return await pgDb.getUserByUsernamePg(username);
+  }
+  
+  // Fallback to in-memory storage
   const user = Array.from(db.users.values()).find(
     u => u.username?.toLowerCase() === username.toLowerCase()
   );
@@ -198,6 +296,13 @@ export async function updateUserPasskey(
     transports: string[];
   }
 ): Promise<void> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    await pgDb.updateUserPasskeyPg(userId, passkeyData);
+    return;
+  }
+  
+  // Fallback to in-memory storage
   const user = db.users.get(userId);
   if (user) {
     user.passkey_credential_id = passkeyData.credentialId;
@@ -232,6 +337,13 @@ export async function getUserPasskeyCredential(userId: string): Promise<{
 }
 
 export async function updatePasskeyCounter(userId: string, newCounter: number): Promise<void> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    await pgDb.updatePasskeyCounterPg(userId, newCounter);
+    return;
+  }
+  
+  // Fallback to in-memory storage
   const user = db.users.get(userId);
   if (user) {
     user.passkey_counter = newCounter;
@@ -278,6 +390,12 @@ export async function createWallet(
     securityLevel: string;
   }
 ): Promise<WalletRecord | null> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    return await pgDb.createWalletPg(id, userId, data);
+  }
+  
+  // Fallback to in-memory storage
   if (db.indices.walletsByUserId.has(userId)) {
     return null; // User already has a wallet
   }
@@ -310,12 +428,24 @@ export async function createWallet(
 }
 
 export async function getWalletByUserId(userId: string): Promise<WalletRecord | null> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    return await pgDb.getWalletByUserIdPg(userId);
+  }
+  
+  // Fallback to in-memory storage
   const walletId = db.indices.walletsByUserId.get(userId);
   if (!walletId) return null;
   return db.wallets.get(walletId) || null;
 }
 
 export async function getWalletByAddress(address: string): Promise<WalletRecord | null> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    return await pgDb.getWalletByAddressPg(address);
+  }
+  
+  // Fallback to in-memory storage
   const walletId = db.indices.walletsByAddress.get(address);
   if (!walletId) return null;
   return db.wallets.get(walletId) || null;
@@ -334,6 +464,13 @@ export async function updateWalletPasskey(
     ivDekPasskey: string;
   }
 ): Promise<void> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    await pgDb.updateWalletPasskeyPg(userId, data);
+    return;
+  }
+  
+  // Fallback to in-memory storage
   const walletId = db.indices.walletsByUserId.get(userId);
   if (!walletId) return;
 

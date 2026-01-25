@@ -2,24 +2,23 @@
  * Wallet Context Provider
  * 
  * Provides embedded wallet state and actions throughout the app.
+ * Auth is handled by Clerk, this context manages wallet-specific operations.
  */
 
 'use client';
 
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
-import { useAuth, type User, type AuthState } from '@/lib/hooks/useAuth';
+import { useAuth, type UserData } from '@/lib/hooks/useAuth';
 import { useEmbeddedWallet, type UseEmbeddedWalletReturn } from '@/lib/hooks/useEmbeddedWallet';
 
 interface WalletContextType extends UseEmbeddedWalletReturn {
-  // Auth state
-  user: User | null;
+  // Auth state (from Clerk)
+  user: UserData | null;
   isAuthLoading: boolean;
   isAuthenticated: boolean;
   authError: string | null;
   
   // Auth actions
-  signup: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -35,18 +34,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (auth.isAuthenticated && !auth.isLoading) {
       wallet.fetchWallet();
     }
-  }, [auth.isAuthenticated, auth.isLoading]);
+  }, [auth.isAuthenticated, auth.isLoading, wallet.fetchWallet]);
 
   const value: WalletContextType = {
-    // Auth state
+    // Auth state (from Clerk)
     user: auth.user,
     isAuthLoading: auth.isLoading,
     isAuthenticated: auth.isAuthenticated,
     authError: auth.error,
     
     // Auth actions
-    signup: auth.signup,
-    login: auth.login,
     logout: auth.logout,
     refreshUser: auth.refreshUser,
     

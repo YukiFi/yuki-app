@@ -92,7 +92,7 @@ export default function RootLayout({
       <html 
         lang="en" 
         className="scroll-smooth"
-        style={{ backgroundColor: '#0f0f12', colorScheme: 'dark' }}
+        style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
       >
         <head>
           {/* Prevent background flash - set background before any CSS loads */}
@@ -100,7 +100,7 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{
               __html: `
                 (function() {
-                  document.documentElement.style.backgroundColor = '#0f0f12';
+                  document.documentElement.style.backgroundColor = '#000000';
                   document.documentElement.style.colorScheme = 'dark';
                 })();
               `,
@@ -111,7 +111,7 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{
               __html: `
                 html, body { 
-                  background-color: #0f0f12; 
+                  background-color: #000000; 
                   color: #ffffff;
                   color-scheme: dark;
                 }
@@ -124,7 +124,7 @@ export default function RootLayout({
             }}
           />
         </head>
-        <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-[#0f0f12] text-white antialiased`}>
+        <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-black text-white antialiased`}>
           <Providers>
             <LayoutContent>{children}</LayoutContent>
           </Providers>

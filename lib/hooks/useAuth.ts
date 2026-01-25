@@ -1,28 +1,41 @@
 /**
  * Authentication hook for user session management
+ * 
+ * This hook wraps Clerk's authentication with additional
+ * user data from our internal database (wallet info, username, etc.)
  */
 
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useUser, useClerk } from '@clerk/nextjs';
 
-export interface User {
+export interface UserData {
   id: string;
-  email: string;
+  clerkId: string;
+  email: string | null;
+  phone: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  imageUrl: string | null;
+  username: string | null;
   hasWallet: boolean;
   walletAddress?: string;
   securityLevel?: 'password_only' | 'passkey_enabled';
-  passkey_credential_id?: string | null;
+  hasPasskey?: boolean;
 }
 
 export interface AuthState {
-  user: User | null;
+  user: UserData | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
 }
 
 export function useAuth() {
+  const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
+  
   const [state, setState] = useState<AuthState>({
     user: null,
     isLoading: true,
@@ -30,7 +43,19 @@ export function useAuth() {
     error: null,
   });
 
-  const fetchUser = useCallback(async () => {
+  const fetchUserData = useCallback(async () => {
+    if (!clerkLoaded) return;
+    
+    if (!isSignedIn || !clerkUser) {
+      setState({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        error: null,
+      });
+      return;
+    }
+    
     try {
       const response = await fetch('/api/auth/me', {
         credentials: 'include',
@@ -45,102 +70,53 @@ export function useAuth() {
           error: null,
         });
       } else {
+        // Even if API fails, we're still authenticated via Clerk
+        // Use Clerk data as fallback
         setState({
-          user: null,
+          user: {
+            id: clerkUser.id,
+            clerkId: clerkUser.id,
+            email: clerkUser.primaryEmailAddress?.emailAddress || null,
+            phone: clerkUser.primaryPhoneNumber?.phoneNumber || null,
+            firstName: clerkUser.firstName,
+            lastName: clerkUser.lastName,
+            imageUrl: clerkUser.imageUrl,
+            username: null,
+            hasWallet: false,
+          },
           isLoading: false,
-          isAuthenticated: false,
+          isAuthenticated: true,
           error: null,
         });
       }
     } catch (error) {
+      // Fallback to Clerk data on network error
       setState({
-        user: null,
+        user: {
+          id: clerkUser.id,
+          clerkId: clerkUser.id,
+          email: clerkUser.primaryEmailAddress?.emailAddress || null,
+          phone: clerkUser.primaryPhoneNumber?.phoneNumber || null,
+          firstName: clerkUser.firstName,
+          lastName: clerkUser.lastName,
+          imageUrl: clerkUser.imageUrl,
+          username: null,
+          hasWallet: false,
+        },
         isLoading: false,
-        isAuthenticated: false,
-        error: 'Failed to fetch user',
+        isAuthenticated: true,
+        error: 'Failed to fetch user data',
       });
     }
-  }, []);
+  }, [clerkLoaded, isSignedIn, clerkUser]);
 
   useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
-
-  const signup = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setState({
-          user: data.user,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null,
-        });
-        return { success: true };
-      } else {
-        // Handle detailed password validation errors
-        let errorMessage = data.error;
-        if (data.details && Array.isArray(data.details) && data.details.length > 0) {
-          errorMessage = data.details.join('. ');
-        }
-        setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
-        return { success: false, error: errorMessage };
-      }
-    } catch (error) {
-      const errorMessage = 'Network error. Please try again.';
-      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
-      return { success: false, error: errorMessage };
-    }
-  };
-
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setState({
-          user: data.user,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null,
-        });
-        return { success: true };
-      } else {
-        setState(prev => ({ ...prev, isLoading: false, error: data.error }));
-        return { success: false, error: data.error };
-      }
-    } catch (error) {
-      const errorMessage = 'Network error. Please try again.';
-      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
-      return { success: false, error: errorMessage };
-    }
-  };
+    fetchUserData();
+  }, [fetchUserData]);
 
   const logout = async (): Promise<void> => {
     try {
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        credentials: 'include',
-      });
+      await signOut();
     } finally {
       setState({
         user: null,
@@ -151,13 +127,14 @@ export function useAuth() {
     }
   };
 
-  const refreshUser = fetchUser;
+  const refreshUser = fetchUserData;
 
   return {
     ...state,
-    signup,
-    login,
     logout,
     refreshUser,
+    // Expose Clerk's raw data for advanced use cases
+    clerkUser,
+    clerkLoaded,
   };
 }

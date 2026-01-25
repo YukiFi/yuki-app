@@ -26,17 +26,17 @@ export function NavSecondary({
   return (
     <SidebarGroup className={cn("px-1", className)}>
       <SidebarGroupContent>
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu className="gap-1">
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton 
                 asChild 
                 tooltip={item.title}
-                className="h-8 px-3 rounded-lg transition-colors duration-150"
+                className="h-10 px-3 rounded-xl"
               >
                 <Link href={item.url}>
-                  <item.icon className="!size-4 text-white/40 shrink-0" strokeWidth={1.5} />
-                  <span className="text-[13px] text-white/45 font-normal group-data-[collapsible=icon]:hidden">{item.title}</span>
+                  <item.icon className="!size-[18px] text-white/40 shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:!size-5" strokeWidth={1.5} />
+                  <span className="text-sm text-white/45 font-normal transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden">{item.title}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

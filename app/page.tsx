@@ -41,133 +41,124 @@ interface YieldHistoryChartProps {
 
 function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   
-  const data = useRef(generateYieldHistory(balance, 14)).current;
-  const maxYield = Math.max(...data.map(d => d.amount));
+  const [data, setData] = useState<DayYield[]>([]);
+  const initializedRef = useRef(false);
+  
+  useEffect(() => {
+    if (balance > 0 && !initializedRef.current) {
+      setData(generateYieldHistory(balance, 14));
+      initializedRef.current = true;
+    }
+  }, [balance]);
+
+  const maxYield = data.length > 0 ? Math.max(...data.map(d => d.amount)) : 1;
   const totalYield = data.reduce((sum, d) => sum + d.amount, 0);
 
-  // Refined proportions - slightly narrower bars, more height
-  const barWidth = 10;
-  const barRadius = barWidth / 2;
-  const barGap = 5;
-  const chartHeight = 72;
+  const chartHeight = 100;
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  const formatDay = (date: Date) => {
-    const today = new Date();
-    const diffDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    return date.toLocaleDateString("en-US", { weekday: "short" });
-  };
+  // Get display values - either hovered day or today
+  const displayIndex = hoveredIndex !== null ? hoveredIndex : data.length - 1;
+  const displayData = data[displayIndex];
+
+  if (data.length === 0) {
+    return (
+      <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <p className="text-white/50 text-xs sm:text-sm font-medium">Daily Yield</p>
+        </div>
+        <div className="flex items-end gap-1 sm:gap-1.5 h-20 sm:h-[100px]">
+          {Array.from({ length: 14 }).map((_, i) => (
+            <div key={i} className="flex-1 h-full flex items-end">
+              <div className="w-full rounded-sm bg-white/[0.04]" style={{ height: '30%' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full max-w-sm"
-    >
-      {/* Header row - refined typography */}
-      <div className="flex items-baseline justify-between mb-5">
-        <p className="text-white/25 text-[10px] uppercase tracking-[0.12em] font-medium">
-          Daily yield
-        </p>
-        <p className="text-white/30 text-[11px] tabular-nums" style={{ fontFeatureSettings: "'tnum' 1" }}>
-          ${totalYield.toFixed(2)} · 14 days
+    <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <p className="text-white/50 text-xs sm:text-sm font-medium">Daily Yield</p>
+        <p className="text-white/30 text-xs sm:text-sm tabular-nums" style={{ fontFeatureSettings: "'tnum' 1" }}>
+          ${totalYield.toFixed(2)} · 14d
         </p>
       </div>
 
-      {/* Hover tooltip - stable height prevents shift */}
-      <div className="h-7 mb-3">
-        {hoveredIndex !== null && (
-          <div className="flex items-baseline gap-2">
-            <span 
-              className="text-base font-medium tabular-nums"
-              style={{ color: BRAND_LAVENDER, fontFeatureSettings: "'tnum' 1" }}
-            >
-              +${data[hoveredIndex].amount.toFixed(2)}
-            </span>
-            <span className="text-white/35 text-xs">
-              {formatDate(data[hoveredIndex].date)}
-            </span>
-          </div>
-        )}
+      {/* Selected day display */}
+      <div className="mb-4 sm:mb-6">
+        <p 
+          className="text-xl sm:text-2xl font-medium tabular-nums mb-0.5 sm:mb-1"
+          style={{ color: BRAND_LAVENDER, fontFeatureSettings: "'tnum' 1" }}
+        >
+          +${displayData?.amount.toFixed(2) || '0.00'}
+        </p>
+        <p className="text-white/40 text-xs sm:text-sm">
+          {displayData ? formatDate(displayData.date) : '—'}
+          {hoveredIndex === null && displayData && ' (today)'}
+        </p>
       </div>
 
-      {/* Chart */}
+      {/* Chart - touch-friendly on mobile */}
       <div 
-        className="flex items-end gap-[5px]"
-        style={{ height: chartHeight }}
+        className="flex items-end gap-1 sm:gap-1.5 h-20 sm:h-[100px] touch-pan-x"
+        onTouchStart={(e) => {
+          const touch = e.touches[0];
+          const target = e.currentTarget;
+          const rect = target.getBoundingClientRect();
+          const x = touch.clientX - rect.left;
+          const barWidth = rect.width / 14;
+          const index = Math.min(13, Math.max(0, Math.floor(x / barWidth)));
+          setHoveredIndex(index);
+        }}
+        onTouchMove={(e) => {
+          const touch = e.touches[0];
+          const target = e.currentTarget;
+          const rect = target.getBoundingClientRect();
+          const x = touch.clientX - rect.left;
+          const barWidth = rect.width / 14;
+          const index = Math.min(13, Math.max(0, Math.floor(x / barWidth)));
+          setHoveredIndex(index);
+        }}
+        onTouchEnd={() => setHoveredIndex(null)}
       >
         {data.map((day, index) => {
-          const heightPercent = (day.amount / maxYield) * 100;
+          const heightPercent = Math.max((day.amount / maxYield) * 100, 10);
           const isHovered = hoveredIndex === index;
           const isToday = index === data.length - 1;
+          const isActive = isHovered || (hoveredIndex === null && isToday);
 
-  return (
+          return (
             <div
               key={index}
-              className="relative cursor-pointer"
-              style={{ width: barWidth, height: '100%' }}
+              className="flex-1 h-full flex items-end"
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              {/* Bar - renders immediately at full height */}
               <div
-                className="absolute bottom-0 w-full"
-                style={{ height: `${heightPercent}%` }}
-              >
-                <svg
-                  width={barWidth}
-                  height="100%"
-                  className="overflow-visible"
-                  style={{ display: 'block' }}
-      >
-        <defs>
-                    <linearGradient id={`yield-bar-${index}`} x1="0" y1="0" x2="0" y2="1">
-            <stop
-              offset="0%"
-                        stopColor={isToday ? BRAND_LAVENDER : "white"} 
-                        stopOpacity={isToday ? 0.9 : 0.25} 
-            />
-            <stop
-              offset="100%"
-                        stopColor={isToday ? BRAND_LAVENDER : "white"} 
-                        stopOpacity={isToday ? 0.5 : 0.08} 
-            />
-          </linearGradient>
-        </defs>
-                  <rect
-                    x="0"
-                    y="0"
-                    width={barWidth}
-                    height="100%"
-                    rx={barRadius}
-                    ry={barRadius}
-                    fill={`url(#yield-bar-${index})`}
-                    style={{
-                      filter: isHovered ? 'brightness(1.3)' : 'brightness(1)',
-                      transition: 'filter 0.1s ease'
-                    }}
-        />
-      </svg>
-              </div>
+                className="w-full rounded-sm transition-all duration-100"
+                style={{ 
+                  height: `${heightPercent}%`,
+                  backgroundColor: isActive ? BRAND_LAVENDER : 'rgba(255,255,255,0.08)',
+                  opacity: isActive ? 1 : (hoveredIndex !== null ? 0.5 : 1)
+                }}
+              />
             </div>
           );
         })}
       </div>
 
-      {/* Time labels - minimal, precise */}
-      <div className="flex justify-between mt-4">
-        <span className="text-white/20 text-[10px] tracking-wide">
-          {formatDay(data[0].date)}
-        </span>
-        <span className="text-white/25 text-[10px] tracking-wide">
-          Today
-        </span>
+      {/* Labels */}
+      <div className="flex justify-between mt-3 sm:mt-4 text-white/30 text-[10px] sm:text-xs">
+        <span>14d ago</span>
+        <span>Today</span>
       </div>
     </div>
   );
@@ -371,13 +362,13 @@ function SendModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
           onClick={handleClose}
         >
-          {/* Backdrop with blur */}
+          {/* Backdrop - simple dim */}
           <motion.div 
-            className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+            className="absolute inset-0 bg-black/90"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -385,11 +376,11 @@ function SendModal({
           
           {/* Modal */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 4 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-[440px] mx-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-full sm:max-w-[440px] mx-0 sm:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <AnimatePresence mode="wait">
@@ -398,26 +389,37 @@ function SendModal({
                   key="compose"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-[#121215] rounded-[28px] overflow-hidden"
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.15 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
                 >
-                  {/* Header - asymmetric, title left-aligned */}
-                  <div className="px-8 pt-8 pb-4">
-                    <p className="text-white/50 text-xs uppercase tracking-[0.2em] mb-1">Send to</p>
-                    {/* Recipient inline - feels integrated, not a form */}
+                  {/* Header */}
+                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-white/50 text-sm font-medium">Send to</p>
+                      <button
+                        onClick={handleClose}
+                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    {/* Recipient input */}
                     <div className="flex items-center gap-1">
                       {recipientMode === "username" ? (
-                        <span className="text-white/40 text-2xl font-light">@</span>
+                        <span style={{ color: BRAND_LAVENDER }} className="text-xl sm:text-2xl font-medium">@</span>
                       ) : (
                         <div className="flex items-center">
-                          <span className="text-white/40 text-2xl font-light">+</span>
+                          <span className="text-white/40 text-xl sm:text-2xl font-light">+</span>
                           <input
                             type="text"
                             inputMode="numeric"
                             value={countryCode.replace(/^\+/, "")}
                             onChange={(e) => setCountryCode(`+${e.target.value.replace(/\D/g, "").slice(0, 3)}`)}
-                            className="bg-transparent text-white/50 text-2xl font-light w-8 focus:outline-none"
+                            className="bg-transparent text-white/60 text-xl sm:text-2xl font-light w-8 focus:outline-none"
                             style={{ fontFeatureSettings: "'tnum' 1" }}
                             placeholder="1"
                           />
@@ -429,11 +431,12 @@ function SendModal({
                         value={recipient}
                         onChange={handleRecipientChange}
                         placeholder={recipientMode === "phone" ? "(555) 123-4567" : "username"}
-                        className="bg-transparent text-white text-2xl font-light w-48 focus:outline-none placeholder:text-white/30"
+                        className="bg-transparent text-white text-xl sm:text-2xl font-light flex-1 focus:outline-none placeholder:text-white/25"
                       />
                     </div>
-                    {/* Status / Error / Mode toggle row */}
-                    <div className="flex items-center justify-between mt-2 min-h-[20px]">
+                    
+                    {/* Status row */}
+                    <div className="flex items-center justify-between mt-3 min-h-[20px]">
                       <div className="flex items-center gap-2">
                         {isChecking && (
                           <motion.div
@@ -459,15 +462,14 @@ function SendModal({
                         )}
                         {!isChecking && hasError && (
                           <motion.p
-                            initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
                             className="text-red-400 text-xs"
                           >
                             {isSendingToSelf ? "Can't send to yourself" : "User not found"}
                           </motion.p>
                         )}
                       </div>
-                      {/* Mode toggle - minimal, bottom right of this section */}
                       <button
                         onClick={() => {
                           setRecipientMode(recipientMode === "phone" ? "username" : "phone");
@@ -478,12 +480,12 @@ function SendModal({
                         {recipientMode === "phone" ? "use @username" : "use phone"}
                       </button>
                     </div>
-      </div>
+                  </div>
 
-                  {/* Amount - the hero, massive and confident */}
-                  <div className="px-8 py-12">
+                  {/* Amount */}
+                  <div className="px-6 sm:px-8 py-8 sm:py-10">
                     <div className="flex items-baseline">
-                      <span className="text-white/30 text-7xl sm:text-8xl font-extralight">$</span>
+                      <span style={{ color: BRAND_LAVENDER }} className="text-4xl sm:text-5xl font-light">$</span>
                       <input
                         ref={inputRef}
                         type="text"
@@ -491,35 +493,32 @@ function SendModal({
                         value={amount}
                         onChange={handleAmountChange}
                         placeholder="0"
-                        className="bg-transparent text-white text-7xl sm:text-8xl font-extralight w-full focus:outline-none placeholder:text-white/25 caret-white/50"
-                        style={{ fontFeatureSettings: "'tnum' 1", caretColor: BRAND_LAVENDER }}
+                        className="bg-transparent text-white text-4xl sm:text-5xl font-light w-full focus:outline-none placeholder:text-white/20"
+                        style={{ fontFeatureSettings: "'tnum' 1" }}
                       />
                     </div>
                     
-                    {/* Current balance - subtle, integrated */}
-                    <div className="mt-6">
+                    <div className="mt-4">
                       <span className="text-white/40 text-sm">
                         Balance: ${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
 
-                  {/* Action - full width, decisive */}
-                  <div className="px-8 pb-8">
-                    <motion.button
+                  {/* Action button */}
+                  <div className="px-6 sm:px-8 pb-8 sm:pb-8">
+                    <button
                       onClick={() => canSend && setStep("confirm")}
                       disabled={!canSend}
                       className={`
-                        w-full py-5 rounded-2xl text-base font-medium transition-all duration-300 cursor-pointer
+                        w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 cursor-pointer touch-manipulation
                         ${canSend 
-                          ? "bg-white text-black" 
+                          ? "bg-white text-black active:scale-[0.98]" 
                           : hasError
-                            ? "bg-red-500/15 text-red-400"
-                            : "bg-white/[0.06] text-white/30"
+                            ? "bg-red-500/10 text-red-400"
+                            : "bg-white/[0.05] text-white/30"
                         }
                       `}
-                      whileHover={canSend ? { scale: 1.01, backgroundColor: "#f0f0f0" } : {}}
-                      whileTap={canSend ? { scale: 0.99 } : {}}
                     >
                       {canSend 
                         ? "Continue" 
@@ -529,154 +528,113 @@ function SendModal({
                             ? recipientMode === "phone" ? "Enter phone" : "Enter username"
                             : "Enter amount"
                       }
-                    </motion.button>
+                    </button>
                   </div>
-
-                  {/* Dismiss - text only, bottom right */}
-                  <button
-                    onClick={handleClose}
-                    className="absolute top-6 right-6 text-white/30 hover:text-white/50 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </motion.div>
               )}
 
               {step === "confirm" && (
                 <motion.div
                   key="confirm"
-                  initial={{ opacity: 0, x: 30 }}
+                  initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="bg-[#121215] rounded-[28px] overflow-hidden"
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
                 >
-                  <div className="px-8 pt-8 pb-10">
-                    {/* Back button */}
-                    <button
-                      onClick={() => setStep("compose")}
-                      className="text-white/40 hover:text-white/60 transition-colors mb-8 -ml-1 cursor-pointer"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                      </svg>
-                    </button>
+                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-6">
+                    {/* Header with back button */}
+                    <div className="flex items-center justify-between mb-6">
+                      <button
+                        onClick={() => setStep("compose")}
+                        className="text-white/40 hover:text-white/60 transition-colors cursor-pointer p-1 -ml-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={handleClose}
+                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
 
-                    {/* Confirmation display - confident, clear */}
-                    <div className="text-center py-8">
-                      <p className="text-white/50 text-xs uppercase tracking-[0.2em] mb-4">You're sending</p>
+                    {/* Confirmation display */}
+                    <div className="text-center py-6">
+                      <p className="text-white/50 text-sm font-medium mb-3">Sending</p>
                       <p 
-                        className="text-6xl sm:text-7xl font-extralight text-white mb-4"
+                        className="text-4xl sm:text-5xl font-light text-white mb-3"
                         style={{ fontFeatureSettings: "'tnum' 1" }}
                       >
-                        <span className="text-white/40">$</span>
+                        <span style={{ color: BRAND_LAVENDER }}>$</span>
                         {numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                       </p>
-                      <p className="text-white/50 text-lg">
+                      <p className="text-white/50 text-base">
                         to <span className="text-white/80">{displayRecipient}</span>
                       </p>
                     </div>
 
-                    {/* Details - minimal, no boxes */}
-                    <div className="py-6 space-y-3">
+                    {/* Details */}
+                    <div className="py-4 space-y-3 bg-white/[0.03] rounded-xl px-4 mb-6">
                       <div className="flex items-center justify-between">
-                        <span className="text-white/45 text-sm">Network fee</span>
+                        <span className="text-white/40 text-sm">Network fee</span>
                         <span className="text-white/60 text-sm">$0.00</span>
                       </div>
-                      <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
                       <div className="flex items-center justify-between">
-                        <span className="text-white/45 text-sm">New balance</span>
+                        <span className="text-white/40 text-sm">New balance</span>
                         <span className="text-white/80 text-sm tabular-nums" style={{ fontFeatureSettings: "'tnum' 1" }}>
                           ${remaining.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Confirm action */}
-                  <div className="px-8 pb-8">
-                    <motion.button
+                    {/* Confirm button */}
+                    <button
                       onClick={handleConfirm}
-                      className="w-full py-5 rounded-2xl text-base font-medium bg-white text-black cursor-pointer"
-                      whileHover={{ scale: 1.01, backgroundColor: "#f0f0f0" }}
-                      whileTap={{ scale: 0.99 }}
+                      className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
                     >
                       Confirm & Send
-                    </motion.button>
+                    </button>
                   </div>
-
-                  <button
-                    onClick={handleClose}
-                    className="absolute top-6 right-6 text-white/30 hover:text-white/50 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </motion.div>
               )}
 
               {step === "processing" && (
                 <motion.div
                   key="processing"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="bg-[#121215] rounded-[28px] overflow-hidden py-16 px-8"
+                  transition={{ duration: 0.2 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-12 sm:py-16 px-6 sm:px-8"
                 >
                   <div className="text-center">
-                    {/* Animated spinner */}
-                    <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8 relative">
-                      {/* Outer ring */}
+                    {/* Spinner */}
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+                      <div className="absolute inset-0 rounded-full border-2 border-white/[0.08]" />
                       <motion.div
-                        className="absolute inset-0 rounded-full border-2 border-white/[0.08]"
-                      />
-                      {/* Spinning arc */}
-                      <motion.div
-                        className="absolute inset-0 rounded-full border-2 border-transparent border-t-white/50"
+                        className="absolute inset-0 rounded-full border-2 border-transparent"
+                        style={{ borderTopColor: BRAND_LAVENDER }}
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       />
-                      {/* Inner pulse */}
-                      <motion.div
-                        className="w-3 h-3 rounded-full bg-white/30"
-                        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                      />
                     </div>
                     
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="text-white text-xl font-medium mb-2"
-                    >
-                      Sending...
-                    </motion.p>
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.1 }}
-                      className="text-white/40 text-sm"
-                    >
-                      Confirming on Base
-                    </motion.p>
+                    <p className="text-white text-lg font-medium mb-1">Sending...</p>
+                    <p className="text-white/40 text-sm mb-6">Confirming on Base</p>
                     
-                    {/* Amount being sent */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="mt-8 py-4"
+                    <p 
+                      className="text-2xl font-light text-white"
+                      style={{ fontFeatureSettings: "'tnum' 1" }}
                     >
-                      <p className="text-white/50 text-sm mb-1">Sending</p>
-                      <p className="text-white text-2xl font-light" style={{ fontFeatureSettings: "'tnum' 1" }}>
-                        ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-white/40 text-sm mt-1">to {displayRecipient}</p>
-                    </motion.div>
+                      <span style={{ color: BRAND_LAVENDER }}>$</span>
+                      {numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-white/40 text-sm mt-1">to {displayRecipient}</p>
                   </div>
                 </motion.div>
               )}
@@ -684,55 +642,32 @@ function SendModal({
               {step === "success" && (
                 <motion.div
                   key="success"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="bg-[#121215] rounded-[28px] overflow-hidden py-12 px-8"
+                  transition={{ duration: 0.2 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-10 sm:py-12 px-6 sm:px-8"
                 >
                   <div className="text-center">
-                    {/* Success checkmark with animation */}
+                    {/* Success checkmark */}
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      transition={{ delay: 0.1, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
-                      className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-6"
+                      transition={{ delay: 0.1, duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+                      className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-5"
                     >
-                      <motion.svg
-                        initial={{ pathLength: 0, opacity: 0 }}
-                        animate={{ pathLength: 1, opacity: 1 }}
-                        transition={{ delay: 0.3, duration: 0.4 }}
-                        className="w-10 h-10 text-emerald-400"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                      >
-                        <motion.path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </motion.svg>
+                      <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
                     </motion.div>
                     
-                    <motion.p
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
-                      className="text-white text-xl font-medium mb-1"
-                    >
-                      Sent successfully
-                    </motion.p>
-                    <motion.p
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="text-white/50 text-base mb-6"
-                    >
+                    <p className="text-white text-lg font-medium mb-1">Sent successfully</p>
+                    <p className="text-white/50 text-sm mb-6">
                       ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} to {displayRecipient}
-                    </motion.p>
+                    </p>
 
                     {/* Transaction details */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.6 }}
-                      className="py-4 space-y-3 text-left"
-                    >
+                    <div className="py-3 space-y-2 bg-white/[0.03] rounded-xl px-4 text-left mb-4">
                       <div className="flex items-center justify-between">
                         <span className="text-white/40 text-sm">Status</span>
                         <span className="text-emerald-400 text-sm flex items-center gap-1.5">
@@ -744,65 +679,28 @@ function SendModal({
                         <span className="text-white/40 text-sm">Network</span>
                         <span className="text-white/60 text-sm">Base</span>
                       </div>
-                    </motion.div>
-
-                    {/* Advanced section */}
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.7 }}
-                      className="mt-4"
-                    >
-                      <button
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                        className="text-white/30 hover:text-white/50 text-xs transition-colors cursor-pointer flex items-center gap-1 mx-auto"
-                      >
-                        Advanced
-                        <svg 
-                          className={`w-3 h-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} 
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      
-                      {showAdvanced && txHash && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="mt-4 space-y-3 text-left"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-white/40 text-sm">Transaction</span>
-                            <span className="text-white/50 text-sm font-mono">
-                              {txHash.slice(0, 6)}...{txHash.slice(-4)}
-                            </span>
-                          </div>
+                      {txHash && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/40 text-sm">Transaction</span>
                           <a
                             href={`https://basescan.org/tx/${txHash}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 text-white/40 hover:text-white/60 text-sm transition-colors py-2"
+                            className="text-white/50 hover:text-white/70 text-sm font-mono transition-colors"
                           >
-                            View on Basescan
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
+                            {txHash.slice(0, 6)}...{txHash.slice(-4)}
                           </a>
-                        </motion.div>
+                        </div>
                       )}
-                    </motion.div>
+                    </div>
 
                     {/* Done button */}
-                    <motion.button
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.8 }}
+                    <button
                       onClick={handleClose}
-                      className="w-full mt-6 py-4 rounded-2xl text-base font-medium bg-white/[0.06] text-white/70 hover:bg-white/[0.1] hover:text-white transition-colors cursor-pointer"
+                      className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
                     >
                       Done
-                    </motion.button>
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -952,23 +850,23 @@ function RequestModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
           onClick={handleClose}
         >
           <motion.div 
-            className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+            className="absolute inset-0 bg-black/90"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           />
           
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 4 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-[440px] mx-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-full sm:max-w-[440px] mx-0 sm:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <AnimatePresence mode="wait">
@@ -977,19 +875,29 @@ function RequestModal({
                   key="compose"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-[#121215] rounded-[28px] overflow-hidden"
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.15 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
                 >
                   {/* Header */}
-                  <div className="px-8 pt-8 pb-2">
-                    <p className="text-white/50 text-xs uppercase tracking-[0.2em]">Request</p>
-                </div>
+                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-white/50 text-sm font-medium">Request</p>
+                      <button
+                        onClick={handleClose}
+                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
 
-                  {/* Amount - the hero */}
-                  <div className="px-8 py-10">
+                  {/* Amount */}
+                  <div className="px-6 sm:px-8 py-6 sm:py-8">
                     <div className="flex items-baseline">
-                      <span className="text-white/30 text-7xl sm:text-8xl font-extralight">$</span>
+                      <span style={{ color: BRAND_LAVENDER }} className="text-4xl sm:text-5xl font-light">$</span>
                       <input
                         ref={inputRef}
                         type="text"
@@ -997,19 +905,19 @@ function RequestModal({
                         value={amount}
                         onChange={handleAmountChange}
                         placeholder="0"
-                        className="bg-transparent text-white text-7xl sm:text-8xl font-extralight w-full focus:outline-none placeholder:text-white/25 caret-white/50"
-                        style={{ fontFeatureSettings: "'tnum' 1", caretColor: BRAND_LAVENDER }}
+                        className="bg-transparent text-white text-4xl sm:text-5xl font-light w-full focus:outline-none placeholder:text-white/20"
+                        style={{ fontFeatureSettings: "'tnum' 1" }}
                       />
                     </div>
                   </div>
 
-                  {/* From - optional, subtle */}
-                  <div className="px-8 pb-4">
-                    <p className="text-white/45 text-xs uppercase tracking-[0.15em] mb-3">From</p>
+                  {/* From - optional */}
+                  <div className="px-6 sm:px-8 pb-4">
+                    <p className="text-white/40 text-sm font-medium mb-3">From (optional)</p>
                     
                     <div className="flex items-center gap-1">
                       {fromMode === "username" ? (
-                        <span className="text-white/40 text-lg">@</span>
+                        <span style={{ color: BRAND_LAVENDER }} className="text-lg font-medium">@</span>
                       ) : (
                         <div className="flex items-center">
                           <span className="text-white/40 text-lg">+</span>
@@ -1030,13 +938,13 @@ function RequestModal({
                         value={from}
                         onChange={handleFromChange}
                         placeholder={fromMode === "phone" ? "(555) 123-4567" : "anyone"}
-                        className="flex-1 bg-transparent text-white/80 text-lg focus:outline-none placeholder:text-white/30"
+                        className="flex-1 bg-transparent text-white text-lg focus:outline-none placeholder:text-white/25"
                       />
                     </div>
                     
-                    {/* Status / Error / Mode toggle row */}
-                    <div className="flex items-center justify-between mt-2 min-h-[20px]">
-                  <div className="flex items-center gap-2">
+                    {/* Status row */}
+                    <div className="flex items-center justify-between mt-3 min-h-[20px]">
+                      <div className="flex items-center gap-2">
                         {isChecking && hasSpecificFrom && (
                           <motion.div
                             initial={{ opacity: 0 }}
@@ -1061,14 +969,14 @@ function RequestModal({
                         )}
                         {!isChecking && hasFromError && hasSpecificFrom && (
                           <motion.p
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
                             className="text-red-400 text-xs"
                           >
                             {isRequestingFromSelf ? "Can't request from yourself" : "User not found"}
                           </motion.p>
                         )}
-                  </div>
+                      </div>
                       <button
                         onClick={() => {
                           setFromMode(fromMode === "phone" ? "username" : "phone");
@@ -1078,25 +986,23 @@ function RequestModal({
                       >
                         {fromMode === "phone" ? "use @username" : "use phone"}
                       </button>
-                </div>
-              </div>
+                    </div>
+                  </div>
 
                   {/* Action */}
-                  <div className="px-8 py-8">
-                    <motion.button
+                  <div className="px-6 sm:px-8 pb-8 pt-4">
+                    <button
                       onClick={() => canRequest && setStep("confirm")}
                       disabled={!canRequest}
                       className={`
-                        w-full py-5 rounded-2xl text-base font-medium transition-all duration-300 cursor-pointer
+                        w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 cursor-pointer touch-manipulation
                         ${canRequest 
-                          ? "bg-white text-black" 
+                          ? "bg-white text-black active:scale-[0.98]" 
                           : hasFromError
-                            ? "bg-red-500/15 text-red-400"
-                            : "bg-white/[0.06] text-white/30"
+                            ? "bg-red-500/10 text-red-400"
+                            : "bg-white/[0.05] text-white/30"
                         }
                       `}
-                      whileHover={canRequest ? { scale: 1.01, backgroundColor: "#f0f0f0" } : {}}
-                      whileTap={canRequest ? { scale: 0.99 } : {}}
                     >
                       {canRequest 
                         ? "Continue" 
@@ -1104,120 +1010,95 @@ function RequestModal({
                           ? "Can't request"
                           : "Enter amount"
                       }
-                    </motion.button>
+                    </button>
                   </div>
-
-                  <button
-                    onClick={handleClose}
-                    className="absolute top-6 right-6 text-white/30 hover:text-white/50 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </motion.div>
               )}
 
               {step === "confirm" && (
                 <motion.div
                   key="confirm"
-                  initial={{ opacity: 0, x: 30 }}
+                  initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="bg-[#121215] rounded-[28px] overflow-hidden"
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
                 >
-                  <div className="px-8 pt-8 pb-10">
-                    <button
-                      onClick={() => setStep("compose")}
-                      className="text-white/40 hover:text-white/60 transition-colors mb-8 -ml-1 cursor-pointer"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                      </svg>
-                    </button>
+                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <button
+                        onClick={() => setStep("compose")}
+                        className="text-white/40 hover:text-white/60 transition-colors cursor-pointer p-1 -ml-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={handleClose}
+                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
 
-                    <div className="text-center py-8">
-                      <p className="text-white/50 text-xs uppercase tracking-[0.2em] mb-4">Requesting</p>
+                    <div className="text-center py-6">
+                      <p className="text-white/50 text-sm font-medium mb-3">Requesting</p>
                       <p 
-                        className="text-6xl sm:text-7xl font-extralight text-white mb-4"
+                        className="text-4xl sm:text-5xl font-light text-white mb-3"
                         style={{ fontFeatureSettings: "'tnum' 1" }}
                       >
-                        <span className="text-white/40">$</span>
+                        <span style={{ color: BRAND_LAVENDER }}>$</span>
                         {numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                       </p>
-                      <p className="text-white/50 text-lg">
+                      <p className="text-white/50 text-base">
                         from <span className="text-white/80">{displayFrom}</span>
-                </p>
-              </div>
-            </div>
+                      </p>
+                    </div>
 
-                  <div className="px-8 pb-8">
-                    <motion.button
+                    <button
                       onClick={handleConfirm}
-                      className="w-full py-5 rounded-2xl text-base font-medium bg-white text-black cursor-pointer"
-                      whileHover={{ scale: 1.01, backgroundColor: "#f0f0f0" }}
-                      whileTap={{ scale: 0.99 }}
+                      className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
                     >
                       Send Request
-                    </motion.button>
-            </div>
-
-                  <button
-                    onClick={handleClose}
-                    className="absolute top-6 right-6 text-white/30 hover:text-white/50 transition-colors cursor-pointer"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-                  </button>
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
               {step === "success" && (
                 <motion.div
                   key="success"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="bg-[#121215] rounded-[28px] overflow-hidden py-16 px-8"
+                  transition={{ duration: 0.2 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-10 sm:py-12 px-6 sm:px-8"
                 >
                   <div className="text-center">
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      transition={{ delay: 0.1, duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
-                      className="w-20 h-20 rounded-full bg-white/[0.06] flex items-center justify-center mx-auto mb-8"
+                      transition={{ delay: 0.1, duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+                      className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
+                      style={{ backgroundColor: `${BRAND_LAVENDER}15` }}
                     >
-                      <motion.svg
-                        initial={{ pathLength: 0, opacity: 0 }}
-                        animate={{ pathLength: 1, opacity: 1 }}
-                        transition={{ delay: 0.3, duration: 0.4 }}
-                        className="w-10 h-10 text-white/80"
+                      <svg 
+                        className="w-8 h-8"
+                        style={{ color: BRAND_LAVENDER }}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                      </motion.svg>
+                      </svg>
                     </motion.div>
                     
-                    <motion.p
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
-                      className="text-white text-xl font-medium mb-2"
-                    >
-                      Request Sent
-                    </motion.p>
-                    <motion.p
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="text-white/50 text-base"
-                    >
+                    <p className="text-white text-lg font-medium mb-1">Request Sent</p>
+                    <p className="text-white/50 text-sm">
                       ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} from {displayFrom}
-                    </motion.p>
-          </div>
+                    </p>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1266,104 +1147,142 @@ export default function Dashboard() {
         No staggered animations - everything appears composed
         Layout is fixed - no shifts during hydration
       */}
-      <div className="min-h-[calc(100vh-3.5rem)] flex flex-col px-6 sm:px-12 lg:px-12 py-12 sm:py-16 lg:py-20">
+      <div className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center px-4 sm:px-8 lg:px-12 py-6 sm:py-10 lg:py-16">
+        <div className="w-full max-w-[1100px]">
         
-        {/* 
-          Primary hierarchy: The balance.
-          No entrance animation - immediately composed
-          Opacity transition for data loading only
-        */}
+        {/* Page Title */}
+        <h1 className="text-lg sm:text-xl lg:text-2xl text-white mb-6 sm:mb-8">
+          Dashboard
+        </h1>
+
+        {/* Hero Balance Section */}
         <div 
           className="transition-opacity duration-200"
           style={{ opacity: isReady ? 1 : 0.5 }}
         >
-          {/* Label - subtle, uppercase, generous letter-spacing */}
-          <p className="text-white/35 text-[11px] uppercase tracking-[0.15em] mb-3">
-            Total balance
-          </p>
-          
-          {/* 
-            The number - hero element
-            Fixed height prevents layout shift
-          */}
-          <h1
-            className="text-[3.5rem] sm:text-[5rem] lg:text-[6.5rem] xl:text-[7.5rem] font-extralight text-white leading-[0.9] tracking-[-0.03em]"
-            style={{ fontFeatureSettings: "'tnum' 1" }}
-          >
-            <span className="text-white/30">$</span>
-            {formattedDollars}
-            <span className="text-white/25 text-[0.35em] font-light ml-0.5">.{cents}</span>
-          </h1>
+          {/* Balance Card */}
+          <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+              {/* Top row with label and status */}
+              <div className="flex items-center justify-between mb-4 sm:mb-6 lg:mb-8">
+                <p className="text-white/50 text-xs sm:text-sm font-medium">
+                  Total Balance
+                </p>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span 
+                    className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full"
+                    style={{ backgroundColor: BRAND_LAVENDER }}
+                  />
+                  <span className="text-white/50 text-[10px] sm:text-xs font-medium">7.8% APY</span>
+                </div>
+              </div>
+              
+              {/* The Balance */}
+              <p
+                className="text-[2.5rem] sm:text-[4rem] lg:text-[5.5rem] font-light text-white leading-none tracking-tight"
+                style={{ fontFeatureSettings: "'tnum' 1" }}
+              >
+                <span style={{ color: BRAND_LAVENDER }}>$</span>
+                {formattedDollars}
+                <span className="text-white/30 text-[0.35em] font-normal ml-0.5 sm:ml-1">.{cents}</span>
+              </p>
 
-          {/* Yield indicator - whispered context */}
-          <div className="mt-5 flex items-center gap-2">
-            <span className="text-white/20 text-sm font-normal tracking-wide">
-              +${todayYield.toFixed(2)} earned today
-            </span>
+              {/* Bottom stats row - stacks on mobile */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 lg:gap-10 mt-6 sm:mt-8 lg:mt-10">
+                <div>
+                  <p className="text-emerald-400 text-base sm:text-lg font-medium tabular-nums mb-0.5 sm:mb-1" style={{ fontFeatureSettings: "'tnum' 1" }}>
+                    +${todayYield.toFixed(2)}
+                  </p>
+                  <p className="text-white/40 text-xs sm:text-sm">Earned today</p>
+                </div>
+                <div>
+                  <p className="text-white/80 text-base sm:text-lg font-medium tabular-nums mb-0.5 sm:mb-1" style={{ fontFeatureSettings: "'tnum' 1" }}>
+                    ~${((balance || 0) * (0.078 / 12)).toFixed(2)}
+                  </p>
+                  <p className="text-white/40 text-xs sm:text-sm">Est. this month</p>
+                </div>
+              </div>
           </div>
         </div>
 
-        {/* 
-          Yield history chart
-          Renders immediately with stable dimensions
-        */}
-        <div className="mt-12 lg:mt-16">
-          <div className="p-6 -ml-6 rounded-2xl">
-            <YieldHistoryChart balance={balance || 0} />
-          </div>
+        {/* Yield History Section */}
+        <div className="mt-6 sm:mt-10 lg:mt-16">
+          <YieldHistoryChart balance={balance || 0} />
         </div>
 
         {/* Flexible spacer - pushes actions to bottom */}
-        <div className="flex-1 min-h-16" />
+        <div className="flex-1 min-h-8 sm:min-h-12 lg:min-h-16" />
 
         {/* 
-          Action bar - No entrance animations
-          Buttons use CSS transitions for hover states only
+          Action bar - Mobile-first grid layout
+          Primary actions full width on mobile, inline on larger screens
         */}
-        <div className="flex items-center gap-3">
-          {/* Primary action - Send */}
-          <button
-            onClick={() => setSendOpen(true)}
-            className="flex items-center gap-2.5 px-6 py-3 rounded-full bg-white text-[#0f0f12] text-[13px] font-semibold cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.1)] hover:bg-[#f5f5f5] active:scale-[0.985] transition-all duration-100"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-            </svg>
-            Send
-          </button>
-
-          {/* Secondary action - Request */}
-          <button
-            onClick={() => setRequestOpen(true)}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-full bg-white/[0.05] text-white/60 text-[13px] font-medium cursor-pointer hover:bg-white/[0.08] hover:text-white/85 active:scale-[0.985] transition-all duration-100"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
-            </svg>
-            Request
-          </button>
-
-          {/* Visual separator - refined */}
-          <div className="w-px h-4 bg-white/[0.08] mx-1" />
-
-          {/* Tertiary actions - Add & Withdraw */}
-          <Link href="/deposit">
-            <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        <div className="w-full">
+          {/* Primary actions - Send & Request */}
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-3">
+            <button
+              onClick={() => setSendOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white text-black text-sm sm:text-[13px] font-semibold cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
               </svg>
-              Add
-            </div>
-          </Link>
+              Send
+            </button>
 
-          <Link href="/withdraw">
-            <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            <button
+              onClick={() => setRequestOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 sm:px-5 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white/[0.08] text-white/80 text-sm sm:text-[13px] font-medium cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
               </svg>
-              Withdraw
-            </div>
-          </Link>
+              Request
+            </button>
+
+            {/* Separator - hidden on mobile */}
+            <div className="hidden sm:block w-px h-4 bg-white/[0.08] mx-1" />
+
+            {/* Tertiary actions - hidden on mobile, shown in second row */}
+            <Link href="/deposit" className="hidden sm:block">
+              <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add
+              </div>
+            </Link>
+
+            <Link href="/withdraw" className="hidden sm:block">
+              <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                Withdraw
+              </div>
+            </Link>
+          </div>
+
+          {/* Secondary actions row - mobile only */}
+          <div className="grid grid-cols-2 gap-3 mt-3 sm:hidden">
+            <Link href="/deposit">
+              <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.05] text-white/60 text-sm font-medium cursor-pointer active:scale-[0.98] transition-all duration-100 touch-manipulation">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add
+              </div>
+            </Link>
+
+            <Link href="/withdraw">
+              <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.05] text-white/60 text-sm font-medium cursor-pointer active:scale-[0.98] transition-all duration-100 touch-manipulation">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+                Withdraw
+              </div>
+            </Link>
+          </div>
+        </div>
         </div>
       </div>
 

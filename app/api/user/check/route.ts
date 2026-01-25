@@ -1,5 +1,6 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { getUserByUsername } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,9 +23,18 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ exists: users.totalCount > 0 });
     } else if (type === "username") {
-      // Search for user by username
+      // Check both Clerk and our internal database
+      const cleanUsername = identifier.startsWith("@") ? identifier : `@${identifier}`;
+      
+      // Check our internal database first
+      const internalUser = await getUserByUsername(cleanUsername);
+      if (internalUser) {
+        return NextResponse.json({ exists: true });
+      }
+      
+      // Also check Clerk (in case username is stored there too)
       const users = await client.users.getUserList({
-        username: [identifier.toLowerCase()],
+        username: [identifier.toLowerCase().replace('@', '')],
       });
 
       return NextResponse.json({ exists: users.totalCount > 0 });

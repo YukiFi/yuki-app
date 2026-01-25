@@ -110,7 +110,9 @@ export function useEmbeddedWallet(): UseEmbeddedWalletReturn {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
-      const response = await fetch('/api/wallet');
+      const response = await fetch('/api/wallet', {
+        credentials: 'include',
+      });
       const data = await response.json();
       
       if (response.ok && data.hasWallet) {
@@ -150,6 +152,7 @@ export function useEmbeddedWallet(): UseEmbeddedWalletReturn {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ encryptedWallet: encryptedData }),
+        credentials: 'include',
       });
       
       const data = await response.json();
@@ -371,6 +374,7 @@ export function useEmbeddedWallet(): UseEmbeddedWalletReturn {
             transports: credential.response.transports,
           },
         }),
+        credentials: 'include',
       });
       
       if (response.ok) {

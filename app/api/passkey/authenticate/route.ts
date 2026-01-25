@@ -1,40 +1,37 @@
 /**
  * POST /api/passkey/authenticate
  * 
- * Generate passkey authentication options for WebAuthn signin.
+ * Generate passkey authentication options for WebAuthn wallet unlock.
+ * Used for unlocking the wallet with passkey instead of password.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getUserByEmail, getWalletByUserId } from '@/lib/db';
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { getOrCreateUserByClerkId, getWalletByUserId } from '@/lib/db';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
-import { getSession } from '@/lib/session';
 
 const rpID = process.env.NEXT_PUBLIC_RP_ID || 'localhost';
 
-export async function POST(request: NextRequest) {
+// Store challenges temporarily (in production, use Redis)
+export const authChallengeStore = new Map<string, string>();
+
+export async function POST() {
   try {
-    const body = await request.json();
-    const { email } = body;
+    const { userId: clerkUserId } = await auth();
     
-    if (!email) {
+    if (!clerkUserId) {
       return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
     
-    const user = await getUserByEmail(email);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
-    
+    const user = await getOrCreateUserByClerkId(clerkUserId);
     const wallet = await getWalletByUserId(user.id);
+    
     if (!wallet || wallet.security_level !== 'passkey_enabled' || !wallet.passkey_meta) {
       return NextResponse.json(
-        { error: 'Passkey not enabled for this account' },
+        { error: 'Passkey not enabled for this wallet' },
         { status: 400 }
       );
     }
@@ -51,11 +48,14 @@ export async function POST(request: NextRequest) {
         transports: passkeyMeta.transports || [],
       }],
     });
-    // Store challenge and user info in session for verification
-    const session = await getSession();
-    session.passkeyChallenge = options.challenge;
-    session.passkeyUserId = user.id;
-    await session.save();
+    
+    // Store challenge for verification
+    authChallengeStore.set(user.id, options.challenge);
+    
+    // Clean up after 5 minutes
+    setTimeout(() => {
+      authChallengeStore.delete(user.id);
+    }, 5 * 60 * 1000);
     
     return NextResponse.json(options);
   } catch (error) {

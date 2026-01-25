@@ -6,22 +6,24 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
-import { getWalletByUserId, updateWalletPasskey } from '@/lib/db';
+import { auth } from '@clerk/nextjs/server';
+import { getWalletByUserId, updateWalletPasskey, getOrCreateUserByClerkId } from '@/lib/db';
 import type { EncryptedWalletData } from '@/lib/crypto';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const { userId: clerkUserId } = await auth();
     
-    if (!session.isLoggedIn || !session.userId) {
+    if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
     
-    const wallet = await getWalletByUserId(session.userId);
+    const user = await getOrCreateUserByClerkId(clerkUserId);
+    const wallet = await getWalletByUserId(user.id);
+    
     if (!wallet) {
       return NextResponse.json(
         { error: 'No wallet found' },
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Update wallet with passkey data
-    await updateWalletPasskey(session.userId, {
+    await updateWalletPasskey(user.id, {
       cipherPriv: upgradedWallet.cipherPriv,
       ivPriv: upgradedWallet.ivPriv,
       securityLevel: 'passkey_enabled',
