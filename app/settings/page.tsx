@@ -44,24 +44,15 @@ export default function SettingsPage() {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
 
-  if (!isLoaded) {
-    return (
-      <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-white/50 animate-spin" />
-      </div>
-    );
-  }
-
-  // Username change logic
+  // Username change logic - computed values
   const daysSinceLastChange = Math.floor(
     (Date.now() - MOCK_LAST_USERNAME_CHANGE.getTime()) / (1000 * 60 * 60 * 24)
   );
   const canChangeUsername = daysSinceLastChange >= 30;
   const daysUntilChange = 30 - daysSinceLastChange;
-
   const currentUsername = user?.username || "Not set";
   
-  // Debounced username availability check
+  // Debounced username availability check - MUST be before any early returns
   useEffect(() => {
     if (!isEditingUsername || !newUsername) {
       setUsernameAvailable(null);
@@ -106,8 +97,21 @@ export default function SettingsPage() {
 
     return () => clearTimeout(timeoutId);
   }, [newUsername, isEditingUsername, currentUsername]);
+
+  // Loading state - after all hooks
+  if (!isLoaded) {
+    return (
+      <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-white/50 animate-spin" />
+      </div>
+    );
+  }
   
   const handleSaveUsername = async () => {
+    if (!user) {
+      setUsernameError("Not logged in");
+      return;
+    }
     if (!newUsername || newUsername.length < 3) {
       setUsernameError("At least 3 characters");
       return;
@@ -121,10 +125,11 @@ export default function SettingsPage() {
     }
     
     setIsSavingUsername(true);
+    setUsernameError(null);
     
     try {
-      // In production, call API to update username
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Actually update the username via Clerk
+      await user.update({ username: newUsername });
       
       setUsernameSaved(true);
       
@@ -136,8 +141,17 @@ export default function SettingsPage() {
         setUsernameAvailable(null);
         setUsernameSaved(false);
       }, 1200);
-    } catch {
-      setUsernameError("Failed to save. Try again.");
+    } catch (err: unknown) {
+      console.error("Failed to update username:", err);
+      const clerkError = err as { errors?: { message?: string; code?: string }[] };
+      const errorMessage = clerkError.errors?.[0]?.message || "Failed to save. Try again.";
+      
+      // Check for specific Clerk error codes
+      if (clerkError.errors?.[0]?.code === "form_identifier_exists") {
+        setUsernameError("Username is already taken");
+      } else {
+        setUsernameError(errorMessage);
+      }
     } finally {
       setIsSavingUsername(false);
     }
@@ -286,61 +300,23 @@ export default function SettingsPage() {
                         autoFocus
                         disabled={isSavingUsername || usernameSaved}
                       />
-                      
-                      {/* Status indicator */}
-                      <div className="w-5 h-5 flex items-center justify-center ml-1">
-                        <AnimatePresence mode="wait">
-                          {isCheckingUsername && (
-                            <motion.div
-                              key="checking"
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.8 }}
-                              className="w-4 h-4 border-2 border-white/20 border-t-white/50 rounded-full animate-spin"
-                            />
-                          )}
-                          {!isCheckingUsername && usernameAvailable === true && !usernameSaved && (
-                            <motion.svg
-                              key="available"
-                              initial={{ opacity: 0, scale: 0.5 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.5 }}
-                              className="w-4 h-4 text-emerald-400"
-                              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </motion.svg>
-                          )}
-                          {!isCheckingUsername && usernameAvailable === false && (
-                            <motion.svg
-                              key="taken"
-                              initial={{ opacity: 0, scale: 0.5 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.5 }}
-                              className="w-4 h-4 text-red-400"
-                              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </motion.svg>
-                          )}
-                          {usernameSaved && (
-                            <motion.svg
-                              key="saved"
-                              initial={{ opacity: 0, scale: 0.5 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              className="w-4 h-4 text-emerald-400"
-                              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </motion.svg>
-                          )}
-                        </AnimatePresence>
-                </div>
-              </div>
+                    </div>
                     
-                    {/* Status message */}
-                    <div className="h-5 mt-1">
+                    {/* Status message with spinner below input */}
+                    <div className="h-5 mt-2">
                       <AnimatePresence mode="wait">
+                        {isCheckingUsername && !usernameError && (
+                          <motion.div
+                            key="checking"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="flex items-center gap-2"
+                          >
+                            <div className="w-3 h-3 border-2 border-white/20 border-t-white/50 rounded-full animate-spin" />
+                            <span className="text-white/40 text-xs">Checking availability...</span>
+                          </motion.div>
+                        )}
                         {usernameError && (
                           <motion.p
                             key="error"
@@ -352,40 +328,49 @@ export default function SettingsPage() {
                             {usernameError}
                           </motion.p>
                         )}
-                        {isCheckingUsername && !usernameError && (
-                          <motion.p
-                            key="checking"
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            className="text-white/40 text-xs"
-                          >
-                            Checking availability...
-                          </motion.p>
-                        )}
                         {!isCheckingUsername && usernameAvailable === true && !usernameError && !usernameSaved && (
-                          <motion.p
+                          <motion.div
                             key="available"
                             initial={{ opacity: 0, y: -4 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -4 }}
-                            className="text-emerald-400/80 text-xs"
+                            className="flex items-center gap-2"
                           >
-                            Username available
-                          </motion.p>
+                            <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-emerald-400/80 text-xs">Username available</span>
+                          </motion.div>
+                        )}
+                        {!isCheckingUsername && usernameAvailable === false && !usernameError && (
+                          <motion.div
+                            key="taken"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="flex items-center gap-2"
+                          >
+                            <svg className="w-3 h-3 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            <span className="text-red-400 text-xs">Username is taken</span>
+                          </motion.div>
                         )}
                         {usernameSaved && (
-                          <motion.p
+                          <motion.div
                             key="saved"
                             initial={{ opacity: 0, y: -4 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -4 }}
-                            className="text-emerald-400 text-xs"
+                            className="flex items-center gap-2"
                           >
-                            Username saved!
-                          </motion.p>
+                            <svg className="w-3 h-3 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="text-emerald-400 text-xs">Username saved!</span>
+                          </motion.div>
                         )}
-                        {!newUsername && !usernameError && (
+                        {!newUsername && !usernameError && !isCheckingUsername && (
                           <motion.p
                             key="hint"
                             initial={{ opacity: 0 }}
