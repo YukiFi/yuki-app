@@ -66,7 +66,7 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
   const displayData = data[displayIndex];
 
   if (data.length === 0) {
-    return (
+  return (
       <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <p className="text-white/50 text-xs sm:text-sm font-medium">Daily Yield</p>
@@ -96,8 +96,8 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
       <div className="mb-4 sm:mb-6">
         <p 
           className="text-xl sm:text-2xl font-medium tabular-nums mb-0.5 sm:mb-1"
-          style={{ color: BRAND_LAVENDER, fontFeatureSettings: "'tnum' 1" }}
-        >
+              style={{ color: BRAND_LAVENDER, fontFeatureSettings: "'tnum' 1" }}
+            >
           +${displayData?.amount.toFixed(2) || '0.00'}
         </p>
         <p className="text-white/40 text-xs sm:text-sm">
@@ -135,7 +135,7 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
           const isToday = index === data.length - 1;
           const isActive = isHovered || (hoveredIndex === null && isToday);
 
-          return (
+  return (
             <div
               key={index}
               className="flex-1 h-full flex items-end"
@@ -144,12 +144,12 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
             >
               <div
                 className="w-full rounded-sm transition-all duration-100"
-                style={{ 
+                    style={{
                   height: `${heightPercent}%`,
                   backgroundColor: isActive ? BRAND_LAVENDER : 'rgba(255,255,255,0.08)',
                   opacity: isActive ? 1 : (hoveredIndex !== null ? 0.5 : 1)
-                }}
-              />
+                    }}
+        />
             </div>
           );
         })}
@@ -480,7 +480,7 @@ function SendModal({
                         {recipientMode === "phone" ? "use @username" : "use phone"}
                       </button>
                     </div>
-                  </div>
+      </div>
 
                   {/* Amount */}
                   <div className="px-6 sm:px-8 py-8 sm:py-10">
@@ -528,7 +528,7 @@ function SendModal({
                             ? recipientMode === "phone" ? "Enter phone" : "Enter username"
                             : "Enter amount"
                       }
-                    </button>
+                  </button>
                   </div>
                 </motion.div>
               )}
@@ -545,14 +545,14 @@ function SendModal({
                   <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-6">
                     {/* Header with back button */}
                     <div className="flex items-center justify-between mb-6">
-                      <button
-                        onClick={() => setStep("compose")}
+                    <button
+                      onClick={() => setStep("compose")}
                         className="text-white/40 hover:text-white/60 transition-colors cursor-pointer p-1 -ml-1"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                      </button>
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                      </svg>
+                    </button>
                       <button
                         onClick={handleClose}
                         className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
@@ -589,8 +589,8 @@ function SendModal({
                         <span className="text-white/80 text-sm tabular-nums" style={{ fontFeatureSettings: "'tnum' 1" }}>
                           ${remaining.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </span>
-                      </div>
                     </div>
+                  </div>
 
                     {/* Confirm button */}
                     <button
@@ -598,7 +598,7 @@ function SendModal({
                       className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
                     >
                       Confirm & Send
-                    </button>
+                  </button>
                   </div>
                 </motion.div>
               )}
@@ -633,8 +633,8 @@ function SendModal({
                     >
                       <span style={{ color: BRAND_LAVENDER }}>$</span>
                       {numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-white/40 text-sm mt-1">to {displayRecipient}</p>
+                      </p>
+                      <p className="text-white/40 text-sm mt-1">to {displayRecipient}</p>
                   </div>
                 </motion.div>
               )}
@@ -680,8 +680,8 @@ function SendModal({
                         <span className="text-white/60 text-sm">Base</span>
                       </div>
                       {txHash && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-white/40 text-sm">Transaction</span>
+                          <div className="flex items-center justify-between">
+                            <span className="text-white/40 text-sm">Transaction</span>
                           <a
                             href={`https://basescan.org/tx/${txHash}`}
                             target="_blank"
@@ -892,7 +892,7 @@ function RequestModal({
                         </svg>
                       </button>
                     </div>
-                  </div>
+                </div>
 
                   {/* Amount */}
                   <div className="px-6 sm:px-8 py-6 sm:py-8">
@@ -944,7 +944,7 @@ function RequestModal({
                     
                     {/* Status row */}
                     <div className="flex items-center justify-between mt-3 min-h-[20px]">
-                      <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
                         {isChecking && hasSpecificFrom && (
                           <motion.div
                             initial={{ opacity: 0 }}
@@ -976,7 +976,7 @@ function RequestModal({
                             {isRequestingFromSelf ? "Can't request from yourself" : "User not found"}
                           </motion.p>
                         )}
-                      </div>
+                  </div>
                       <button
                         onClick={() => {
                           setFromMode(fromMode === "phone" ? "username" : "phone");
@@ -986,8 +986,8 @@ function RequestModal({
                       >
                         {fromMode === "phone" ? "use @username" : "use phone"}
                       </button>
-                    </div>
-                  </div>
+                </div>
+              </div>
 
                   {/* Action */}
                   <div className="px-6 sm:px-8 pb-8 pt-4">
@@ -1010,7 +1010,7 @@ function RequestModal({
                           ? "Can't request"
                           : "Enter amount"
                       }
-                    </button>
+                  </button>
                   </div>
                 </motion.div>
               )}
@@ -1026,14 +1026,14 @@ function RequestModal({
                 >
                   <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-6">
                     <div className="flex items-center justify-between mb-6">
-                      <button
-                        onClick={() => setStep("compose")}
+                    <button
+                      onClick={() => setStep("compose")}
                         className="text-white/40 hover:text-white/60 transition-colors cursor-pointer p-1 -ml-1"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                      </button>
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                      </svg>
+                    </button>
                       <button
                         onClick={handleClose}
                         className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
@@ -1055,15 +1055,15 @@ function RequestModal({
                       </p>
                       <p className="text-white/50 text-base">
                         from <span className="text-white/80">{displayFrom}</span>
-                      </p>
-                    </div>
+                </p>
+            </div>
 
                     <button
                       onClick={handleConfirm}
                       className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
                     >
                       Send Request
-                    </button>
+                  </button>
                   </div>
                 </motion.div>
               )}
@@ -1098,7 +1098,7 @@ function RequestModal({
                     <p className="text-white/50 text-sm">
                       ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} from {displayFrom}
                     </p>
-                  </div>
+          </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1166,7 +1166,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-4 sm:mb-6 lg:mb-8">
                 <p className="text-white/50 text-xs sm:text-sm font-medium">
                   Total Balance
-                </p>
+          </p>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <span 
                     className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full"
@@ -1179,10 +1179,10 @@ export default function Dashboard() {
               {/* The Balance */}
               <p
                 className="text-[2.5rem] sm:text-[4rem] lg:text-[5.5rem] font-light text-white leading-none tracking-tight"
-                style={{ fontFeatureSettings: "'tnum' 1" }}
-              >
+            style={{ fontFeatureSettings: "'tnum' 1" }}
+          >
                 <span style={{ color: BRAND_LAVENDER }}>$</span>
-                {formattedDollars}
+            {formattedDollars}
                 <span className="text-white/30 text-[0.35em] font-normal ml-0.5 sm:ml-1">.{cents}</span>
               </p>
 
@@ -1206,7 +1206,7 @@ export default function Dashboard() {
 
         {/* Yield History Section */}
         <div className="mt-6 sm:mt-10 lg:mt-16">
-          <YieldHistoryChart balance={balance || 0} />
+            <YieldHistoryChart balance={balance || 0} />
         </div>
 
         {/* Flexible spacer - pushes actions to bottom */}
@@ -1219,48 +1219,48 @@ export default function Dashboard() {
         <div className="w-full">
           {/* Primary actions - Send & Request */}
           <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-3">
-            <button
-              onClick={() => setSendOpen(true)}
+          <button
+            onClick={() => setSendOpen(true)}
               className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white text-black text-sm sm:text-[13px] font-semibold cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-              </svg>
-              Send
-            </button>
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+            </svg>
+            Send
+          </button>
 
-            <button
-              onClick={() => setRequestOpen(true)}
+          <button
+            onClick={() => setRequestOpen(true)}
               className="flex items-center justify-center gap-2 px-4 sm:px-5 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white/[0.08] text-white/80 text-sm sm:text-[13px] font-medium cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
-              </svg>
-              Request
-            </button>
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
+            </svg>
+            Request
+          </button>
 
             {/* Separator - hidden on mobile */}
             <div className="hidden sm:block w-px h-4 bg-white/[0.08] mx-1" />
 
             {/* Tertiary actions - hidden on mobile, shown in second row */}
             <Link href="/deposit" className="hidden sm:block">
-              <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                Add
-              </div>
-            </Link>
+            <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Add
+            </div>
+          </Link>
 
             <Link href="/withdraw" className="hidden sm:block">
-              <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                </svg>
-                Withdraw
-              </div>
-            </Link>
-          </div>
+            <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+              Withdraw
+            </div>
+          </Link>
+        </div>
 
           {/* Secondary actions row - mobile only */}
           <div className="grid grid-cols-2 gap-3 mt-3 sm:hidden">

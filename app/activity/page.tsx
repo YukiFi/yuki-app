@@ -324,64 +324,64 @@ export default function ActivityPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Activity</h1>
           <p className="text-white/40 text-sm sm:text-base">
             <span style={{ color: BRAND_LAVENDER }}>${totalYield.toFixed(2)}</span> earned all time
-          </p>
-        </div>
+        </p>
+      </div>
 
         {/* Filter tabs */}
         <div className="flex gap-1 mb-8 sm:mb-10">
-          {[
-            { key: "all", label: "All" },
-            { key: "yield", label: "Yield" },
-            { key: "transfers", label: "Transfers" },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key as typeof filter)}
+        {[
+          { key: "all", label: "All" },
+          { key: "yield", label: "Yield" },
+          { key: "transfers", label: "Transfers" },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key as typeof filter)}
               className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer"
               style={{
                 backgroundColor: filter === key ? `${BRAND_LAVENDER}20` : "transparent",
                 color: filter === key ? BRAND_LAVENDER : "rgba(255,255,255,0.4)"
               }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+          >
+            {label}
+          </button>
+        ))}
+                  </div>
 
-        {/* Transaction groups */}
+      {/* Transaction groups */}
         <div className="space-y-6 sm:space-y-8">
-          {Object.keys(groupedTransactions)
-            .sort((a, b) => {
-              const aIndex = groupOrder.indexOf(a);
-              const bIndex = groupOrder.indexOf(b);
-              if (aIndex === -1 && bIndex === -1) return 0;
-              if (aIndex === -1) return 1;
-              if (bIndex === -1) return -1;
-              return aIndex - bIndex;
-            })
-            .map((groupName) => (
+        {Object.keys(groupedTransactions)
+          .sort((a, b) => {
+            const aIndex = groupOrder.indexOf(a);
+            const bIndex = groupOrder.indexOf(b);
+            if (aIndex === -1 && bIndex === -1) return 0;
+            if (aIndex === -1) return 1;
+            if (bIndex === -1) return -1;
+            return aIndex - bIndex;
+          })
+          .map((groupName) => (
               <div key={groupName} className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                {/* Group header */}
+              {/* Group header */}
                 <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  {groupName}
-                </p>
+                {groupName}
+              </p>
 
-                {/* Transactions in group */}
-                <div className="divide-y divide-white/[0.04]">
-                  {groupedTransactions[groupName].map((tx) => (
-                    <TransactionRow 
-                      key={tx.id} 
-                      transaction={tx} 
-                      index={rowIndex++}
-                    />
-                  ))}
+              {/* Transactions in group */}
+              <div className="divide-y divide-white/[0.04]">
+                {groupedTransactions[groupName].map((tx) => (
+                  <TransactionRow 
+                    key={tx.id} 
+                    transaction={tx} 
+                    index={rowIndex++}
+                  />
+                ))}
+                  </div>
                 </div>
-              </div>
             ))}
-        </div>
+          </div>
 
-        {/* Empty state */}
-        {filteredTransactions.length === 0 && (
+      {/* Empty state */}
+      {filteredTransactions.length === 0 && (
           <div className="text-center py-16 sm:py-20">
             <div 
               className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 sm:mb-6"
@@ -395,8 +395,8 @@ export default function ActivityPage() {
                 strokeWidth={1.5}
                 style={{ color: BRAND_LAVENDER }}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
             </div>
             <p className="text-white font-medium mb-1 text-sm sm:text-base">No transactions yet</p>
             <p className="text-white/30 text-xs sm:text-sm">Your activity will appear here</p>

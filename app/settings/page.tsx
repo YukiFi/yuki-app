@@ -266,17 +266,20 @@ export default function SettingsPage() {
       <div className="min-h-[calc(100vh-3.5rem)] w-full flex flex-col items-center px-4 sm:px-8 lg:px-16 py-8 sm:py-12">
         <div className="w-full max-w-[1100px]">
           {/* Header */}
-          <div className="mb-8 sm:mb-12">
+          <div className="mb-8 sm:mb-10">
             <h1 className="text-xl sm:text-2xl font-bold text-white">Settings</h1>
           </div>
 
           {/* Profile Section */}
           <section className="mb-6 sm:mb-8">
-            <p className="text-white/50 text-xs font-medium tracking-wide mb-4 sm:mb-6">Profile</p>
-            
-            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-4 sm:px-6 sm:py-5">
+            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
+              {/* Section header */}
+              <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
+                Profile
+              </p>
+
               {/* Avatar */}
-              <div className="flex items-center gap-4 sm:gap-6 py-3 sm:py-4">
+              <div className="flex items-center gap-4 sm:gap-6 py-4 sm:py-5 border-t border-white/[0.04]">
                 <button
                   onClick={handleAvatarClick}
                   disabled={isUploadingAvatar}
@@ -312,11 +315,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="h-px bg-white/[0.04] my-1" />
-
               {/* Username */}
-              <div className="py-3 sm:py-4">
+              <div className="py-4 sm:py-5 border-t border-white/[0.04]">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <p className="text-white/50 text-xs sm:text-sm mb-1.5">Username</p>
@@ -494,11 +494,14 @@ export default function SettingsPage() {
 
           {/* Security Section */}
           <section className="mb-6 sm:mb-8">
-            <p className="text-white/50 text-xs font-medium tracking-wide mb-4 sm:mb-6">Security</p>
-            
-            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-4 sm:px-6 sm:py-5">
+            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
+              {/* Section header */}
+              <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
+                Security
+              </p>
+
               {/* 2FA / Passkey */}
-              <div className="py-3 sm:py-4 flex items-center justify-between gap-4">
+              <div className="py-4 sm:py-5 border-t border-white/[0.04] flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-white font-medium text-sm sm:text-base mb-0.5">Two-Factor Authentication</p>
                   <p className="text-white/40 text-xs sm:text-sm">Passkey or authenticator app</p>
@@ -518,11 +521,14 @@ export default function SettingsPage() {
 
           {/* Wallet Section */}
           <section className="mb-6 sm:mb-8">
-            <p className="text-white/50 text-xs font-medium tracking-wide mb-4 sm:mb-6">Wallet</p>
-            
-            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-4 sm:px-6 sm:py-5">
+            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
+              {/* Section header */}
+              <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
+                Wallet
+              </p>
+
               {/* Public Address */}
-              <div className="py-3 sm:py-4">
+              <div className="py-4 sm:py-5 border-t border-white/[0.04]">
                 <p className="text-white/50 text-xs sm:text-sm mb-1.5">Public Address</p>
                 <div className="flex items-center gap-2 sm:gap-3">
                   <p className="text-white font-mono text-xs sm:text-sm">
@@ -555,11 +561,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="h-px bg-white/[0.04] my-1" />
-
               {/* Private Key */}
-              <div className="py-3 sm:py-4 flex items-center justify-between gap-4">
+              <div className="py-4 sm:py-5 border-t border-white/[0.04] flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-white font-medium text-sm sm:text-base mb-0.5">Private Key</p>
                   <p className="text-white/40 text-xs sm:text-sm">Export your wallet's private key</p>

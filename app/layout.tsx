@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import LayoutContent from "@/components/LayoutContent";
+import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { Providers } from "./providers";
 import { Geist, Geist_Mono } from 'next/font/google'
 import "./globals.css";
@@ -126,7 +127,9 @@ export default function RootLayout({
         </head>
         <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-black text-white antialiased`}>
           <Providers>
+            <OnboardingGuard>
             <LayoutContent>{children}</LayoutContent>
+            </OnboardingGuard>
           </Providers>
         </body>
       </html>

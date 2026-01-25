@@ -3,27 +3,200 @@
  * 
  * Uses PostgreSQL when DATABASE_URL is set, otherwise falls back to
  * in-memory storage for development/demo purposes.
+ * 
+ * Error Handling Policy:
+ * - Connection errors (DB unavailable): fallback to in-memory in dev, fail fast in prod
+ * - Schema/constraint errors: ALWAYS fail fast with actionable error messages
+ * - This prevents silent data loss and noisy retry loops
  */
-
-import * as pgDb from './db-postgres';
 
 // Check if PostgreSQL is available
 const USE_POSTGRES = !!process.env.DATABASE_URL;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// ============================================
+// Error Classification
+// ============================================
+
+/**
+ * PostgreSQL error codes for classification
+ * See: https://www.postgresql.org/docs/current/errcodes-appendix.html
+ */
+const PG_ERROR_CODES = {
+  // Connection errors (Class 08)
+  CONNECTION_EXCEPTION: '08000',
+  CONNECTION_DOES_NOT_EXIST: '08003',
+  CONNECTION_FAILURE: '08006',
+  
+  // Integrity constraint violations (Class 23)
+  NOT_NULL_VIOLATION: '23502',
+  FOREIGN_KEY_VIOLATION: '23503',
+  UNIQUE_VIOLATION: '23505',
+  CHECK_VIOLATION: '23514',
+  
+  // Syntax/schema errors (Class 42)
+  UNDEFINED_TABLE: '42P01',
+  UNDEFINED_COLUMN: '42703',
+  SYNTAX_ERROR: '42601',
+} as const;
+
+interface PgError extends Error {
+  code?: string;
+  detail?: string;
+  constraint?: string;
+  table?: string;
+  column?: string;
+}
+
+/**
+ * Check if error is a connection-level error (DB unavailable)
+ * These are the ONLY errors that should trigger fallback in development
+ */
+function isConnectionError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const pgError = error as PgError;
+    
+    // Check PostgreSQL error code
+    if (pgError.code) {
+      // Class 08 = Connection Exception
+      if (pgError.code.startsWith('08')) return true;
+      // Class 57 = Operator Intervention (includes server shutdown)
+      if (pgError.code.startsWith('57')) return true;
+    }
+    
+    // Check error message for connection issues
+    const msg = error.message.toLowerCase();
+    return (
+      msg.includes('econnrefused') ||
+      msg.includes('connection refused') ||
+      msg.includes('connection timeout') ||
+      msg.includes('connection terminated') ||
+      msg.includes('database system is starting up') ||
+      msg.includes('too many connections') ||
+      msg.includes('could not connect')
+    );
+  }
+  return false;
+}
+
+/**
+ * Check if error is a schema/constraint error
+ * These should NEVER trigger fallback - they indicate bugs or migration issues
+ */
+function isSchemaOrConstraintError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const pgError = error as PgError;
+    
+    if (pgError.code) {
+      // Class 23 = Integrity Constraint Violation
+      if (pgError.code.startsWith('23')) return true;
+      // Class 42 = Syntax Error or Access Rule Violation
+      if (pgError.code.startsWith('42')) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Create actionable error message from PostgreSQL error
+ */
+function formatPgError(error: unknown, context: string): string {
+  if (error instanceof Error) {
+    const pgError = error as PgError;
+    const parts = [`[DB] ${context} failed`];
+    
+    if (pgError.code) parts.push(`code=${pgError.code}`);
+    if (pgError.table) parts.push(`table=${pgError.table}`);
+    if (pgError.column) parts.push(`column=${pgError.column}`);
+    if (pgError.constraint) parts.push(`constraint=${pgError.constraint}`);
+    if (pgError.detail) parts.push(`detail=${pgError.detail}`);
+    
+    parts.push(`message=${pgError.message}`);
+    return parts.join(' ');
+  }
+  return `[DB] ${context} failed: ${String(error)}`;
+}
+
+/**
+ * Handle PostgreSQL errors with proper classification
+ * Returns true if fallback to in-memory is allowed
+ */
+function handlePgError(error: unknown, context: string): boolean {
+  const errorMessage = formatPgError(error, context);
+  
+  if (isSchemaOrConstraintError(error)) {
+    // Schema/constraint errors should NEVER fallback - they indicate real bugs
+    console.error(`${errorMessage} [FATAL: Schema/constraint error - check migrations]`);
+    throw error; // Re-throw to fail fast
+  }
+  
+  if (isConnectionError(error)) {
+    if (IS_PRODUCTION) {
+      // In production, fail fast even for connection errors
+      console.error(`${errorMessage} [FATAL: Database unavailable in production]`);
+      throw error;
+    }
+    // In development, allow fallback for connection errors only
+    console.warn(`${errorMessage} [WARN: Falling back to in-memory storage]`);
+    return true;
+  }
+  
+  // Unknown error type - log and fail fast to be safe
+  console.error(`${errorMessage} [FATAL: Unknown error type]`);
+  throw error;
+}
+
+// Lazy load PostgreSQL module only when needed
+let pgDb: typeof import('./db-postgres') | null = null;
+let pgInitialized = false;
+let pgInitError: Error | null = null;
+
+async function getPgDb() {
+  if (!USE_POSTGRES) return null;
+  
+  // If we already failed to initialize, don't retry
+  if (pgInitError) {
+    throw pgInitError;
+  }
+  
+  if (!pgDb || !pgInitialized) {
+    try {
+      pgDb = await import('./db-postgres');
+      await pgDb.initializeDatabase();
+      pgInitialized = true;
+      console.log('[DB] PostgreSQL initialized successfully');
+    } catch (error) {
+      pgInitError = error instanceof Error ? error : new Error(String(error));
+      
+      if (!isConnectionError(error)) {
+        // Schema errors during init are fatal
+        console.error(formatPgError(error, 'initializeDatabase'));
+        throw error;
+      }
+      
+      if (IS_PRODUCTION) {
+        throw error;
+      }
+      
+      console.warn('[DB] PostgreSQL initialization failed, using in-memory fallback');
+      return null;
+    }
+  }
+  return pgDb;
+}
 
 if (USE_POSTGRES) {
-  console.log('[DB] Using PostgreSQL database');
-  // Initialize PostgreSQL schema on first import
-  pgDb.initializeDatabase().catch(console.error);
+  console.log('[DB] PostgreSQL mode enabled (DATABASE_URL set)');
 } else {
   console.log('[DB] Using in-memory database (set DATABASE_URL for PostgreSQL)');
 }
 
-// In-memory storage (fallback for development)
+// In-memory storage (fallback for development only)
 const db = {
-  users: new Map<string, any>(),
-  wallets: new Map<string, any>(),
-  sessions: new Map<string, any>(),
-  rateLimits: new Map<string, any>(),
+  users: new Map<string, User>(),
+  wallets: new Map<string, WalletRecord>(),
+  sessions: new Map<string, unknown>(),
+  rateLimits: new Map<string, { count: number; resetAt: Date }>(),
   indices: {
     usersByEmail: new Map<string, string>(),
     usersByClerkId: new Map<string, string>(),
@@ -40,9 +213,10 @@ const db = {
 export interface User {
   id: string;
   clerk_user_id: string | null;
-  email: string;
+  auth_provider: 'clerk' | 'local';
+  email: string | null;
   phone_number: string | null;
-  password_hash: string;
+  password_hash: string | null;
   created_at: Date;
   updated_at: Date;
   email_verified: boolean;
@@ -50,6 +224,13 @@ export interface User {
   failed_attempts: number;
   username: string | null;
   username_last_changed: Date | null;
+  // Profile fields
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  is_private: boolean;
+  // Passkey fields
   passkey_credential_id: string | null;
   passkey_public_key: string | null;
   passkey_counter: number;
@@ -59,6 +240,26 @@ export interface User {
   passkey_created_at: Date | null;
 }
 
+export interface WalletRecord {
+  id: string;
+  user_id: string;
+  address: string;
+  chain_id: number;
+  version: number;
+  cipher_priv: string;
+  iv_priv: string;
+  kdf_salt: string;
+  kdf_params: string;
+  security_level: 'password_only' | 'passkey_enabled';
+  passkey_meta: string | null;
+  wrapped_dek_password: string | null;
+  iv_dek_password: string | null;
+  wrapped_dek_passkey: string | null;
+  iv_dek_passkey: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
 export async function createUser(
   id: string,
   email: string,
@@ -66,18 +267,14 @@ export async function createUser(
 ): Promise<User | null> {
   const normalizedEmail = email.toLowerCase();
   
-  console.log('[DB] createUser - Normalized email:', normalizedEmail);
-  console.log('[DB] createUser - Email exists in index?', db.indices.usersByEmail.has(normalizedEmail));
-  console.log('[DB] createUser - Current users in DB:', Array.from(db.indices.usersByEmail.keys()));
-  
   if (db.indices.usersByEmail.has(normalizedEmail)) {
-    console.log('[DB] createUser - BLOCKED: Email already exists');
     return null; // Email already exists
   }
   
   const user: User = {
     id,
     clerk_user_id: null,
+    auth_provider: 'local',
     email: normalizedEmail,
     phone_number: null,
     password_hash: passwordHash,
@@ -88,6 +285,11 @@ export async function createUser(
     failed_attempts: 0,
     username: null,
     username_last_changed: null,
+    display_name: null,
+    bio: null,
+    avatar_url: null,
+    banner_url: null,
+    is_private: false,
     passkey_credential_id: null,
     passkey_public_key: null,
     passkey_counter: 0,
@@ -100,8 +302,6 @@ export async function createUser(
   db.users.set(id, user);
   db.indices.usersByEmail.set(normalizedEmail, id);
   
-  console.log('[DB] createUser - SUCCESS: User created with ID:', id);
-  
   return user;
 }
 
@@ -111,13 +311,9 @@ export async function getUserById(id: string): Promise<User | null> {
 
 export async function getUserByEmail(email: string): Promise<User | null> {
   const normalizedEmail = email.toLowerCase();
-  console.log('[DB] getUserByEmail - Looking up:', normalizedEmail);
   const userId = db.indices.usersByEmail.get(normalizedEmail);
-  console.log('[DB] getUserByEmail - Found userId:', userId || 'NOT FOUND');
   if (!userId) return null;
-  const user = db.users.get(userId) || null;
-  console.log('[DB] getUserByEmail - User object exists:', !!user);
-  return user;
+  return db.users.get(userId) || null;
 }
 
 // Get or create a user by email (for demo purposes)
@@ -126,14 +322,14 @@ export async function getOrCreateUserByEmail(email: string): Promise<User> {
   let user = await getUserByEmail(normalizedEmail);
   
   if (!user) {
-    // Create a new user with the email as ID (simplified for demo)
     const id = `user_${normalizedEmail.replace(/[^a-z0-9]/g, '_')}`;
     user = {
       id,
       clerk_user_id: null,
+      auth_provider: 'local',
       email: normalizedEmail,
       phone_number: null,
-      password_hash: '',
+      password_hash: null,
       created_at: new Date(),
       updated_at: new Date(),
       email_verified: true,
@@ -141,6 +337,11 @@ export async function getOrCreateUserByEmail(email: string): Promise<User> {
       failed_attempts: 0,
       username: null,
       username_last_changed: null,
+      display_name: null,
+      bio: null,
+      avatar_url: null,
+      banner_url: null,
+      is_private: false,
       passkey_credential_id: null,
       passkey_public_key: null,
       passkey_counter: 0,
@@ -160,16 +361,32 @@ export async function getOrCreateUserByEmail(email: string): Promise<User> {
 /**
  * Get or create a user by Clerk user ID
  * This is the primary method for binding Clerk auth to our internal user system
+ * 
+ * Error handling:
+ * - Schema/constraint errors: fail fast (indicates bugs or migration issues)
+ * - Connection errors in dev: fallback to in-memory
+ * - Connection errors in prod: fail fast
  */
 export async function getOrCreateUserByClerkId(clerkUserId: string): Promise<User> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    const pgUser = await pgDb.getOrCreateUserByClerkIdPg(clerkUserId);
-    if (pgUser) return pgUser;
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        // This will throw if it fails (never returns null)
+        return await pg.getOrCreateUserByClerkIdPg(clerkUserId);
+      }
+    } catch (error) {
+      // handlePgError will throw for schema/constraint errors
+      // and return true only for connection errors in development
+      const shouldFallback = handlePgError(error, 'getOrCreateUserByClerkId');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
-  // Check if user already exists with this Clerk ID
+  // Fallback to in-memory storage (only in development with connection issues)
   const existingUserId = db.indices.usersByClerkId.get(clerkUserId);
   if (existingUserId) {
     const user = db.users.get(existingUserId);
@@ -181,9 +398,10 @@ export async function getOrCreateUserByClerkId(clerkUserId: string): Promise<Use
   const user: User = {
     id,
     clerk_user_id: clerkUserId,
-    email: '',
+    auth_provider: 'clerk',
+    email: null,
     phone_number: null,
-    password_hash: '',
+    password_hash: null,
     created_at: new Date(),
     updated_at: new Date(),
     email_verified: true,
@@ -191,6 +409,11 @@ export async function getOrCreateUserByClerkId(clerkUserId: string): Promise<Use
     failed_attempts: 0,
     username: null,
     username_last_changed: null,
+    display_name: null,
+    bio: null,
+    avatar_url: null,
+    banner_url: null,
+    is_private: false,
     passkey_credential_id: null,
     passkey_public_key: null,
     passkey_counter: 0,
@@ -203,7 +426,7 @@ export async function getOrCreateUserByClerkId(clerkUserId: string): Promise<Use
   db.users.set(id, user);
   db.indices.usersByClerkId.set(clerkUserId, id);
   
-  console.log('[DB] getOrCreateUserByClerkId - Created new user:', id, 'for Clerk ID:', clerkUserId);
+  console.log('[DB] Created in-memory user for Clerk ID:', clerkUserId);
   
   return user;
 }
@@ -241,20 +464,46 @@ export async function resetUserFailedAttempts(userId: string): Promise<void> {
   }
 }
 
-export async function updateUsername(userId: string, username: string): Promise<void> {
+export async function updateUsername(userId: string, username: string, recordHistory = true): Promise<void> {
+  // Get current username before updating (for history)
+  let oldUsername: string | null = null;
+  
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    // Check if taken
-    const existing = await pgDb.getUserByUsernamePg(username);
-    if (existing && existing.id !== userId) {
-      throw new Error("Username is already taken");
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        // Get current user to capture old username
+        const currentUser = await pg.getUserByIdPg(userId);
+        oldUsername = currentUser?.username || null;
+        
+        // Check if taken (case-insensitive)
+        const existing = await pg.getUserByUsernamePg(username);
+        if (existing && existing.id !== userId) {
+          throw new Error("Username is already taken");
+        }
+        await pg.updateUsernamePg(userId, username);
+        
+        // Record in handle history for redirects
+        if (recordHistory && oldUsername && oldUsername.toLowerCase() !== username.toLowerCase()) {
+          await pg.addHandleHistoryPg(userId, oldUsername, username);
+        }
+        return;
+      }
+    } catch (error) {
+      // Re-throw business logic errors
+      if (error instanceof Error && error.message === "Username is already taken") {
+        throw error;
+      }
+      // Use proper error handling for DB errors
+      const shouldFallback = handlePgError(error, 'updateUsername');
+      if (!shouldFallback) {
+        throw error;
+      }
     }
-    await pgDb.updateUsernamePg(userId, username);
-    return;
   }
   
-  // Fallback to in-memory storage
-  // Check if username is already taken by another user
+  // Fallback to in-memory storage (development only)
   const existingUser = Array.from(db.users.values()).find(
     u => u.username?.toLowerCase() === username.toLowerCase() && u.id !== userId
   );
@@ -265,24 +514,186 @@ export async function updateUsername(userId: string, username: string): Promise<
   
   const user = db.users.get(userId);
   if (user) {
+    oldUsername = user.username;
     user.username = username;
     user.username_last_changed = new Date();
     user.updated_at = new Date();
     db.users.set(userId, user);
+    
+    // Record in handle history for redirects (in-memory)
+    if (recordHistory && oldUsername && oldUsername.toLowerCase() !== username.toLowerCase()) {
+      // Use the in-memory handle history map from addHandleHistory
+      await addHandleHistoryInMemory(userId, oldUsername, username);
+    }
   }
+}
+
+// Helper for in-memory handle history (used internally)
+const handleHistoryMemory = new Map<string, string>(); // old_handle (lowercase) -> new_handle
+
+async function addHandleHistoryInMemory(userId: string, oldHandle: string, newHandle: string): Promise<void> {
+  handleHistoryMemory.set(oldHandle.toLowerCase(), newHandle);
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    return await pgDb.getUserByUsernamePg(username);
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.getUserByUsernamePg(username);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getUserByUsername');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
+  // Fallback to in-memory storage (development only)
   const user = Array.from(db.users.values()).find(
     u => u.username?.toLowerCase() === username.toLowerCase()
   );
   return user || null;
+}
+
+// ============================================
+// Profile Operations
+// ============================================
+
+export interface ProfileUpdateData {
+  display_name?: string;
+  bio?: string;
+  avatar_url?: string;
+  banner_url?: string;
+  is_private?: boolean;
+}
+
+export interface PublicProfile {
+  handle: string;
+  displayName: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  createdAt: string;
+}
+
+/**
+ * Get public profile by handle/username
+ */
+export async function getProfileByHandle(handle: string): Promise<(User & { clerkUserId: string | null }) | null> {
+  // Normalize handle (remove @ if present)
+  const cleanHandle = handle.startsWith('@') ? handle : `@${handle}`;
+  
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        const user = await pg.getUserByUsernamePg(cleanHandle);
+        return user ? { ...user, clerkUserId: user.clerk_user_id } : null;
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getProfileByHandle');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+  
+  // Fallback to in-memory storage (development only)
+  const user = Array.from(db.users.values()).find(
+    u => u.username?.toLowerCase() === cleanHandle.toLowerCase()
+  );
+  return user ? { ...user, clerkUserId: user.clerk_user_id } : null;
+}
+
+/**
+ * Update user profile fields (display_name, bio, avatar_url, banner_url)
+ */
+export async function updateUserProfile(userId: string, data: ProfileUpdateData): Promise<void> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        await pg.updateUserProfilePg(userId, data);
+        return;
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'updateUserProfile');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+  
+  // Fallback to in-memory storage (development only)
+  const user = db.users.get(userId);
+  if (user) {
+    if (data.display_name !== undefined) user.display_name = data.display_name;
+    if (data.bio !== undefined) user.bio = data.bio;
+    if (data.avatar_url !== undefined) user.avatar_url = data.avatar_url;
+    if (data.banner_url !== undefined) user.banner_url = data.banner_url;
+    if (data.is_private !== undefined) user.is_private = data.is_private;
+    user.updated_at = new Date();
+    db.users.set(userId, user);
+  }
+}
+
+// ============================================
+// Handle History Operations
+// ============================================
+
+// In-memory handle history for development
+const handleHistory = new Map<string, string>(); // old_handle (lowercase) -> new_handle
+
+/**
+ * Record a handle change for redirect purposes
+ */
+export async function addHandleHistory(userId: string, oldHandle: string, newHandle: string): Promise<void> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        await pg.addHandleHistoryPg(userId, oldHandle, newHandle);
+        return;
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'addHandleHistory');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+  
+  // Fallback to in-memory storage (development only)
+  handleHistory.set(oldHandle.toLowerCase(), newHandle);
+}
+
+/**
+ * Look up an old handle to find where it redirects to
+ */
+export async function getHandleRedirect(oldHandle: string): Promise<string | null> {
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.getHandleRedirectPg(oldHandle);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getHandleRedirect');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+  
+  // Fallback to in-memory storage (development only)
+  return handleHistory.get(oldHandle.toLowerCase()) || null;
 }
 
 export async function updateUserPasskey(
@@ -298,11 +709,21 @@ export async function updateUserPasskey(
 ): Promise<void> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    await pgDb.updateUserPasskeyPg(userId, passkeyData);
-    return;
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        await pg.updateUserPasskeyPg(userId, passkeyData);
+        return;
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'updateUserPasskey');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
+  // Fallback to in-memory storage (development only)
   const user = db.users.get(userId);
   if (user) {
     user.passkey_credential_id = passkeyData.credentialId;
@@ -339,11 +760,21 @@ export async function getUserPasskeyCredential(userId: string): Promise<{
 export async function updatePasskeyCounter(userId: string, newCounter: number): Promise<void> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    await pgDb.updatePasskeyCounterPg(userId, newCounter);
-    return;
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        await pg.updatePasskeyCounterPg(userId, newCounter);
+        return;
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'updatePasskeyCounter');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
+  // Fallback to in-memory storage (development only)
   const user = db.users.get(userId);
   if (user) {
     user.passkey_counter = newCounter;
@@ -355,26 +786,6 @@ export async function updatePasskeyCounter(userId: string, newCounter: number): 
 // ============================================
 // Wallet Operations
 // ============================================
-
-export interface WalletRecord {
-  id: string;
-  user_id: string;
-  address: string;
-  chain_id: number;
-  version: number;
-  cipher_priv: string;
-  iv_priv: string;
-  kdf_salt: string;
-  kdf_params: string;
-  security_level: 'password_only' | 'passkey_enabled';
-  passkey_meta: string | null;
-  wrapped_dek_password: string | null;
-  iv_dek_password: string | null;
-  wrapped_dek_passkey: string | null;
-  iv_dek_passkey: string | null;
-  created_at: Date;
-  updated_at: Date;
-}
 
 export async function createWallet(
   id: string,
@@ -392,10 +803,20 @@ export async function createWallet(
 ): Promise<WalletRecord | null> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    return await pgDb.createWalletPg(id, userId, data);
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.createWalletPg(id, userId, data);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'createWallet');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
+  // Fallback to in-memory storage (development only)
   if (db.indices.walletsByUserId.has(userId)) {
     return null; // User already has a wallet
   }
@@ -410,7 +831,7 @@ export async function createWallet(
     iv_priv: data.ivPriv,
     kdf_salt: data.kdfSalt,
     kdf_params: JSON.stringify(data.kdfParams),
-    security_level: data.securityLevel as any,
+    security_level: data.securityLevel as 'password_only' | 'passkey_enabled',
     passkey_meta: null,
     wrapped_dek_password: null,
     iv_dek_password: null,
@@ -430,10 +851,20 @@ export async function createWallet(
 export async function getWalletByUserId(userId: string): Promise<WalletRecord | null> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    return await pgDb.getWalletByUserIdPg(userId);
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.getWalletByUserIdPg(userId);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getWalletByUserId');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
+  // Fallback to in-memory storage (development only)
   const walletId = db.indices.walletsByUserId.get(userId);
   if (!walletId) return null;
   return db.wallets.get(walletId) || null;
@@ -442,10 +873,20 @@ export async function getWalletByUserId(userId: string): Promise<WalletRecord | 
 export async function getWalletByAddress(address: string): Promise<WalletRecord | null> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    return await pgDb.getWalletByAddressPg(address);
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.getWalletByAddressPg(address);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getWalletByAddress');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
+  // Fallback to in-memory storage (development only)
   const walletId = db.indices.walletsByAddress.get(address);
   if (!walletId) return null;
   return db.wallets.get(walletId) || null;
@@ -466,11 +907,21 @@ export async function updateWalletPasskey(
 ): Promise<void> {
   // Use PostgreSQL if available
   if (USE_POSTGRES) {
-    await pgDb.updateWalletPasskeyPg(userId, data);
-    return;
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        await pg.updateWalletPasskeyPg(userId, data);
+        return;
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'updateWalletPasskey');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
   }
   
-  // Fallback to in-memory storage
+  // Fallback to in-memory storage (development only)
   const walletId = db.indices.walletsByUserId.get(userId);
   if (!walletId) return;
 
@@ -478,7 +929,7 @@ export async function updateWalletPasskey(
   if (wallet) {
     wallet.cipher_priv = data.cipherPriv;
     wallet.iv_priv = data.ivPriv;
-    wallet.security_level = data.securityLevel;
+    wallet.security_level = data.securityLevel as 'password_only' | 'passkey_enabled';
     wallet.passkey_meta = JSON.stringify(data.passkeyMeta);
     wallet.wrapped_dek_password = data.wrappedDekPassword;
     wallet.iv_dek_password = data.ivDekPassword;
@@ -522,8 +973,8 @@ export async function checkRateLimit(
     return { allowed: false, remaining: 0, resetAt: currentRecord.resetAt };
   }
   
-  // Increment count
-  currentRecord.count += 1;
+  // Increment counter
+  currentRecord.count++;
   db.rateLimits.set(key, currentRecord);
   
   return { 
@@ -535,73 +986,4 @@ export async function checkRateLimit(
 
 export async function resetRateLimit(key: string): Promise<void> {
   db.rateLimits.delete(key);
-}
-
-// ============================================
-// Session Operations
-// ============================================
-
-export async function createSession(
-  id: string,
-  userId: string,
-  expiresAt: Date,
-  ipAddress?: string,
-  userAgent?: string
-): Promise<void> {
-  const session = {
-    id,
-    user_id: userId,
-    expires_at: expiresAt,
-    ip_address: ipAddress || null,
-    user_agent: userAgent || null,
-    created_at: new Date()
-  };
-  
-  db.sessions.set(id, session);
-  
-  if (!db.indices.sessionsByUserId.has(userId)) {
-    db.indices.sessionsByUserId.set(userId, new Set());
-  }
-  db.indices.sessionsByUserId.get(userId)?.add(id);
-}
-
-export async function getSession(id: string): Promise<{ id: string; user_id: string; expires_at: Date } | null> {
-  const session = db.sessions.get(id);
-  if (!session) return null;
-  
-  if (session.expires_at < new Date()) {
-    await deleteSession(id);
-    return null;
-  }
-  
-  return session;
-}
-
-export async function deleteSession(id: string): Promise<void> {
-  const session = db.sessions.get(id);
-  if (session) {
-    const userId = session.user_id;
-    db.indices.sessionsByUserId.get(userId)?.delete(id);
-    db.sessions.delete(id);
-  }
-}
-
-export async function deleteUserSessions(userId: string): Promise<void> {
-  const sessionIds = db.indices.sessionsByUserId.get(userId);
-  if (sessionIds) {
-    for (const id of sessionIds) {
-      db.sessions.delete(id);
-    }
-    db.indices.sessionsByUserId.delete(userId);
-  }
-}
-
-// Cleanup expired sessions periodically
-export async function cleanupExpiredSessions(): Promise<void> {
-  const now = new Date();
-  for (const [id, session] of db.sessions.entries()) {
-    if (session.expires_at < now) {
-      await deleteSession(id);
-    }
-  }
 }

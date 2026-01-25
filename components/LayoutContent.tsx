@@ -26,7 +26,8 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   // Pages that should NOT show the sidebar (full-bleed layouts)
   const isLoginPage = pathname === "/login" || pathname?.startsWith("/login/")
   const isOnboardingPage = pathname === "/onboarding"
-  const isFullBleedPage = isLoginPage || isOnboardingPage
+  const isSetupPage = pathname === "/setup" || pathname?.startsWith("/setup/")
+  const isFullBleedPage = isLoginPage || isOnboardingPage || isSetupPage
 
   // Full-bleed layout for login/onboarding - no sidebar shell needed
   if (isFullBleedPage) {
