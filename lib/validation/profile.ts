@@ -49,12 +49,16 @@ export interface PublicProfile {
   bannerUrl: string | null;
   isPrivate: boolean;
   createdAt: string;
+  // Wallet address for ownership check (client-side)
+  walletAddress?: string | null;
 }
 
 // Full profile (for owner)
 export interface FullProfile extends PublicProfile {
   id: string;
-  clerkUserId: string;
+  walletAddress?: string;
+  // Legacy - kept for backwards compatibility
+  clerkUserId?: string;
   usernameLastChanged: string | null;
   canChangeUsername: boolean;
   daysUntilUsernameChange: number;

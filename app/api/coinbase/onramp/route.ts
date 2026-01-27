@@ -3,32 +3,26 @@
  * 
  * Generates Coinbase Onramp URLs for fiat-to-crypto deposits.
  * Users complete KYC and purchase with Coinbase, funds go to their wallet.
+ * 
+ * Uses wallet address from request body for authentication.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { getOrCreateUserByClerkId, getWalletByUserId } from '@/lib/db';
 
 // Coinbase Onramp configuration
 const COINBASE_APP_ID = process.env.COINBASE_APP_ID || '';
 const COINBASE_ONRAMP_URL = 'https://pay.coinbase.com/buy/select-asset';
 
 interface OnrampParams {
-  // Coinbase App ID
   appId: string;
-  // Destination wallet address
   destinationWallets: Array<{
     address: string;
     blockchains?: string[];
     assets?: string[];
   }>;
-  // Default asset to purchase
   defaultAsset?: string;
-  // Default network
   defaultNetwork?: string;
-  // Pre-filled purchase amount
   presetFiatAmount?: number;
-  // Fiat currency
   fiatCurrency?: string;
 }
 
@@ -38,13 +32,9 @@ interface OnrampParams {
 function buildOnrampUrl(params: OnrampParams): string {
   const url = new URL(COINBASE_ONRAMP_URL);
   
-  // Add app ID
   url.searchParams.set('appId', params.appId);
-  
-  // Add destination wallets as JSON
   url.searchParams.set('destinationWallets', JSON.stringify(params.destinationWallets));
   
-  // Add optional parameters
   if (params.defaultAsset) {
     url.searchParams.set('defaultAsset', params.defaultAsset);
   }
@@ -63,33 +53,22 @@ function buildOnrampUrl(params: OnrampParams): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
-    
-    if (!clerkUserId) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
-    
-    // Get user and wallet
-    const user = await getOrCreateUserByClerkId(clerkUserId);
-    const wallet = await getWalletByUserId(user.id);
-    
-    if (!wallet) {
-      return NextResponse.json(
-        { error: 'No wallet found. Please create a wallet first.' },
-        { status: 400 }
-      );
-    }
-    
-    // Parse request body for optional parameters
+    // Parse request body
     const body = await request.json().catch(() => ({}));
-    const { amount, asset = 'USDC', network = 'base' } = body as {
+    const { walletAddress, amount, asset = 'USDC', network = 'base' } = body as {
+      walletAddress?: string;
       amount?: number;
       asset?: string;
       network?: string;
     };
+    
+    // Validate wallet address
+    if (!walletAddress || !walletAddress.match(/^0x[a-fA-F0-9]{40}$/i)) {
+      return NextResponse.json(
+        { error: 'Valid wallet address is required' },
+        { status: 400 }
+      );
+    }
     
     // Validate Coinbase App ID
     if (!COINBASE_APP_ID) {
@@ -103,7 +82,7 @@ export async function POST(request: NextRequest) {
     const onrampUrl = buildOnrampUrl({
       appId: COINBASE_APP_ID,
       destinationWallets: [{
-        address: wallet.address,
+        address: walletAddress,
         blockchains: [network],
         assets: [asset],
       }],
@@ -116,7 +95,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       onrampUrl,
-      walletAddress: wallet.address,
+      walletAddress,
     });
   } catch (error) {
     console.error('Coinbase onramp error:', error);
@@ -139,4 +118,3 @@ export async function GET() {
     supportedNetworks: ['base', 'ethereum'],
   });
 }
-

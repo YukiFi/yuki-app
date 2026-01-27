@@ -1,11 +1,8 @@
 /**
  * Wallet components barrel export
+ * 
+ * With Alchemy Smart Wallets, many components are simplified or deprecated.
  */
 
-export { UnlockModal } from './UnlockModal';
-export { CreateWalletModal } from './CreateWalletModal';
-export { PasskeyUpgradeBanner } from './PasskeyUpgradeBanner';
-export { WalletSecurityIndicator } from './WalletSecurityIndicator';
 export { DepositFlow } from './DepositFlow';
-export { ExportPrivateKey } from './ExportPrivateKey';
 export { WalletSettings } from './WalletSettings';

@@ -3,6 +3,7 @@
  * 
  * Wrapper component that checks if the user has completed onboarding.
  * Redirects to /setup if they haven't set a username yet.
+ * Redirects to /login if not authenticated.
  * 
  * Key features:
  * - Only checks once per session (cached result)
@@ -14,21 +15,25 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
+import { useSignerStatus, useSmartAccountClient } from '@account-kit/react';
 
 interface OnboardingGuardProps {
   children: React.ReactNode;
 }
 
-// Routes that don't need onboarding check at all
+// Routes that don't need authentication at all
 const PUBLIC_ROUTES = ['/login', '/documents', '/legal', '/help'];
 // Routes accessible during onboarding
 const ONBOARDING_ROUTES = ['/setup'];
 
 export function OnboardingGuard({ children }: OnboardingGuardProps) {
-  const { isLoaded, isSignedIn, user } = useUser();
+  const { isConnected, isInitializing } = useSignerStatus();
+  const { client } = useSmartAccountClient({});
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Get wallet address from smart account client
+  const walletAddress = client?.account?.address;
   
   // Track onboarding state - null = not checked yet
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
@@ -36,15 +41,22 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   
   // Use ref to prevent duplicate checks
   const hasCheckedRef = useRef(false);
-  const lastClerkIdRef = useRef<string | null>(null);
+  const lastWalletRef = useRef<string | null>(null);
   
   // Check if current route is public (no auth needed)
   const isPublicRoute = PUBLIC_ROUTES.some(route => pathname?.startsWith(route));
   const isOnboardingRoute = ONBOARDING_ROUTES.some(route => pathname?.startsWith(route));
   
-  const checkOnboardingStatus = useCallback(async (clerkUserId: string) => {
-    // Prevent duplicate checks for same user
-    if (hasCheckedRef.current && lastClerkIdRef.current === clerkUserId) {
+  // Check if this is a profile route (/@handle or /handle pattern)
+  const isProfileRoute = pathname && !pathname.startsWith('/api') && 
+    pathname.split('/').filter(Boolean).length === 1 &&
+    !PUBLIC_ROUTES.some(route => pathname.startsWith(route)) &&
+    !ONBOARDING_ROUTES.some(route => pathname.startsWith(route)) &&
+    !['/activity', '/settings', '/configure', '/deposit', '/withdraw', '/funds', '/security', '/'].includes(pathname);
+  
+  const checkOnboardingStatus = useCallback(async (address: string) => {
+    // Prevent duplicate checks for same wallet
+    if (hasCheckedRef.current && lastWalletRef.current === address) {
       return;
     }
     
@@ -52,11 +64,12 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     
     try {
       const response = await fetch('/api/auth/onboarding-status', {
-        credentials: 'include',
-        // Add cache control to prevent stale responses
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
         },
+        body: JSON.stringify({ walletAddress: address }),
       });
       
       if (response.ok) {
@@ -65,11 +78,11 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
         
         setOnboardingComplete(completed);
         hasCheckedRef.current = true;
-        lastClerkIdRef.current = clerkUserId;
+        lastWalletRef.current = address;
         
         return completed;
       } else if (response.status === 401) {
-        // Not authenticated - this is fine, Clerk middleware will handle it
+        // Not authenticated
         setOnboardingComplete(null);
         return null;
       } else {
@@ -89,29 +102,28 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   }, []);
   
   useEffect(() => {
-    // Not loaded yet - wait
-    if (!isLoaded) return;
+    // Still initializing Alchemy - wait
+    if (isInitializing) return;
     
-    // Not signed in - nothing to check
-    if (!isSignedIn || !user?.id) {
-      setOnboardingComplete(null);
-      hasCheckedRef.current = false;
+    // Public routes - no auth needed
+    if (isPublicRoute || isProfileRoute) {
       return;
     }
     
-    // Public routes don't need onboarding check
-    if (isPublicRoute) {
+    // Not connected and not on public route - redirect to login
+    if (!isConnected || !walletAddress) {
+      router.replace('/login');
       return;
     }
     
-    // If user changed (different Clerk ID), reset and re-check
-    if (lastClerkIdRef.current && lastClerkIdRef.current !== user.id) {
+    // If wallet changed, reset and re-check
+    if (lastWalletRef.current && lastWalletRef.current !== walletAddress) {
       hasCheckedRef.current = false;
       setOnboardingComplete(null);
     }
     
-    // Already checked for this user - use cached result
-    if (hasCheckedRef.current && lastClerkIdRef.current === user.id) {
+    // Already checked for this wallet - use cached result
+    if (hasCheckedRef.current && lastWalletRef.current === walletAddress) {
       // Handle redirects based on cached state
       if (onboardingComplete === false && !isOnboardingRoute) {
         router.replace('/setup');
@@ -122,22 +134,22 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     }
     
     // Need to check onboarding status
-    checkOnboardingStatus(user.id).then((completed) => {
+    checkOnboardingStatus(walletAddress).then((completed) => {
       if (completed === false && !isOnboardingRoute) {
         router.replace('/setup');
       } else if (completed === true && isOnboardingRoute) {
         router.replace('/');
       }
     });
-  }, [isLoaded, isSignedIn, user?.id, pathname, isPublicRoute, isOnboardingRoute, onboardingComplete, router, checkOnboardingStatus]);
+  }, [isInitializing, isConnected, walletAddress, pathname, isPublicRoute, isProfileRoute, isOnboardingRoute, onboardingComplete, router, checkOnboardingStatus]);
   
-  // Public routes - render immediately
-  if (isPublicRoute) {
+  // Public routes and profile routes - render immediately
+  if (isPublicRoute || isProfileRoute) {
     return <>{children}</>;
   }
   
-  // Still loading Clerk
-  if (!isLoaded) {
+  // Still initializing Alchemy
+  if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-white/50 animate-spin" />
@@ -145,9 +157,13 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
     );
   }
   
-  // Not signed in - Clerk middleware will redirect to login
-  if (!isSignedIn) {
-    return <>{children}</>;
+  // Not connected - will redirect to login
+  if (!isConnected || !walletAddress) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-white/50 animate-spin" />
+      </div>
+    );
   }
   
   // Checking onboarding status (first time only)

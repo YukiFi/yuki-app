@@ -1,21 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { useSmartAccountClient } from "@account-kit/react";
+import { useTransactionHistory, type Transaction, type TransactionType } from "@/lib/hooks/useTransactionHistory";
 
 const BRAND_LAVENDER = "#e1a8f0";
-
-type TransactionType = "sent" | "received" | "deposit" | "withdrawal" | "yield";
-
-interface Transaction {
-  id: string;
-  type: TransactionType;
-  description: string;
-  counterparty?: string;
-  amount: number;
-  timestamp: Date;
-  status: "completed" | "pending";
-}
 
 // Group transactions by relative time periods
 function groupTransactionsByDate(transactions: Transaction[]) {
@@ -203,102 +193,13 @@ function TransactionRow({
   );
 }
 
-// Mock data generator
-function generateTransactions(): Transaction[] {
-  return [
-    {
-      id: "1",
-      type: "yield",
-      description: "Interest earned",
-      amount: 2.67,
-      timestamp: new Date(),
-      status: "completed",
-    },
-    {
-      id: "2",
-      type: "sent",
-      description: "Sent to Alex",
-      counterparty: "Alex",
-      amount: -250.00,
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "3",
-      type: "deposit",
-      description: "Added money",
-      amount: 2000.00,
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "4",
-      type: "yield",
-      description: "Interest earned",
-      amount: 2.54,
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "5",
-      type: "received",
-      description: "Received from Mike",
-      counterparty: "Mike",
-      amount: 75.00,
-      timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "6",
-      type: "yield",
-      description: "Interest earned",
-      amount: 2.41,
-      timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "7",
-      type: "deposit",
-      description: "Added money",
-      amount: 5000.00,
-      timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "8",
-      type: "withdrawal",
-      description: "Withdrew to bank",
-      amount: -500.00,
-      timestamp: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "9",
-      type: "received",
-      description: "Received from Sarah",
-      counterparty: "Sarah",
-      amount: 150.00,
-      timestamp: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "10",
-      type: "deposit",
-      description: "Initial deposit",
-      amount: 6000.00,
-      timestamp: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-  ];
-}
-
 export default function ActivityPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const { client } = useSmartAccountClient({});
   const [filter, setFilter] = useState<"all" | "yield" | "transfers">("all");
 
-  useEffect(() => {
-    setTransactions(generateTransactions());
-  }, []);
+  // Get wallet address from smart account client
+  const walletAddress = client?.account?.address as `0x${string}` | undefined;
+  const { transactions, isLoading } = useTransactionHistory(walletAddress, { enabled: !!walletAddress });
 
   const filteredTransactions = transactions.filter(tx => {
     if (filter === "yield") return tx.type === "yield";
@@ -350,7 +251,16 @@ export default function ActivityPage() {
 
       {/* Transaction groups */}
         <div className="space-y-6 sm:space-y-8">
-        {Object.keys(groupedTransactions)
+        {isLoading ? (
+          <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-8 sm:px-5 sm:py-12 flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-8 sm:px-5 sm:py-12 text-center">
+            <p className="text-white/40 text-sm">No transactions yet</p>
+            <p className="text-white/25 text-xs mt-1">Your transaction history will appear here</p>
+          </div>
+        ) : Object.keys(groupedTransactions)
           .sort((a, b) => {
             const aIndex = groupOrder.indexOf(a);
             const bIndex = groupOrder.indexOf(b);
@@ -377,31 +287,9 @@ export default function ActivityPage() {
                 ))}
                   </div>
                 </div>
-            ))}
+            ))
+        }
           </div>
-
-      {/* Empty state */}
-      {filteredTransactions.length === 0 && (
-          <div className="text-center py-16 sm:py-20">
-            <div 
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 sm:mb-6"
-              style={{ backgroundColor: `${BRAND_LAVENDER}10` }}
-            >
-              <svg 
-                className="w-7 h-7 sm:w-8 sm:h-8" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor" 
-                strokeWidth={1.5}
-                style={{ color: BRAND_LAVENDER }}
-              >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-            </svg>
-            </div>
-            <p className="text-white font-medium mb-1 text-sm sm:text-base">No transactions yet</p>
-            <p className="text-white/30 text-xs sm:text-sm">Your activity will appear here</p>
-          </div>
-        )}
       </div>
     </div>
   );

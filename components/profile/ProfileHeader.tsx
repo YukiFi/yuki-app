@@ -1,19 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { PublicProfile } from '@/lib/validation/profile';
 import { EditProfileModal } from './EditProfileModal';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 const BRAND_LAVENDER = "#e1a8f0";
 
 interface ProfileHeaderProps {
   profile: PublicProfile;
-  isOwner: boolean;
+  isOwner?: boolean; // Made optional - will be determined client-side
 }
 
-export function ProfileHeader({ profile, isOwner }: ProfileHeaderProps) {
+export function ProfileHeader({ profile, isOwner: serverIsOwner }: ProfileHeaderProps) {
   const [showEditModal, setShowEditModal] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  
+  // Determine ownership client-side by comparing wallet addresses
+  const isOwner = useMemo(() => {
+    // If server already confirmed ownership, use that
+    if (serverIsOwner) return true;
+    
+    // Check if current user's wallet matches profile wallet
+    if (!isAuthenticated || !user?.walletAddress || !profile.walletAddress) {
+      return false;
+    }
+    
+    return user.walletAddress.toLowerCase() === profile.walletAddress.toLowerCase();
+  }, [serverIsOwner, isAuthenticated, user?.walletAddress, profile.walletAddress]);
   
   // Get display name or fallback to handle
   const displayName = profile.displayName || profile.handle.replace('@', '');

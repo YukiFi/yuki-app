@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { useUser } from "@clerk/nextjs";
+import { useSignerStatus, useSmartAccountClient } from "@account-kit/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,6 @@ async function checkUsernameAvailability(username: string): Promise<boolean> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identifier: username.toLowerCase(), type: "username" }),
-      credentials: "include",
     });
     
     if (!response.ok) return false;
@@ -36,7 +35,11 @@ async function checkUsernameAvailability(username: string): Promise<boolean> {
 
 export default function SetupPage() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useUser();
+  const { isConnected, isInitializing } = useSignerStatus();
+  const { client } = useSmartAccountClient({});
+  
+  // Get wallet address from smart account client
+  const walletAddress = client?.account?.address;
   
   const [username, setUsername] = useState("");
   const [isChecking, setIsChecking] = useState(false);
@@ -45,12 +48,12 @@ export default function SetupPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   
-  // Redirect if not signed in
+  // Redirect if not connected
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
+    if (!isInitializing && !isConnected) {
       router.push("/login");
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [isInitializing, isConnected, router]);
   
   // Check username availability with debounce
   useEffect(() => {
@@ -95,7 +98,7 @@ export default function SetupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isAvailable || !username || username.length < 3) return;
+    if (!isAvailable || !username || username.length < 3 || !walletAddress) return;
     
     setIsSaving(true);
     setError(null);
@@ -104,8 +107,7 @@ export default function SetupPage() {
       const response = await fetch("/api/auth/username", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
-        credentials: "include",
+        body: JSON.stringify({ username, walletAddress }),
       });
       
       const data = await response.json();
@@ -128,7 +130,7 @@ export default function SetupPage() {
   };
   
   // Loading state
-  if (!isLoaded) {
+  if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0f0f12]">
         <div className="w-8 h-8 border-2 border-white/20 border-t-[#e1a8f0] rounded-full animate-spin" />
@@ -136,8 +138,8 @@ export default function SetupPage() {
     );
   }
   
-  // Not signed in - will redirect
-  if (!isSignedIn) {
+  // Not connected - will redirect
+  if (!isConnected) {
     return null;
   }
   

@@ -200,6 +200,7 @@ const db = {
   indices: {
     usersByEmail: new Map<string, string>(),
     usersByClerkId: new Map<string, string>(),
+    usersByWalletAddress: new Map<string, string>(),
     walletsByUserId: new Map<string, string>(),
     walletsByAddress: new Map<string, string>(),
     sessionsByUserId: new Map<string, Set<string>>()
@@ -212,8 +213,11 @@ const db = {
 
 export interface User {
   id: string;
+  // Wallet-based auth (Alchemy Smart Wallets)
+  wallet_address: string | null;
+  // Legacy: Clerk auth (deprecated)
   clerk_user_id: string | null;
-  auth_provider: 'clerk' | 'local';
+  auth_provider: 'alchemy' | 'clerk' | 'local';
   email: string | null;
   phone_number: string | null;
   password_hash: string | null;
@@ -230,7 +234,7 @@ export interface User {
   avatar_url: string | null;
   banner_url: string | null;
   is_private: boolean;
-  // Passkey fields
+  // Passkey fields (legacy - now handled by Alchemy)
   passkey_credential_id: string | null;
   passkey_public_key: string | null;
   passkey_counter: number;
@@ -273,6 +277,7 @@ export async function createUser(
   
   const user: User = {
     id,
+    wallet_address: null,
     clerk_user_id: null,
     auth_provider: 'local',
     email: normalizedEmail,
@@ -325,6 +330,7 @@ export async function getOrCreateUserByEmail(email: string): Promise<User> {
     const id = `user_${normalizedEmail.replace(/[^a-z0-9]/g, '_')}`;
     user = {
       id,
+      wallet_address: null,
       clerk_user_id: null,
       auth_provider: 'local',
       email: normalizedEmail,
@@ -397,6 +403,7 @@ export async function getOrCreateUserByClerkId(clerkUserId: string): Promise<Use
   const id = `user_${clerkUserId}`;
   const user: User = {
     id,
+    wallet_address: null,
     clerk_user_id: clerkUserId,
     auth_provider: 'clerk',
     email: null,
@@ -436,6 +443,102 @@ export async function getOrCreateUserByClerkId(clerkUserId: string): Promise<Use
  */
 export async function getUserByClerkId(clerkUserId: string): Promise<User | null> {
   const userId = db.indices.usersByClerkId.get(clerkUserId);
+  if (!userId) return null;
+  return db.users.get(userId) || null;
+}
+
+/**
+ * Get or create a user by wallet address
+ * This is the primary method for Alchemy Smart Wallets authentication
+ * The wallet address becomes the user's identity
+ */
+export async function getOrCreateUserByWalletAddress(walletAddress: string): Promise<User> {
+  const normalizedAddress = walletAddress.toLowerCase();
+  
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.getOrCreateUserByWalletAddressPg(normalizedAddress);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getOrCreateUserByWalletAddress');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+  
+  // Fallback to in-memory storage (only in development with connection issues)
+  const existingUserId = db.indices.usersByWalletAddress.get(normalizedAddress);
+  if (existingUserId) {
+    const user = db.users.get(existingUserId);
+    if (user) return user;
+  }
+  
+  // Create a new user linked to this wallet address
+  const id = `user_${normalizedAddress.slice(0, 10)}_${Date.now()}`;
+  const user: User = {
+    id,
+    wallet_address: normalizedAddress,
+    clerk_user_id: null,
+    auth_provider: 'alchemy',
+    email: null,
+    phone_number: null,
+    password_hash: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+    email_verified: true,
+    locked_until: null,
+    failed_attempts: 0,
+    username: null,
+    username_last_changed: null,
+    display_name: null,
+    bio: null,
+    avatar_url: null,
+    banner_url: null,
+    is_private: false,
+    passkey_credential_id: null,
+    passkey_public_key: null,
+    passkey_counter: 0,
+    passkey_device_type: null,
+    passkey_backed_up: false,
+    passkey_transports: null,
+    passkey_created_at: null,
+  };
+  
+  db.users.set(id, user);
+  db.indices.usersByWalletAddress.set(normalizedAddress, id);
+  
+  console.log('[DB] Created in-memory user for wallet:', normalizedAddress);
+  
+  return user;
+}
+
+/**
+ * Get user by wallet address
+ */
+export async function getUserByWalletAddress(walletAddress: string): Promise<User | null> {
+  const normalizedAddress = walletAddress.toLowerCase();
+  
+  // Use PostgreSQL if available
+  if (USE_POSTGRES) {
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.getUserByWalletAddressPg(normalizedAddress);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getUserByWalletAddress');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+  
+  // Fallback to in-memory storage
+  const userId = db.indices.usersByWalletAddress.get(normalizedAddress);
   if (!userId) return null;
   return db.users.get(userId) || null;
 }

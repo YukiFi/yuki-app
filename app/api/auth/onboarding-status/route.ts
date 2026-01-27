@@ -1,26 +1,44 @@
 /**
- * GET /api/auth/onboarding-status
+ * POST /api/auth/onboarding-status
  * 
- * Check if the current user has completed onboarding (has a username).
+ * Check if the user has completed onboarding (has a username).
+ * Uses wallet address as the user identifier.
  */
 
-import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { getOrCreateUserByClerkId } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { getOrCreateUserByWalletAddress } from '@/lib/db';
 
-export async function GET() {
+export async function POST(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    let walletAddress: string;
     
-    if (!clerkUserId) {
+    try {
+      const body = await request.json();
+      walletAddress = body.walletAddress;
+    } catch {
       return NextResponse.json(
-        { error: 'Not authenticated' },
+        { error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
+    
+    if (!walletAddress) {
+      return NextResponse.json(
+        { error: 'Wallet address is required' },
         { status: 401 }
       );
     }
     
-    // Get or create internal user
-    const user = await getOrCreateUserByClerkId(clerkUserId);
+    // Validate address format
+    if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/i)) {
+      return NextResponse.json(
+        { error: 'Invalid wallet address format' },
+        { status: 400 }
+      );
+    }
+    
+    // Get or create user by wallet address
+    const user = await getOrCreateUserByWalletAddress(walletAddress.toLowerCase());
     
     // Check if user has completed onboarding
     const hasUsername = !!user.username && user.username.length > 0;
@@ -28,7 +46,6 @@ export async function GET() {
     return NextResponse.json({
       completed: hasUsername,
       username: user.username,
-      // Add more onboarding steps here as needed
       steps: {
         username: hasUsername,
       },
@@ -42,3 +59,22 @@ export async function GET() {
   }
 }
 
+// Keep GET for backwards compatibility
+export async function GET(request: NextRequest) {
+  const walletAddress = request.headers.get('x-wallet-address');
+  
+  if (!walletAddress) {
+    return NextResponse.json(
+      { error: 'Not authenticated' },
+      { status: 401 }
+    );
+  }
+  
+  const mockRequest = new Request(request.url, {
+    method: 'POST',
+    body: JSON.stringify({ walletAddress }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+  
+  return POST(mockRequest as NextRequest);
+}

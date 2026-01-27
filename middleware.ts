@@ -1,5 +1,16 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+/**
+ * Middleware for route handling
+ * 
+ * With Alchemy Smart Wallets, authentication is handled client-side.
+ * This middleware handles:
+ * 1. Distinguishing profile routes from app routes
+ * 2. Basic route-level redirects
+ * 
+ * Auth protection is handled by client-side components (OnboardingGuard, etc.)
+ */
 
 // Reserved routes that should not be treated as profile handles
 const RESERVED_ROUTES = new Set([
@@ -13,15 +24,6 @@ const RESERVED_ROUTES = new Set([
   // Reserved words
   'admin', 'root', 'support', 'yuki', 'system', 'wallet', 'profile',
   'user', 'users', 'account', 'home', 'dashboard', 'explore', 'search',
-]);
-
-// Public routes that don't require authentication
-const isPublicRoute = createRouteMatcher([
-  "/login(.*)",
-  "/setup(.*)",
-  "/documents(.*)",
-  "/legal(.*)",
-  "/help(.*)",
 ]);
 
 /**
@@ -52,34 +54,23 @@ function isPotentialProfileRoute(pathname: string): boolean {
   return true;
 }
 
-export default clerkMiddleware(async (auth, request) => {
-  const { userId } = await auth();
+export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
-  // If user is logged in and tries to access login page, redirect to dashboard
-  // (The OnboardingGuard will handle redirecting to /setup if needed)
-  if (userId && pathname.startsWith("/login")) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-  
   // Profile routes are public - anyone can view profiles
+  // Just let them through - the page will handle 404 if user doesn't exist
   if (isPotentialProfileRoute(pathname)) {
     return NextResponse.next();
   }
   
-  // Protect all non-public routes - redirect to custom login page
-  if (!isPublicRoute(request) && !userId) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect_url", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-  
+  // All other routes proceed normally
+  // Client-side components handle auth state and redirects
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
+    // Skip Next.js internals and all static files
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Always run for API routes
     "/(api|trpc)(.*)",

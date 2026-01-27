@@ -1,40 +1,36 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSmartAccountClient } from "@account-kit/react";
+import { useBalance } from "@/lib/hooks/useBalance";
 
 type Mode = "add" | "withdraw";
 
 export default function FundsPage() {
   const router = useRouter();
+  const { client } = useSmartAccountClient({});
   const [mode, setMode] = useState<Mode>("add");
   const [step, setStep] = useState<"input" | "confirm" | "success">("input");
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [totalBalance, setTotalBalance] = useState(0);
 
-  useEffect(() => {
-    // Load balance from localStorage
-    const storedBalance = localStorage.getItem("yuki_balance");
-    if (storedBalance) {
-      setTotalBalance(parseFloat(storedBalance));
-    }
-  }, []);
+  // Get wallet address from smart account client
+  const walletAddress = client?.account?.address as `0x${string}` | undefined;
+  const { total, refetch } = useBalance(walletAddress, { enabled: !!walletAddress });
+  const totalBalance = parseFloat(total) || 0;
 
   const handleAdd = () => {
     setIsLoading(true);
 
+    // In production, this would trigger a deposit flow
+    // For now, we show the success step and refetch balance
     setTimeout(() => {
-      const addAmount = parseFloat(amount);
-      const newBalance = totalBalance + addAmount;
-
-      localStorage.setItem("yuki_balance", newBalance.toString());
-      setTotalBalance(newBalance);
-      window.dispatchEvent(new Event("yuki_login_update"));
-
       setIsLoading(false);
       setStep("success");
+      // Refetch balance from blockchain
+      refetch();
     }, 1500);
   };
 
@@ -44,15 +40,13 @@ export default function FundsPage() {
 
     setIsLoading(true);
 
+    // In production, this would trigger a withdrawal transaction
+    // For now, we show the success step and refetch balance
     setTimeout(() => {
-      const newBalance = totalBalance - withdrawAmount;
-      
-      localStorage.setItem("yuki_balance", newBalance.toString());
-      setTotalBalance(newBalance);
-      window.dispatchEvent(new Event("yuki_login_update"));
-
       setIsLoading(false);
       setStep("success");
+      // Refetch balance from blockchain
+      refetch();
     }, 2000);
   };
 

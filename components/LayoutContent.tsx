@@ -1,7 +1,7 @@
 "use client"
 
 import { usePathname } from "next/navigation"
-import { useUser } from "@clerk/nextjs"
+import { useSignerStatus } from "@account-kit/react"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
   SidebarInset,
@@ -21,7 +21,10 @@ import { Separator } from "@/components/ui/separator"
  */
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { isSignedIn, isLoaded } = useUser()
+  const { isConnected, isInitializing } = useSignerStatus()
+  
+  // Consider loaded when not initializing
+  const isLoaded = !isInitializing
   
   // Pages that should NOT show the sidebar (full-bleed layouts)
   const isLoginPage = pathname === "/login" || pathname?.startsWith("/login/")
@@ -47,7 +50,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
       {/* Visibility controlled by opacity, not mount/unmount */}
       <div 
         className="transition-opacity duration-150"
-        style={{ opacity: isLoaded && isSignedIn ? 1 : 0 }}
+        style={{ opacity: isLoaded && isConnected ? 1 : 0 }}
       >
         <AppSidebar />
       </div>
@@ -56,7 +59,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
         {/* Header - always visible, provides visual stability */}
         <header 
           className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.04] bg-black px-4 transition-opacity duration-150"
-          style={{ opacity: isLoaded && isSignedIn ? 1 : 0 }}
+          style={{ opacity: isLoaded && isConnected ? 1 : 0 }}
         >
           <SidebarTrigger className="-ml-1 text-white/50 hover:text-white/80 hover:bg-white/[0.04]" />
           <Separator orientation="vertical" className="mr-2 h-4 bg-white/[0.06]" />

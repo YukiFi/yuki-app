@@ -1,13 +1,12 @@
 /**
  * Profile Me API
  * 
- * GET /api/profile/me - Get current user's full profile
+ * GET /api/profile/me - Get current user's full profile (requires x-wallet-address header)
  * PATCH /api/profile/me - Update current user's profile
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { getOrCreateUserByClerkId, updateUserProfile, updateUsername, getUserByUsername } from '@/lib/db';
+import { getOrCreateUserByWalletAddress, updateUserProfile, updateUsername, getUserByUsername } from '@/lib/db';
 import { profileUpdateSchema, type FullProfile } from '@/lib/validation/profile';
 import { isReservedRoute } from '@/lib/constants/reserved-routes';
 
@@ -32,27 +31,38 @@ function checkUsernameCooldown(lastChanged: Date | null): { canChange: boolean; 
 }
 
 /**
+ * Get wallet address from request headers or body
+ */
+function getWalletAddressFromRequest(request: NextRequest): string | null {
+  const walletAddress = request.headers.get('x-wallet-address');
+  if (walletAddress && walletAddress.match(/^0x[a-fA-F0-9]{40}$/i)) {
+    return walletAddress.toLowerCase();
+  }
+  return null;
+}
+
+/**
  * GET /api/profile/me
  * 
  * Get current user's full profile including private fields.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    const walletAddress = getWalletAddressFromRequest(request);
     
-    if (!clerkUserId) {
+    if (!walletAddress) {
       return NextResponse.json(
         { error: 'Not authenticated', code: 'UNAUTHORIZED' },
         { status: 401 }
       );
     }
     
-    const user = await getOrCreateUserByClerkId(clerkUserId);
+    const user = await getOrCreateUserByWalletAddress(walletAddress);
     const cooldown = checkUsernameCooldown(user.username_last_changed);
     
     const fullProfile: FullProfile = {
       id: user.id,
-      clerkUserId: clerkUserId,
+      walletAddress: walletAddress,
       handle: user.username || '',
       displayName: user.display_name,
       bio: user.bio,
@@ -82,9 +92,9 @@ export async function GET() {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    const walletAddress = getWalletAddressFromRequest(request);
     
-    if (!clerkUserId) {
+    if (!walletAddress) {
       return NextResponse.json(
         { error: 'Not authenticated', code: 'UNAUTHORIZED' },
         { status: 401 }
@@ -115,7 +125,7 @@ export async function PATCH(request: NextRequest) {
     const { displayName, bio, avatarUrl, bannerUrl, username } = result.data;
     
     // Get current user
-    const user = await getOrCreateUserByClerkId(clerkUserId);
+    const user = await getOrCreateUserByWalletAddress(walletAddress);
     
     // Handle username change separately (has cooldown)
     if (username !== undefined) {
@@ -183,12 +193,12 @@ export async function PATCH(request: NextRequest) {
     }
     
     // Fetch updated user
-    const updatedUser = await getOrCreateUserByClerkId(clerkUserId);
+    const updatedUser = await getOrCreateUserByWalletAddress(walletAddress);
     const cooldown = checkUsernameCooldown(updatedUser.username_last_changed);
     
     const fullProfile: FullProfile = {
       id: updatedUser.id,
-      clerkUserId: clerkUserId,
+      walletAddress: walletAddress,
       handle: updatedUser.username || '',
       displayName: updatedUser.display_name,
       bio: updatedUser.bio,
@@ -216,4 +226,3 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
-

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { getOrCreateUserByClerkId, updateUsername, getUserByUsername } from "@/lib/db";
+import { getOrCreateUserByWalletAddress, updateUsername, getUserByUsername } from "@/lib/db";
 
 const RESERVED_USERNAMES = [
   "admin", "root", "support", "help", "yuki", "system", "wallet",
@@ -66,37 +65,42 @@ function checkCooldown(lastChanged: Date | null): { allowed: boolean; daysRemain
 }
 
 /**
+ * Extract wallet address from request
+ */
+async function getWalletAddressFromRequest(req: NextRequest): Promise<{ walletAddress: string | null; body: Record<string, unknown> }> {
+  try {
+    const body = await req.json();
+    const walletAddress = body.walletAddress as string | undefined;
+    
+    if (!walletAddress || !walletAddress.match(/^0x[a-fA-F0-9]{40}$/i)) {
+      return { walletAddress: null, body };
+    }
+    
+    return { walletAddress: walletAddress.toLowerCase(), body };
+  } catch {
+    return { walletAddress: null, body: {} };
+  }
+}
+
+/**
  * POST /api/auth/username
  * 
  * Set or update the user's username.
- * 
- * Idempotency: Setting the same username twice returns success.
- * Rate limited: 30 day cooldown between changes (except first-time setup).
+ * Uses wallet address as the user identifier.
  */
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authenticate with Clerk
-    const { userId: clerkUserId } = await auth();
+    // 1. Authenticate with wallet address
+    const { walletAddress, body } = await getWalletAddressFromRequest(req);
     
-    if (!clerkUserId) {
+    if (!walletAddress) {
       return NextResponse.json(
         { error: "Not authenticated", code: "UNAUTHORIZED" },
         { status: 401 }
       );
     }
 
-    // 2. Parse and validate request body
-    let body: { username?: string };
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid JSON body", code: "INVALID_REQUEST" },
-        { status: 400 }
-      );
-    }
-
-    const { username: rawUsername } = body;
+    const rawUsername = body.username as string | undefined;
     
     if (!rawUsername || typeof rawUsername !== "string") {
       return NextResponse.json(
@@ -116,8 +120,8 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // 4. Get or create user from Clerk ID
-    const user = await getOrCreateUserByClerkId(clerkUserId);
+    // 4. Get or create user from wallet address
+    const user = await getOrCreateUserByWalletAddress(walletAddress);
 
     // 5. Idempotency check: if setting same username, return success
     if (user.username?.toLowerCase() === username.toLowerCase()) {
@@ -153,18 +157,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 8. Update username (handles DB constraint errors)
+    // 8. Update username
     try {
       await updateUsername(user.id, username);
     } catch (error) {
-      // Handle race condition where username was taken between check and update
       if (error instanceof Error && error.message === "Username is already taken") {
         return NextResponse.json(
           { error: "Username is already taken", code: "USERNAME_TAKEN" },
           { status: 409 }
         );
       }
-      // Re-throw other errors to be caught by outer handler
       throw error;
     }
 
@@ -176,7 +178,6 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[API] Username update error:", error);
     
-    // Provide more context for debugging in development
     const isDev = process.env.NODE_ENV !== "production";
     const errorMessage = isDev && error instanceof Error 
       ? `Internal server error: ${error.message}`
@@ -194,19 +195,19 @@ export async function POST(req: NextRequest) {
  * 
  * Get current user's username and change eligibility.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    const walletAddress = req.headers.get('x-wallet-address');
     
-    if (!clerkUserId) {
+    if (!walletAddress || !walletAddress.match(/^0x[a-fA-F0-9]{40}$/i)) {
       return NextResponse.json(
         { error: "Not authenticated", code: "UNAUTHORIZED" },
         { status: 401 }
       );
     }
 
-    // Get or create user from Clerk ID
-    const user = await getOrCreateUserByClerkId(clerkUserId);
+    // Get or create user from wallet address
+    const user = await getOrCreateUserByWalletAddress(walletAddress.toLowerCase());
     
     // Calculate cooldown status
     const cooldown = checkCooldown(user.username_last_changed);
@@ -214,7 +215,7 @@ export async function GET() {
     return NextResponse.json({
       username: user.username || null,
       lastChanged: user.username_last_changed?.toISOString() || null,
-      canChange: user.username ? cooldown.allowed : true, // First-time setup always allowed
+      canChange: user.username ? cooldown.allowed : true,
       daysUntilChange: cooldown.daysRemaining || 0
     });
   } catch (error) {

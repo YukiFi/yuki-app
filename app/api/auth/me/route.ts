@@ -1,45 +1,59 @@
 /**
- * GET /api/auth/me
+ * POST /api/auth/me
  * 
- * Get current authenticated user info from Clerk session.
+ * Get current user info based on wallet address.
+ * With Alchemy Smart Wallets, the wallet address is the user identity.
  */
 
-import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
-import { getOrCreateUserByClerkId, getWalletByUserId } from '@/lib/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { getOrCreateUserByWalletAddress } from '@/lib/db';
 
-export async function GET() {
+export async function POST(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    let walletAddress: string;
     
-    if (!clerkUserId) {
+    try {
+      const body = await request.json();
+      walletAddress = body.walletAddress;
+    } catch {
       return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
+        { error: 'Invalid request body' },
+        { status: 400 }
       );
     }
     
-    // Get Clerk user details
-    const clerkUser = await currentUser();
+    if (!walletAddress) {
+      return NextResponse.json(
+        { error: 'Wallet address is required' },
+        { status: 400 }
+      );
+    }
     
-    // Get or create our internal user
-    const user = await getOrCreateUserByClerkId(clerkUserId);
-    const wallet = await getWalletByUserId(user.id);
+    // Validate address format
+    if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/i)) {
+      return NextResponse.json(
+        { error: 'Invalid wallet address format' },
+        { status: 400 }
+      );
+    }
+    
+    // Normalize to lowercase
+    const normalizedAddress = walletAddress.toLowerCase();
+    
+    // Get or create user by wallet address
+    const user = await getOrCreateUserByWalletAddress(normalizedAddress);
     
     return NextResponse.json({
       user: {
         id: user.id,
-        clerkId: clerkUserId,
-        email: clerkUser?.primaryEmailAddress?.emailAddress || user.email,
-        phone: clerkUser?.primaryPhoneNumber?.phoneNumber || user.phone_number,
-        firstName: clerkUser?.firstName,
-        lastName: clerkUser?.lastName,
-        imageUrl: clerkUser?.imageUrl,
+        walletAddress: user.wallet_address,
+        email: user.email,
         username: user.username,
-        hasWallet: !!wallet,
-        walletAddress: wallet?.address,
-        securityLevel: wallet?.security_level,
-        hasPasskey: !!user.passkey_credential_id,
+        displayName: user.display_name,
+        avatarUrl: user.avatar_url,
+        bannerUrl: user.banner_url,
+        bio: user.bio,
+        isPrivate: user.is_private,
       },
     });
   } catch (error) {
@@ -49,4 +63,25 @@ export async function GET() {
       { status: 500 }
     );
   }
+}
+
+// Keep GET for backwards compatibility, but it now requires wallet address in headers
+export async function GET(request: NextRequest) {
+  const walletAddress = request.headers.get('x-wallet-address');
+  
+  if (!walletAddress) {
+    return NextResponse.json(
+      { error: 'Not authenticated' },
+      { status: 401 }
+    );
+  }
+  
+  // Create a mock request with the wallet address in the body
+  const mockRequest = new Request(request.url, {
+    method: 'POST',
+    body: JSON.stringify({ walletAddress }),
+    headers: { 'Content-Type': 'application/json' },
+  });
+  
+  return POST(mockRequest as NextRequest);
 }

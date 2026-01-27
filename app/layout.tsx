@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import LayoutContent from "@/components/LayoutContent";
 import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { Providers } from "./providers";
@@ -84,55 +83,48 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider
-      signInUrl="/login"
-      signUpUrl="/login?su"
-      signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
+    <html 
+      lang="en" 
+      className="scroll-smooth"
+      style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
     >
-      <html 
-        lang="en" 
-        className="scroll-smooth"
-        style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
-      >
-        <head>
-          {/* Prevent background flash - set background before any CSS loads */}
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                (function() {
-                  document.documentElement.style.backgroundColor = '#000000';
-                  document.documentElement.style.colorScheme = 'dark';
-                })();
-              `,
-            }}
-          />
-          {/* Preload critical CSS */}
-          <style
-            dangerouslySetInnerHTML={{
-              __html: `
-                html, body { 
-                  background-color: #000000; 
-                  color: #ffffff;
-                  color-scheme: dark;
-                }
-                /* Prevent layout shift - pre-allocate sidebar width */
-                :root {
-                  --sidebar-width: 16rem;
-                  --sidebar-width-collapsed: 3rem;
-                }
-              `,
-            }}
-          />
-        </head>
-        <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-black text-white antialiased`}>
-          <Providers>
-            <OnboardingGuard>
+      <head>
+        {/* Prevent background flash - set background before any CSS loads */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                document.documentElement.style.backgroundColor = '#000000';
+                document.documentElement.style.colorScheme = 'dark';
+              })();
+            `,
+          }}
+        />
+        {/* Preload critical CSS */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              html, body { 
+                background-color: #000000; 
+                color: #ffffff;
+                color-scheme: dark;
+              }
+              /* Prevent layout shift - pre-allocate sidebar width */
+              :root {
+                --sidebar-width: 16rem;
+                --sidebar-width-collapsed: 3rem;
+              }
+            `,
+          }}
+        />
+      </head>
+      <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-black text-white antialiased`}>
+        <Providers>
+          <OnboardingGuard>
             <LayoutContent>{children}</LayoutContent>
-            </OnboardingGuard>
-          </Providers>
-        </body>
-      </html>
-    </ClerkProvider>
+          </OnboardingGuard>
+        </Providers>
+      </body>
+    </html>
   );
 }

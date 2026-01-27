@@ -1,28 +1,28 @@
 /**
  * Authentication hook for user session management
  * 
- * This hook wraps Clerk's authentication with additional
- * user data from our internal database (wallet info, username, etc.)
+ * This hook uses Alchemy Smart Wallets for authentication.
+ * The wallet address becomes the user's primary identifier.
  */
 
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { 
+  useUser as useAlchemyUser,
+  useLogout as useAlchemyLogout,
+  useSignerStatus,
+  useSmartAccountClient,
+} from '@account-kit/react';
 
 export interface UserData {
   id: string;
-  clerkId: string;
+  walletAddress: string;
   email: string | null;
-  phone: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  imageUrl: string | null;
   username: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
   hasWallet: boolean;
-  walletAddress?: string;
-  securityLevel?: 'password_only' | 'passkey_enabled';
-  hasPasskey?: boolean;
 }
 
 export interface AuthState {
@@ -33,8 +33,11 @@ export interface AuthState {
 }
 
 export function useAuth() {
-  const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn } = useUser();
-  const { signOut } = useClerk();
+  // Alchemy hooks for authentication state
+  const alchemyUser = useAlchemyUser();
+  const { isConnected, isInitializing } = useSignerStatus();
+  const { logout: alchemyLogout } = useAlchemyLogout();
+  const { client } = useSmartAccountClient({});
   
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -43,10 +46,15 @@ export function useAuth() {
     error: null,
   });
 
+  // Get wallet address from smart account client
+  const walletAddress = client?.account?.address;
+
   const fetchUserData = useCallback(async () => {
-    if (!clerkLoaded) return;
+    // Still initializing Alchemy
+    if (isInitializing) return;
     
-    if (!isSignedIn || !clerkUser) {
+    // Not connected
+    if (!isConnected || !walletAddress) {
       setState({
         user: null,
         isLoading: false,
@@ -57,58 +65,80 @@ export function useAuth() {
     }
     
     try {
+      // Fetch user data from our API using wallet address
       const response = await fetch('/api/auth/me', {
-        credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress }),
       });
       
       if (response.ok) {
         const data = await response.json();
         setState({
-          user: data.user,
-          isLoading: false,
-          isAuthenticated: true,
-          error: null,
-        });
-      } else {
-        // Even if API fails, we're still authenticated via Clerk
-        // Use Clerk data as fallback
-        setState({
           user: {
-            id: clerkUser.id,
-            clerkId: clerkUser.id,
-            email: clerkUser.primaryEmailAddress?.emailAddress || null,
-            phone: clerkUser.primaryPhoneNumber?.phoneNumber || null,
-            firstName: clerkUser.firstName,
-            lastName: clerkUser.lastName,
-            imageUrl: clerkUser.imageUrl,
-            username: null,
-            hasWallet: false,
+            id: data.user?.id || walletAddress,
+            walletAddress: walletAddress,
+            email: alchemyUser?.email || null,
+            username: data.user?.username || null,
+            displayName: data.user?.displayName || null,
+            avatarUrl: data.user?.avatarUrl || null,
+            hasWallet: true,
           },
           isLoading: false,
           isAuthenticated: true,
           error: null,
         });
+      } else if (response.status === 404) {
+        // User doesn't exist in our DB yet - they need to complete onboarding
+        setState({
+          user: {
+            id: walletAddress,
+            walletAddress: walletAddress,
+            email: alchemyUser?.email || null,
+            username: null,
+            displayName: null,
+            avatarUrl: null,
+            hasWallet: true,
+          },
+          isLoading: false,
+          isAuthenticated: true,
+          error: null,
+        });
+      } else {
+        // Other error - still authenticated but couldn't fetch profile
+        setState({
+          user: {
+            id: walletAddress,
+            walletAddress: walletAddress,
+            email: alchemyUser?.email || null,
+            username: null,
+            displayName: null,
+            avatarUrl: null,
+            hasWallet: true,
+          },
+          isLoading: false,
+          isAuthenticated: true,
+          error: 'Failed to fetch user profile',
+        });
       }
     } catch (error) {
-      // Fallback to Clerk data on network error
+      // Network error - still authenticated
       setState({
         user: {
-          id: clerkUser.id,
-          clerkId: clerkUser.id,
-          email: clerkUser.primaryEmailAddress?.emailAddress || null,
-          phone: clerkUser.primaryPhoneNumber?.phoneNumber || null,
-          firstName: clerkUser.firstName,
-          lastName: clerkUser.lastName,
-          imageUrl: clerkUser.imageUrl,
+          id: walletAddress,
+          walletAddress: walletAddress,
+          email: alchemyUser?.email || null,
           username: null,
-          hasWallet: false,
+          displayName: null,
+          avatarUrl: null,
+          hasWallet: true,
         },
         isLoading: false,
         isAuthenticated: true,
-        error: 'Failed to fetch user data',
+        error: 'Network error fetching user data',
       });
     }
-  }, [clerkLoaded, isSignedIn, clerkUser]);
+  }, [isInitializing, isConnected, walletAddress, alchemyUser?.email]);
 
   useEffect(() => {
     fetchUserData();
@@ -116,7 +146,7 @@ export function useAuth() {
 
   const logout = async (): Promise<void> => {
     try {
-      await signOut();
+      await alchemyLogout();
     } finally {
       setState({
         user: null,
@@ -133,8 +163,11 @@ export function useAuth() {
     ...state,
     logout,
     refreshUser,
-    // Expose Clerk's raw data for advanced use cases
-    clerkUser,
-    clerkLoaded,
+    // Expose wallet address directly for convenience
+    walletAddress,
+    // Expose Alchemy's raw data for advanced use cases
+    alchemyUser,
+    isConnected,
+    isInitializing,
   };
 }

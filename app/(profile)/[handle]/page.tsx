@@ -6,11 +6,10 @@
  * Handles redirects for old handles.
  */
 
-import { auth } from '@clerk/nextjs/server';
+import { cookies, headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import { getProfileByHandle, getHandleRedirect } from '@/lib/db';
+import { getProfileByHandle, getHandleRedirect, getUserByWalletAddress } from '@/lib/db';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
-import { ProfileTransactionFeed } from '@/components/profile/ProfileTransactionFeed';
 
 interface ProfilePageProps {
   params: Promise<{ handle: string }>;
@@ -35,8 +34,9 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   }
   
   // Check if current user is the owner
-  const { userId: clerkUserId } = await auth();
-  const isOwner = !!(clerkUserId && profile.clerk_user_id === clerkUserId);
+  // With Alchemy Smart Wallets, we can't get the wallet address server-side
+  // The client-side ProfileHeader component will handle ownership check
+  const isOwner = false; // Client will determine this
   
   // Build public profile object
   const publicProfile = {
@@ -47,19 +47,13 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     bannerUrl: profile.banner_url,
     isPrivate: profile.is_private ?? false,
     createdAt: profile.created_at.toISOString(),
+    // Pass wallet address so client can check ownership
+    walletAddress: profile.wallet_address,
   };
   
   return (
     <div className="min-h-screen bg-black">
       <ProfileHeader profile={publicProfile} isOwner={isOwner} />
-      
-      {/* Transaction feed */}
-      <div className="max-w-[600px] mx-auto px-4">
-        <ProfileTransactionFeed 
-          isPrivate={publicProfile.isPrivate} 
-          isOwner={isOwner} 
-        />
-      </div>
     </div>
   );
 }
@@ -70,14 +64,14 @@ export async function generateMetadata({ params }: ProfilePageProps) {
   
   if (!profile || !profile.username) {
     return {
-      title: 'User not found | Yuki',
+      title: 'User Not Found | Yuki',
     };
   }
   
-  const displayName = profile.display_name || profile.username.replace('@', '');
+  const displayName = profile.display_name || profile.username;
   
   return {
     title: `${displayName} (${profile.username}) | Yuki`,
-    description: profile.bio || `View ${displayName}'s profile on Yuki`,
+    description: profile.bio || `${displayName}'s profile on Yuki`,
   };
 }

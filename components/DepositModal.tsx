@@ -8,7 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useWalletContext } from '@/lib/context/WalletContext';
+import { useSmartAccountClient } from '@account-kit/react';
 
 const BRAND_LAVENDER = '#e1a8f0';
 
@@ -20,7 +20,7 @@ interface DepositModalProps {
 type Step = 'amount' | 'loading' | 'redirect' | 'error';
 
 export function DepositModal({ isOpen, onClose }: DepositModalProps) {
-  const { encryptedWallet } = useWalletContext();
+  const { client } = useSmartAccountClient({});
   
   const [step, setStep] = useState<Step>('amount');
   const [amount, setAmount] = useState('');
@@ -139,7 +139,7 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
                     <div className="bg-white/[0.03] rounded-2xl p-4 text-left">
                       <p className="text-white/50 text-xs mb-2">Your wallet address</p>
                       <p className="text-white font-mono text-sm break-all">
-                        {encryptedWallet?.address || 'No wallet'}
+                        {client?.account?.address || 'No wallet'}
                       </p>
                       <p className="text-white/40 text-xs mt-2">
                         You can receive USDC on Base directly to this address.
@@ -247,7 +247,7 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
                 <div className="bg-white/[0.03] rounded-2xl p-4 mb-6">
                   <p className="text-white/50 text-xs mb-1">Funds will be sent to</p>
                   <p className="text-white font-mono text-sm break-all">
-                    {encryptedWallet?.address}
+                    {client?.account?.address}
                   </p>
                 </div>
                 

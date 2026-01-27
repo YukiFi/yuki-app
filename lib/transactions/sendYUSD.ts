@@ -83,9 +83,22 @@ export function buildERC20Approval(
 }
 
 /**
+ * Check if the yUSD address is configured (not the zero address placeholder)
+ */
+export function isYUSDConfigured(): boolean {
+  return YUSD_ADDRESS !== '0x0000000000000000000000000000000000000000';
+}
+
+/**
  * Get yUSD balance for an address
+ * Returns '0' if yUSD contract is not configured (placeholder address)
  */
 export async function getYUSDBalance(address: `0x${string}`): Promise<string> {
+  // Skip if yUSD address is the zero address placeholder
+  if (!isYUSDConfigured()) {
+    return '0';
+  }
+  
   const client = createPublicViemClient(base.id);
   
   try {

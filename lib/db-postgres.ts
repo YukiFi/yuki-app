@@ -131,10 +131,24 @@ export async function initializeDatabase(): Promise<void> {
       END $$;
     `);
 
-    // Create indexes (including for clerk_user_id)
+    // Add wallet_address column for Alchemy Smart Wallets
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'wallet_address'
+        ) THEN
+          ALTER TABLE users ADD COLUMN wallet_address TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Create indexes (including for clerk_user_id and wallet_address)
     // Use case-insensitive index for username
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_users_clerk_id ON users(clerk_user_id) WHERE clerk_user_id IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address) WHERE wallet_address IS NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     `);
     
@@ -308,8 +322,11 @@ export async function initializeDatabase(): Promise<void> {
 
 export interface User {
   id: string;
+  // Wallet-based auth (Alchemy Smart Wallets)
+  wallet_address: string | null;
+  // Legacy: Clerk auth (deprecated)
   clerk_user_id: string | null;
-  auth_provider: 'clerk' | 'local';
+  auth_provider: 'alchemy' | 'clerk' | 'local';
   email: string | null;
   phone_number: string | null;
   password_hash: string | null;
@@ -326,7 +343,7 @@ export interface User {
   avatar_url: string | null;
   banner_url: string | null;
   is_private: boolean;
-  // Passkey fields
+  // Passkey fields (legacy - now handled by Alchemy)
   passkey_credential_id: string | null;
   passkey_public_key: string | null;
   passkey_counter: number;
@@ -426,6 +443,78 @@ export async function getOrCreateUserByClerkIdPg(clerkUserId: string): Promise<U
   }
   
   return result.rows[0];
+}
+
+/**
+ * Get or create a user by wallet address (for Alchemy Smart Wallets)
+ * 
+ * Uses a safe pattern to handle race conditions:
+ * 1. Try to find existing user
+ * 2. If not found, insert (without ON CONFLICT expression which doesn't work with expression indexes)
+ * 3. If insert fails due to race condition, find the user that was just created
+ */
+export async function getOrCreateUserByWalletAddressPg(walletAddress: string): Promise<User> {
+  if (!pool) {
+    throw new Error('[DB] PostgreSQL pool not available - DATABASE_URL not set');
+  }
+  
+  const normalizedAddress = walletAddress.toLowerCase();
+  
+  // First try to find existing user
+  const existing = await pool.query<User>(
+    `SELECT * FROM users WHERE LOWER(wallet_address) = LOWER($1)`,
+    [normalizedAddress]
+  );
+  
+  if (existing.rows[0]) {
+    return existing.rows[0];
+  }
+  
+  // Create new user - use a simple insert
+  const id = `user_${normalizedAddress.slice(2, 10)}_${Date.now()}`;
+  
+  try {
+    const result = await pool.query<User>(
+      `INSERT INTO users (id, wallet_address, auth_provider, created_at, updated_at, email_verified)
+       VALUES ($1, $2, 'alchemy', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, true)
+       RETURNING *`,
+      [id, normalizedAddress]
+    );
+    
+    if (result.rows[0]) {
+      return result.rows[0];
+    }
+  } catch (error: unknown) {
+    // Handle unique constraint violation (race condition - another request created the user)
+    const pgError = error as { code?: string };
+    if (pgError.code === '23505') { // unique_violation
+      const retryFind = await pool.query<User>(
+        `SELECT * FROM users WHERE LOWER(wallet_address) = LOWER($1)`,
+        [normalizedAddress]
+      );
+      
+      if (retryFind.rows[0]) {
+        return retryFind.rows[0];
+      }
+    }
+    throw error;
+  }
+  
+  throw new Error(`[DB] Failed to create/get user for wallet: ${normalizedAddress}`);
+}
+
+/**
+ * Get user by wallet address
+ */
+export async function getUserByWalletAddressPg(walletAddress: string): Promise<User | null> {
+  if (!pool) return null;
+  
+  const result = await pool.query<User>(
+    'SELECT * FROM users WHERE LOWER(wallet_address) = LOWER($1)',
+    [walletAddress]
+  );
+  
+  return result.rows[0] || null;
 }
 
 export async function updateUsernamePg(userId: string, username: string): Promise<void> {

@@ -3,7 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUser } from "@clerk/nextjs";
+import { useSignerStatus, useSmartAccountClient } from "@account-kit/react";
+import { useBalance } from "@/lib/hooks/useBalance";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { SendModal } from "@/components/SendModal";
 
 // ============================================================================
 // YIELD HISTORY - User's actual daily yield performance
@@ -180,25 +183,16 @@ function formatPhoneDisplay(value: string): string {
   }
 }
 
-// Check if user exists via API - uses Clerk backend
+// Check if user exists via API
 async function checkUserExists(
   identifier: string, 
-  mode: "phone" | "username",
-  countryCode: string = "+1"
+  mode: "email" | "username"
 ): Promise<boolean> {
   try {
-    let formattedIdentifier = identifier;
-    
-    if (mode === "phone") {
-      const digits = identifier.replace(/\D/g, "");
-      const countryDigits = countryCode.replace(/\D/g, "");
-      formattedIdentifier = `+${countryDigits}${digits}`;
-    }
-
     const response = await fetch("/api/user/check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identifier: formattedIdentifier, type: mode }),
+      body: JSON.stringify({ identifier, type: mode }),
     });
 
     if (!response.ok) return true;
@@ -210,509 +204,6 @@ async function checkUserExists(
 }
 
 // ============================================================================
-// SEND MODAL - "I'm moving my money confidently."
-// ============================================================================
-
-function SendModal({ 
-  open, 
-  onClose,
-  balance,
-  currentUserPhone,
-  currentUserUsername,
-}: { 
-  open: boolean; 
-  onClose: () => void;
-  balance: number;
-  currentUserPhone: string;
-  currentUserUsername: string;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [amount, setAmount] = useState("");
-  const [recipient, setRecipient] = useState("");
-  const [recipientMode, setRecipientMode] = useState<"phone" | "username">("username");
-  const [countryCode, setCountryCode] = useState("+1");
-  const [step, setStep] = useState<"compose" | "confirm" | "processing" | "success">("compose");
-  const [recipientExists, setRecipientExists] = useState<boolean | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  const numericAmount = parseFloat(amount) || 0;
-  const recipientDigits = recipient.replace(/\D/g, "");
-  const isRecipientValid = recipientMode === "phone" 
-    ? recipientDigits.length >= 10
-    : recipient.length >= 3;
-  
-  const fullRecipientPhone = recipientMode === "phone" 
-    ? `${countryCode.replace(/\D/g, "")}${recipientDigits}` : "";
-  
-  const isSendingToSelf = isRecipientValid && (
-    recipientMode === "phone"
-      ? fullRecipientPhone === currentUserPhone
-      : recipient.toLowerCase() === currentUserUsername.toLowerCase()
-  );
-
-  // Check recipient with timeout safety
-  useEffect(() => {
-    if (!isRecipientValid || isSendingToSelf) {
-      setRecipientExists(null);
-      setIsChecking(false);
-      return;
-    }
-    
-    setIsChecking(true);
-    let cancelled = false;
-    
-    // Debounce the API call
-    const debounceId = setTimeout(async () => {
-      try {
-        const exists = await checkUserExists(recipient, recipientMode, countryCode);
-        if (!cancelled) {
-          setRecipientExists(exists);
-          setIsChecking(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setRecipientExists(null);
-          setIsChecking(false);
-        }
-      }
-    }, 400);
-    
-    // Safety timeout - if still checking after 5s, give up
-    const safetyId = setTimeout(() => {
-      if (!cancelled) {
-        setIsChecking(false);
-      }
-    }, 5000);
-    
-    return () => {
-      cancelled = true;
-      clearTimeout(debounceId);
-      clearTimeout(safetyId);
-    };
-  }, [recipient, recipientMode, countryCode, isRecipientValid, isSendingToSelf]);
-
-  // Reset when mode or country code changes
-  useEffect(() => { 
-    setRecipientExists(null);
-    setIsChecking(false);
-  }, [recipientMode, countryCode]);
-
-  // Focus input on open
-  useEffect(() => {
-    if (open && step === "compose") {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [open, step]);
-
-  const hasError = isSendingToSelf || recipientExists === false;
-  const remaining = balance - numericAmount;
-  const canSend = numericAmount > 0 && numericAmount <= balance && isRecipientValid && !isSendingToSelf && recipientExists === true;
-  const displayRecipient = recipientMode === "username" ? `@${recipient}` : `${countryCode} ${recipient}`;
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^0-9.]/g, "");
-    const parts = val.split(".");
-    if (parts.length > 2) return;
-    if (parts[1]?.length > 2) return;
-    setAmount(val);
-  };
-
-  const handleRecipientChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (recipientMode === "phone") {
-      setRecipient(formatPhoneDisplay(e.target.value));
-    } else {
-      setRecipient(e.target.value.replace(/^@/, "").replace(/[^a-zA-Z0-9_]/g, ""));
-    }
-  };
-
-  const handleConfirm = async () => {
-    setStep("processing");
-    
-    // Simulate transaction processing (in production, this would be the actual blockchain tx)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Generate mock transaction hash
-    const mockHash = `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`;
-    setTxHash(mockHash);
-    
-    setStep("success");
-  };
-
-  const handleClose = () => {
-    onClose();
-    setTimeout(() => {
-      setAmount("");
-      setRecipient("");
-      setRecipientMode("username");
-      setCountryCode("+1");
-      setStep("compose");
-      setRecipientExists(null);
-      setIsChecking(false);
-      setTxHash(null);
-      setShowAdvanced(false);
-    }, 200);
-  };
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-          onClick={handleClose}
-        >
-          {/* Backdrop - simple dim */}
-          <motion.div 
-            className="absolute inset-0 bg-black/90"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
-          
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full sm:max-w-[440px] mx-0 sm:mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <AnimatePresence mode="wait">
-              {step === "compose" && (
-                <motion.div
-                  key="compose"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.15 }}
-                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
-                >
-                  {/* Header */}
-                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-white/50 text-sm font-medium">Send to</p>
-                      <button
-                        onClick={handleClose}
-                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    
-                    {/* Recipient input */}
-                    <div className="flex items-center gap-1">
-                      {recipientMode === "username" ? (
-                        <span style={{ color: BRAND_LAVENDER }} className="text-xl sm:text-2xl font-medium">@</span>
-                      ) : (
-                        <div className="flex items-center">
-                          <span className="text-white/40 text-xl sm:text-2xl font-light">+</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={countryCode.replace(/^\+/, "")}
-                            onChange={(e) => setCountryCode(`+${e.target.value.replace(/\D/g, "").slice(0, 3)}`)}
-                            className="bg-transparent text-white/60 text-xl sm:text-2xl font-light w-8 focus:outline-none"
-                            style={{ fontFeatureSettings: "'tnum' 1" }}
-                            placeholder="1"
-                          />
-                        </div>
-                      )}
-                      <input
-                        type="text"
-                        inputMode={recipientMode === "phone" ? "tel" : "text"}
-                        value={recipient}
-                        onChange={handleRecipientChange}
-                        placeholder={recipientMode === "phone" ? "(555) 123-4567" : "username"}
-                        className="bg-transparent text-white text-xl sm:text-2xl font-light flex-1 focus:outline-none placeholder:text-white/25"
-                      />
-                    </div>
-                    
-                    {/* Status row */}
-                    <div className="flex items-center justify-between mt-3 min-h-[20px]">
-                      <div className="flex items-center gap-2">
-                        {isChecking && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex items-center gap-2 text-white/40 text-xs"
-                          >
-                            <span className="w-3 h-3 border-2 border-white/20 border-t-white/50 rounded-full animate-spin" />
-                            Checking...
-                          </motion.div>
-                        )}
-                        {!isChecking && recipientExists === true && !isSendingToSelf && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex items-center gap-1.5 text-emerald-400 text-xs"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Found
-                          </motion.div>
-                        )}
-                        {!isChecking && hasError && (
-                          <motion.p
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="text-red-400 text-xs"
-                          >
-                            {isSendingToSelf ? "Can't send to yourself" : "User not found"}
-                          </motion.p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => {
-                          setRecipientMode(recipientMode === "phone" ? "username" : "phone");
-                          setRecipient("");
-                        }}
-                        className="text-white/40 hover:text-white/60 text-xs transition-colors cursor-pointer"
-                      >
-                        {recipientMode === "phone" ? "use @username" : "use phone"}
-                      </button>
-                    </div>
-      </div>
-
-                  {/* Amount */}
-                  <div className="px-6 sm:px-8 py-8 sm:py-10">
-                    <div className="flex items-baseline">
-                      <span style={{ color: BRAND_LAVENDER }} className="text-4xl sm:text-5xl font-light">$</span>
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        inputMode="decimal"
-                        value={amount}
-                        onChange={handleAmountChange}
-                        placeholder="0"
-                        className="bg-transparent text-white text-4xl sm:text-5xl font-light w-full focus:outline-none placeholder:text-white/20"
-                        style={{ fontFeatureSettings: "'tnum' 1" }}
-                      />
-                    </div>
-                    
-                    <div className="mt-4">
-                      <span className="text-white/40 text-sm">
-                        Balance: ${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Action button */}
-                  <div className="px-6 sm:px-8 pb-8 sm:pb-8">
-                    <button
-                      onClick={() => canSend && setStep("confirm")}
-                      disabled={!canSend}
-                      className={`
-                        w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 cursor-pointer touch-manipulation
-                        ${canSend 
-                          ? "bg-white text-black active:scale-[0.98]" 
-                          : hasError
-                            ? "bg-red-500/10 text-red-400"
-                            : "bg-white/[0.05] text-white/30"
-                        }
-                      `}
-                    >
-                      {canSend 
-                        ? "Continue" 
-                        : hasError 
-                          ? "Can't send" 
-                          : numericAmount > 0 && !isRecipientValid
-                            ? recipientMode === "phone" ? "Enter phone" : "Enter username"
-                            : "Enter amount"
-                      }
-                  </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {step === "confirm" && (
-                <motion.div
-                  key="confirm"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
-                >
-                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-6">
-                    {/* Header with back button */}
-                    <div className="flex items-center justify-between mb-6">
-                    <button
-                      onClick={() => setStep("compose")}
-                        className="text-white/40 hover:text-white/60 transition-colors cursor-pointer p-1 -ml-1"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                      </svg>
-                    </button>
-                      <button
-                        onClick={handleClose}
-                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* Confirmation display */}
-                    <div className="text-center py-6">
-                      <p className="text-white/50 text-sm font-medium mb-3">Sending</p>
-                      <p 
-                        className="text-4xl sm:text-5xl font-light text-white mb-3"
-                        style={{ fontFeatureSettings: "'tnum' 1" }}
-                      >
-                        <span style={{ color: BRAND_LAVENDER }}>$</span>
-                        {numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-white/50 text-base">
-                        to <span className="text-white/80">{displayRecipient}</span>
-                      </p>
-                    </div>
-
-                    {/* Details */}
-                    <div className="py-4 space-y-3 bg-white/[0.03] rounded-xl px-4 mb-6">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/40 text-sm">Network fee</span>
-                        <span className="text-white/60 text-sm">$0.00</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/40 text-sm">New balance</span>
-                        <span className="text-white/80 text-sm tabular-nums" style={{ fontFeatureSettings: "'tnum' 1" }}>
-                          ${remaining.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                        </span>
-                    </div>
-                  </div>
-
-                    {/* Confirm button */}
-                    <button
-                      onClick={handleConfirm}
-                      className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
-                    >
-                      Confirm & Send
-                  </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {step === "processing" && (
-                <motion.div
-                  key="processing"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-12 sm:py-16 px-6 sm:px-8"
-                >
-                  <div className="text-center">
-                    {/* Spinner */}
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-                      <div className="absolute inset-0 rounded-full border-2 border-white/[0.08]" />
-                      <motion.div
-                        className="absolute inset-0 rounded-full border-2 border-transparent"
-                        style={{ borderTopColor: BRAND_LAVENDER }}
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      />
-                    </div>
-                    
-                    <p className="text-white text-lg font-medium mb-1">Sending...</p>
-                    <p className="text-white/40 text-sm mb-6">Confirming on Base</p>
-                    
-                    <p 
-                      className="text-2xl font-light text-white"
-                      style={{ fontFeatureSettings: "'tnum' 1" }}
-                    >
-                      <span style={{ color: BRAND_LAVENDER }}>$</span>
-                      {numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-white/40 text-sm mt-1">to {displayRecipient}</p>
-                  </div>
-                </motion.div>
-              )}
-
-              {step === "success" && (
-                <motion.div
-                  key="success"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-10 sm:py-12 px-6 sm:px-8"
-                >
-                  <div className="text-center">
-                    {/* Success checkmark */}
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.1, duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
-                      className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-5"
-                    >
-                      <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </motion.div>
-                    
-                    <p className="text-white text-lg font-medium mb-1">Sent successfully</p>
-                    <p className="text-white/50 text-sm mb-6">
-                      ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} to {displayRecipient}
-                    </p>
-
-                    {/* Transaction details */}
-                    <div className="py-3 space-y-2 bg-white/[0.03] rounded-xl px-4 text-left mb-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/40 text-sm">Status</span>
-                        <span className="text-emerald-400 text-sm flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                          Confirmed
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/40 text-sm">Network</span>
-                        <span className="text-white/60 text-sm">Base</span>
-                      </div>
-                      {txHash && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-white/40 text-sm">Transaction</span>
-                          <a
-                            href={`https://basescan.org/tx/${txHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-white/50 hover:text-white/70 text-sm font-mono transition-colors"
-                          >
-                            {txHash.slice(0, 6)}...{txHash.slice(-4)}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Done button */}
-                    <button
-                      onClick={handleClose}
-                      className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// ============================================================================
 // REQUEST MODAL - "This is simple. This is safe."
 // ============================================================================
 
@@ -720,34 +211,31 @@ function RequestModal({
   open, 
   onClose,
   userIdentifier,
-  currentUserPhone,
+  currentUserEmail,
   currentUserUsername,
 }: { 
   open: boolean; 
   onClose: () => void;
   userIdentifier: string;
-  currentUserPhone: string;
+  currentUserEmail: string;
   currentUserUsername: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [amount, setAmount] = useState("");
   const [from, setFrom] = useState("");
-  const [fromMode, setFromMode] = useState<"phone" | "username">("username");
-  const [fromCountryCode, setFromCountryCode] = useState("+1");
+  const [fromMode, setFromMode] = useState<"email" | "username">("username");
   const [step, setStep] = useState<"compose" | "confirm" | "success">("compose");
   const [fromExists, setFromExists] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(false);
 
   const numericAmount = parseFloat(amount) || 0;
-  const fromDigits = from.replace(/\D/g, "");
-  const isFromValid = fromMode === "phone" ? fromDigits.length >= 10 : from.length >= 3;
-  
-  const fullFromPhone = fromMode === "phone" 
-    ? `${fromCountryCode.replace(/\D/g, "")}${fromDigits}` : "";
+  const isFromValid = fromMode === "email" 
+    ? from.includes("@") && from.length >= 5 
+    : from.length >= 3;
   
   const isRequestingFromSelf = isFromValid && (
-    fromMode === "phone"
-      ? fullFromPhone === currentUserPhone
+    fromMode === "email"
+      ? from.toLowerCase() === currentUserEmail.toLowerCase()
       : from.toLowerCase() === currentUserUsername.toLowerCase()
   );
 
@@ -765,7 +253,7 @@ function RequestModal({
     // Debounce the API call
     const debounceId = setTimeout(async () => {
       try {
-        const exists = await checkUserExists(from, fromMode, fromCountryCode);
+        const exists = await checkUserExists(from, fromMode);
         if (!cancelled) {
           setFromExists(exists);
           setIsChecking(false);
@@ -790,13 +278,13 @@ function RequestModal({
       clearTimeout(debounceId);
       clearTimeout(safetyId);
     };
-  }, [from, fromMode, fromCountryCode, isFromValid, isRequestingFromSelf]);
+  }, [from, fromMode, isFromValid, isRequestingFromSelf]);
 
-  // Reset when mode or country code changes
+  // Reset when mode changes
   useEffect(() => { 
     setFromExists(null);
     setIsChecking(false);
-  }, [fromMode, fromCountryCode]);
+  }, [fromMode]);
 
   useEffect(() => {
     if (open && step === "compose") {
@@ -807,7 +295,7 @@ function RequestModal({
   const hasFromError = isRequestingFromSelf || fromExists === false;
   const hasSpecificFrom = from.length > 0 && isFromValid;
   const canRequest = numericAmount > 0 && (!hasSpecificFrom || (fromExists === true && !isRequestingFromSelf));
-  const displayFrom = from ? (fromMode === "username" ? `@${from}` : `${fromCountryCode} ${from}`) : "Anyone";
+  const displayFrom = from ? (fromMode === "username" ? `@${from}` : from) : "Anyone";
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/[^0-9.]/g, "");
@@ -818,8 +306,9 @@ function RequestModal({
   };
 
   const handleFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (fromMode === "phone") {
-      setFrom(formatPhoneDisplay(e.target.value));
+    if (fromMode === "email") {
+      // Allow email-valid characters
+      setFrom(e.target.value.toLowerCase().trim());
     } else {
       setFrom(e.target.value.replace(/^@/, "").replace(/[^a-zA-Z0-9_]/g, ""));
     }
@@ -836,7 +325,6 @@ function RequestModal({
       setAmount("");
       setFrom("");
       setFromMode("username");
-      setFromCountryCode("+1");
       setStep("compose");
       setFromExists(null);
       setIsChecking(false);
@@ -916,28 +404,15 @@ function RequestModal({
                     <p className="text-white/40 text-sm font-medium mb-3">From (optional)</p>
                     
                     <div className="flex items-center gap-1">
-                      {fromMode === "username" ? (
+                      {fromMode === "username" && (
                         <span style={{ color: BRAND_LAVENDER }} className="text-lg font-medium">@</span>
-                      ) : (
-                        <div className="flex items-center">
-                          <span className="text-white/40 text-lg">+</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={fromCountryCode.replace(/^\+/, "")}
-                            onChange={(e) => setFromCountryCode(`+${e.target.value.replace(/\D/g, "").slice(0, 3)}`)}
-                            className="bg-transparent text-white/60 text-lg w-8 focus:outline-none"
-                            style={{ fontFeatureSettings: "'tnum' 1" }}
-                            placeholder="1"
-                          />
-                        </div>
                       )}
                       <input
-                        type="text"
-                        inputMode={fromMode === "phone" ? "tel" : "text"}
+                        type={fromMode === "email" ? "email" : "text"}
+                        inputMode={fromMode === "email" ? "email" : "text"}
                         value={from}
                         onChange={handleFromChange}
-                        placeholder={fromMode === "phone" ? "(555) 123-4567" : "anyone"}
+                        placeholder={fromMode === "email" ? "email@example.com" : "anyone"}
                         className="flex-1 bg-transparent text-white text-lg focus:outline-none placeholder:text-white/25"
                       />
                     </div>
@@ -979,12 +454,12 @@ function RequestModal({
                   </div>
                       <button
                         onClick={() => {
-                          setFromMode(fromMode === "phone" ? "username" : "phone");
+                          setFromMode(fromMode === "email" ? "username" : "email");
                           setFrom("");
                         }}
                         className="text-white/40 hover:text-white/60 text-xs transition-colors cursor-pointer"
                       >
-                        {fromMode === "phone" ? "use @username" : "use phone"}
+                        {fromMode === "email" ? "use @username" : "use email"}
                       </button>
                 </div>
               </div>
@@ -1110,35 +585,35 @@ function RequestModal({
 }
 
 export default function Dashboard() {
-  const { user } = useUser();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [todayYield, setTodayYield] = useState(0);
+  const { isConnected } = useSignerStatus();
+  const { client } = useSmartAccountClient({});
+  const { user } = useAuth();
   const [sendOpen, setSendOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
 
-  // Extract user's phone and username from Clerk
-  const currentUserPhone = user?.primaryPhoneNumber?.phoneNumber?.replace(/\D/g, "") || "";
-  const currentUserUsername = user?.username || "";
-  const userIdentifier = currentUserUsername ? `@${currentUserUsername}` : currentUserPhone ? `+1${currentUserPhone.slice(-10)}` : "user";
+  // Get wallet address from smart account client
+  const walletAddress = client?.account?.address as `0x${string}` | undefined;
+  const { total, isLoading: balanceLoading } = useBalance(walletAddress, { enabled: !!walletAddress });
+  
+  // Parse balance from string to number
+  const balance = parseFloat(total) || 0;
+  
+  // Calculate today's yield at 7.8% APY
+  const todayYield = balance * (0.078 / 365);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("yuki_balance");
-    const initial = stored ? parseFloat(stored) : 12438.72;
-    setBalance(initial);
-      localStorage.setItem("yuki_balance", initial.toString());
-    
-    // Today's yield at 7.8% APY
-    setTodayYield(initial * (0.078 / 365));
-  }, []);
+  // User identifier for display
+  const userIdentifier = walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "user";
+
+  // User info for request modal - email instead of phone since we use email auth
+  const currentUserEmail = user?.email || "";
+  const currentUserUsername = user?.username || "";
 
   // Split balance for typography control
-  const [dollars, cents] = balance !== null 
-    ? balance.toFixed(2).split(".") 
-    : ["0", "00"];
+  const [dollars, cents] = balance.toFixed(2).split(".");
   const formattedDollars = parseInt(dollars).toLocaleString("en-US");
   
   // Show skeleton-like state while loading, but with stable layout
-  const isReady = balance !== null;
+  const isReady = !balanceLoading;
 
   return (
     <>
@@ -1206,7 +681,7 @@ export default function Dashboard() {
 
         {/* Yield History Section */}
         <div className="mt-6 sm:mt-10 lg:mt-16">
-            <YieldHistoryChart balance={balance || 0} />
+            <YieldHistoryChart balance={balance} />
         </div>
 
         {/* Flexible spacer - pushes actions to bottom */}
@@ -1288,17 +763,14 @@ export default function Dashboard() {
 
       {/* Modals */}
       <SendModal 
-        open={sendOpen} 
+        isOpen={sendOpen} 
         onClose={() => setSendOpen(false)} 
-        balance={balance ?? 0}
-        currentUserPhone={currentUserPhone}
-        currentUserUsername={currentUserUsername}
       />
       <RequestModal 
         open={requestOpen} 
         onClose={() => setRequestOpen(false)}
         userIdentifier={userIdentifier}
-        currentUserPhone={currentUserPhone}
+        currentUserEmail={currentUserEmail}
         currentUserUsername={currentUserUsername}
       />
     </>

@@ -1,19 +1,26 @@
 /**
  * Send Modal Component
  * 
- * A production-ready modal for sending yUSD to other addresses.
- * Uses the embedded wallet for signing and transaction submission.
+ * A production-ready modal for sending funds to other users.
+ * Supports @username or wallet address as recipient.
+ * Uses Alchemy Smart Wallets with sponsored gas (users never pay fees).
  */
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useWalletContext } from '@/lib/context/WalletContext';
-import { buildYUSDTransfer, isValidAddress, formatAmount, getYUSDBalance, YUSD_DECIMALS } from '@/lib/transactions/sendYUSD';
-import { createEmbeddedWalletClient, createPublicViemClient } from '@/lib/wagmi';
-import { toHex } from '@/lib/crypto';
-import { base } from 'viem/chains';
+import { 
+  useSmartAccountClient,
+  useSendUserOperation,
+} from '@account-kit/react';
+import { encodeFunctionData, parseUnits, erc20Abi } from 'viem';
+import { 
+  isValidAddress, 
+  getUSDCBalance, 
+  USDC_DECIMALS, 
+  USDC_ADDRESS,
+} from '@/lib/transactions/sendYUSD';
 
 const BRAND_LAVENDER = '#e1a8f0';
 
@@ -23,32 +30,65 @@ interface SendModalProps {
   onSuccess?: (txHash: string) => void;
 }
 
-type Step = 'amount' | 'recipient' | 'confirm' | 'unlock' | 'signing' | 'success' | 'error';
+interface ResolvedUser {
+  walletAddress: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+}
+
+type Step = 'compose' | 'confirm' | 'sending' | 'success' | 'error';
 
 export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
-  const { 
-    encryptedWallet, 
-    isUnlocked, 
-    account, 
-    unlockWallet,
-    signTransaction
-  } = useWalletContext();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { client } = useSmartAccountClient({});
   
-  const [step, setStep] = useState<Step>('amount');
+  // Use Alchemy's sendUserOperation hook for sponsored gas transactions
+  const { sendUserOperationAsync } = useSendUserOperation({
+    client,
+    waitForTxn: true,
+    onSuccess: ({ hash }) => {
+      setTxHash(hash);
+      setStep('success');
+      onSuccess?.(hash);
+    },
+    onError: (error) => {
+      console.error('Transaction error:', error);
+      setError(error.message || 'Transaction failed');
+      setStep('error');
+    },
+  });
+  
+  const walletAddress = client?.account?.address;
+  
+  const [step, setStep] = useState<Step>('compose');
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
-  const [password, setPassword] = useState('');
+  const [recipientMode, setRecipientMode] = useState<'username' | 'address'>('username');
+  const [resolvedUser, setResolvedUser] = useState<ResolvedUser | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [balance, setBalance] = useState<string>('0');
   const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   
+  const numericAmount = parseFloat(amount) || 0;
+  
+  // Check if recipient is valid based on mode
+  const isRecipientValid = recipientMode === 'address' 
+    ? isValidAddress(recipient)
+    : recipient.length >= 3;
+  
+  // Check if sending to self
+  const isSendingToSelf = resolvedUser 
+    ? resolvedUser.walletAddress.toLowerCase() === walletAddress?.toLowerCase()
+    : recipientMode === 'address' && recipient.toLowerCase() === walletAddress?.toLowerCase();
+  
   // Fetch balance when modal opens
   useEffect(() => {
-    if (isOpen && encryptedWallet?.address) {
+    if (isOpen && walletAddress) {
       setIsLoadingBalance(true);
-      getYUSDBalance(encryptedWallet.address as `0x${string}`)
+      getUSDCBalance(walletAddress as `0x${string}`)
         .then(bal => {
           setBalance(bal);
           setIsLoadingBalance(false);
@@ -58,456 +98,546 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
           setIsLoadingBalance(false);
         });
     }
-  }, [isOpen, encryptedWallet?.address]);
+  }, [isOpen, walletAddress]);
   
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setStep('amount');
+      setStep('compose');
       setAmount('');
       setRecipient('');
-      setPassword('');
+      setRecipientMode('username');
+      setResolvedUser(null);
       setError(null);
       setTxHash(null);
     }
   }, [isOpen]);
   
-  const handleAmountSubmit = () => {
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      setError('Please enter a valid amount');
+  // Focus input on open
+  useEffect(() => {
+    if (isOpen && step === 'compose') {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isOpen, step]);
+
+  // Resolve username when it changes (with debounce)
+  useEffect(() => {
+    if (recipientMode !== 'username' || recipient.length < 3) {
+      setResolvedUser(null);
       return;
     }
-    if (numAmount > parseFloat(balance)) {
+
+    const timeoutId = setTimeout(async () => {
+      setIsResolving(true);
+      try {
+        const res = await fetch('/api/user/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: recipient }),
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          setResolvedUser({
+            walletAddress: data.walletAddress,
+            username: data.username,
+            displayName: data.displayName,
+            avatarUrl: data.avatarUrl,
+          });
+          setError(null);
+        } else {
+          setResolvedUser(null);
+        }
+      } catch {
+        setResolvedUser(null);
+      } finally {
+        setIsResolving(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [recipient, recipientMode]);
+
+  const handleClose = () => {
+    if (step !== 'sending') {
+      onClose();
+    }
+  };
+  
+  const handleContinue = () => {
+    if (numericAmount <= 0) {
+      setError('Please enter an amount');
+      return;
+    }
+    if (numericAmount > parseFloat(balance)) {
       setError('Insufficient balance');
       return;
     }
-    setError(null);
-    setStep('recipient');
-  };
-  
-  const handleRecipientSubmit = () => {
-    if (!isValidAddress(recipient)) {
-      setError('Invalid Ethereum address');
-      return;
-    }
-    setError(null);
     
-    // Check if wallet is unlocked
-    if (isUnlocked && account) {
-      setStep('confirm');
+    if (recipientMode === 'username') {
+      if (!resolvedUser) {
+        setError('User not found');
+        return;
+      }
+      if (isSendingToSelf) {
+        setError("You can't send to yourself");
+        return;
+      }
     } else {
-      setStep('unlock');
-    }
-  };
-  
-  const handleUnlock = async () => {
-    if (!password) {
-      setError('Please enter your password');
-      return;
+      if (!isValidAddress(recipient)) {
+        setError('Please enter a valid address');
+        return;
+      }
+      if (isSendingToSelf) {
+        setError("You can't send to yourself");
+        return;
+      }
     }
     
-    setIsLoading(true);
     setError(null);
-    
-    const result = await unlockWallet(password);
-    
-    if (result.success) {
-      setStep('confirm');
-    } else {
-      setError(result.error || 'Invalid password');
-    }
-    
-    setIsLoading(false);
+    setStep('confirm');
   };
   
   const handleSend = async () => {
-    if (!account || !encryptedWallet) {
+    if (!client) {
       setError('Wallet not ready');
       return;
     }
     
-    setStep('signing');
-    setIsLoading(true);
+    const targetAddress = recipientMode === 'username' 
+      ? resolvedUser?.walletAddress 
+      : recipient;
+    
+    if (!targetAddress) {
+      setError('No recipient address');
+      return;
+    }
+    
+    setStep('sending');
     setError(null);
     
     try {
-      // Build the transaction
-      const txData = buildYUSDTransfer(
-        recipient as `0x${string}`,
-        amount
-      );
-      
-      // Get wallet client
-      const walletClient = createEmbeddedWalletClient(
-        account.address as `0x${string}`,
-        base.id
-      );
-      
-      const publicClient = createPublicViemClient(base.id);
-      
-      // Get nonce and gas estimates
-      const nonce = await publicClient.getTransactionCount({
-        address: account.address,
+      // Build the ERC20 transfer call data (using USDC)
+      const transferData = encodeFunctionData({
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [
+          targetAddress as `0x${string}`,
+          parseUnits(amount, USDC_DECIMALS),
+        ],
       });
       
-      const gasPrice = await publicClient.getGasPrice();
-      
-      const gas = await publicClient.estimateGas({
-        account: account.address,
-        to: txData.to,
-        data: txData.data as `0x${string}`,
-        value: txData.value,
+      // Send the user operation (gas is sponsored!)
+      await sendUserOperationAsync({
+        uo: {
+          target: USDC_ADDRESS,
+          data: transferData,
+          value: 0n,
+        },
       });
-      
-      // Sign and send the transaction
-      const hash = await walletClient.sendTransaction({
-        to: txData.to,
-        data: txData.data as `0x${string}`,
-        value: txData.value,
-        gas: (gas * 120n) / 100n, // 20% buffer
-        gasPrice,
-        nonce,
-        chain: base,
-      });
-      
-      setTxHash(hash);
-      setStep('success');
-      onSuccess?.(hash);
     } catch (err) {
       console.error('Transaction error:', err);
       setError(err instanceof Error ? err.message : 'Transaction failed');
       setStep('error');
-    } finally {
-      setIsLoading(false);
     }
   };
-  
-  const handleClose = () => {
-    if (step !== 'signing') {
-      onClose();
+
+  // Display text for recipient
+  const getRecipientDisplay = () => {
+    if (recipientMode === 'username' && resolvedUser) {
+      return resolvedUser.displayName || resolvedUser.username;
     }
+    if (recipientMode === 'address' && recipient) {
+      return `${recipient.slice(0, 6)}...${recipient.slice(-4)}`;
+    }
+    return '';
   };
   
   if (!isOpen) return null;
   
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-      >
-        {/* Backdrop */}
-        <div 
-          className="absolute inset-0 bg-black/80"
-          onClick={handleClose}
-        />
-        
-        {/* Modal */}
+      {isOpen && (
         <motion.div
-          initial={{ y: '100%', opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative w-full sm:max-w-md bg-black rounded-t-3xl sm:rounded-3xl overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          onClick={handleClose}
         >
-          <div className="p-6 sm:p-8">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">
-                {step === 'success' ? 'Sent!' : 'Send yUSD'}
-              </h2>
-              {step !== 'signing' && (
-                <button
-                  onClick={handleClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/[0.06] text-white/60 hover:bg-white/[0.1] transition-colors"
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80"
+          />
+          
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-full sm:max-w-[440px] mx-0 sm:mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <AnimatePresence mode="wait">
+              {step === 'compose' && (
+                <motion.div
+                  key="compose"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.15 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
                 >
-                  ×
-                </button>
-              )}
-            </div>
-            
-            {/* Amount Step */}
-            {step === 'amount' && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <p className="text-white/50 text-sm mb-2">Available balance</p>
-                  <p className="text-2xl font-medium text-white">
-                    {isLoadingBalance ? (
-                      <span className="animate-pulse">Loading...</span>
-                    ) : (
-                      `$${formatAmount(balance)}`
-                    )}
-                  </p>
-                </div>
-                
-                <div>
-                  <label className="block text-white/50 text-sm mb-2">Amount to send</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50">$</span>
-                    <input
-                      type="number"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-white/[0.06] rounded-2xl px-8 py-4 text-white text-xl text-center placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
-                      step="0.01"
-                      min="0"
-                    />
-                  </div>
-                  
-                  {/* Quick amount buttons */}
-                  <div className="flex gap-2 mt-3">
-                    {['10', '25', '50', '100'].map((quickAmount) => (
+                  {/* Header */}
+                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-white/50 text-sm font-medium">Send</p>
                       <button
-                        key={quickAmount}
-                        onClick={() => setAmount(quickAmount)}
-                        className="flex-1 py-2 rounded-xl bg-white/[0.06] text-white/60 text-sm hover:bg-white/[0.1] transition-colors"
+                        onClick={handleClose}
+                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
                       >
-                        ${quickAmount}
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
-                    ))}
+                    </div>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="px-6 sm:px-8 py-6 sm:py-8">
+                    <div className="flex items-center justify-center gap-1 mb-6">
+                      <span 
+                        className="text-5xl sm:text-6xl font-light"
+                        style={{ color: BRAND_LAVENDER }}
+                      >
+                        $
+                      </span>
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        inputMode="decimal"
+                        value={amount}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                            setAmount(val);
+                            setError(null);
+                          }
+                        }}
+                        placeholder="0"
+                        className="text-5xl sm:text-6xl font-light text-white bg-transparent border-none outline-none w-40 sm:w-48"
+                        style={{ caretColor: BRAND_LAVENDER }}
+                      />
+                    </div>
+                    
+                    <div className="flex justify-center mb-8">
+                      <span className="text-white/30 text-sm">
+                        Available: {isLoadingBalance ? '...' : `$${parseFloat(balance).toFixed(2)}`}
+                      </span>
+                    </div>
+
+                    {/* Recipient Mode Toggle */}
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        onClick={() => {
+                          setRecipientMode('username');
+                          setRecipient('');
+                          setResolvedUser(null);
+                          setError(null);
+                        }}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                          recipientMode === 'username'
+                            ? 'bg-white/10 text-white'
+                            : 'bg-white/[0.03] text-white/40 hover:text-white/60'
+                        }`}
+                      >
+                        @username
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRecipientMode('address');
+                          setRecipient('');
+                          setResolvedUser(null);
+                          setError(null);
+                        }}
+                        className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                          recipientMode === 'address'
+                            ? 'bg-white/10 text-white'
+                            : 'bg-white/[0.03] text-white/40 hover:text-white/60'
+                        }`}
+                      >
+                        Address
+                      </button>
+                    </div>
+
+                    {/* Recipient Input */}
+                    <div className="space-y-3">
+                      <label className="text-white/50 text-sm">To</label>
+                      <div className="relative">
+                        {recipientMode === 'username' && (
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40">@</span>
+                        )}
+                        <input
+                          type="text"
+                          value={recipient}
+                          onChange={(e) => {
+                            let val = e.target.value;
+                            // Remove @ if user types it (we already show it)
+                            if (recipientMode === 'username') {
+                              val = val.replace(/^@/, '');
+                            }
+                            setRecipient(val);
+                            setError(null);
+                          }}
+                          placeholder={recipientMode === 'username' ? 'username' : '0x...'}
+                          className={`w-full bg-white/[0.04] border border-white/[0.06] rounded-2xl py-4 pr-4 text-white focus:outline-none focus:border-white/20 transition-colors placeholder:text-white/20 ${
+                            recipientMode === 'username' ? 'pl-9 font-medium' : 'pl-4 font-mono text-sm'
+                          }`}
+                        />
+                        
+                        {/* Resolving indicator */}
+                        {recipientMode === 'username' && isResolving && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <div className="w-4 h-4 border-2 border-white/20 border-t-white/50 rounded-full animate-spin" />
+                          </div>
+                        )}
+                        
+                        {/* Resolved user indicator */}
+                        {recipientMode === 'username' && resolvedUser && !isResolving && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Resolved user preview */}
+                      {recipientMode === 'username' && resolvedUser && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-3 p-3 bg-white/[0.03] rounded-xl"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60">
+                            {(resolvedUser.displayName || resolvedUser.username || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium truncate">
+                              {resolvedUser.displayName || resolvedUser.username}
+                            </p>
+                            <p className="text-white/40 text-xs truncate">
+                              {resolvedUser.walletAddress.slice(0, 8)}...{resolvedUser.walletAddress.slice(-6)}
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Error */}
+                  {error && (
+                    <div className="px-6 sm:px-8 pb-4">
+                      <p className="text-red-400 text-sm text-center">{error}</p>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-4">
                     <button
-                      onClick={() => setAmount(balance)}
-                      className="flex-1 py-2 rounded-xl text-sm transition-colors"
-                      style={{ backgroundColor: `${BRAND_LAVENDER}20`, color: BRAND_LAVENDER }}
+                      onClick={handleContinue}
+                      disabled={!amount || !recipient || (recipientMode === 'username' && !resolvedUser)}
+                      className="w-full py-4 rounded-2xl font-medium transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
+                      style={{ backgroundColor: BRAND_LAVENDER, color: '#1a0a1f' }}
                     >
-                      Max
+                      Continue
                     </button>
                   </div>
-                </div>
-                
-                {error && (
-                  <p className="text-red-400 text-sm text-center">{error}</p>
-                )}
-                
-                <button
-                  onClick={handleAmountSubmit}
-                  disabled={!amount || parseFloat(amount) <= 0}
-                  className="w-full py-4 rounded-2xl font-medium text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: BRAND_LAVENDER }}
+                </motion.div>
+              )}
+
+              {step === 'confirm' && (
+                <motion.div
+                  key="confirm"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.15 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
                 >
-                  Continue
-                </button>
-              </div>
-            )}
-            
-            {/* Recipient Step */}
-            {step === 'recipient' && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <p className="text-white/50 text-sm mb-1">Sending</p>
-                  <p className="text-3xl font-medium text-white">${formatAmount(amount)}</p>
-                </div>
-                
-                <div>
-                  <label className="block text-white/50 text-sm mb-2">Recipient address</label>
-                  <input
-                    type="text"
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                    placeholder="0x..."
-                    className="w-full bg-white/[0.06] rounded-2xl px-4 py-4 text-white font-mono text-sm placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
-                  />
-                </div>
-                
-                {error && (
-                  <p className="text-red-400 text-sm text-center">{error}</p>
-                )}
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => { setStep('amount'); setError(null); }}
-                    className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white/70 hover:bg-white/[0.1] transition-colors"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handleRecipientSubmit}
-                    disabled={!recipient}
-                    className="flex-1 py-4 rounded-2xl font-medium text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: BRAND_LAVENDER }}
-                  >
-                    Continue
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Unlock Step */}
-            {step === 'unlock' && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-white/[0.06] flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                  {/* Header */}
+                  <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-white/50 text-sm font-medium">Confirm</p>
+                      <button
+                        onClick={handleClose}
+                        className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-medium text-white mb-2">Unlock your wallet</h3>
-                  <p className="text-white/50 text-sm">Enter your password to sign this transaction</p>
-                </div>
-                
-                <div>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full bg-white/[0.06] rounded-2xl px-4 py-4 text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
-                    onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
-                  />
-                </div>
-                
-                {error && (
-                  <p className="text-red-400 text-sm text-center">{error}</p>
-                )}
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => { setStep('recipient'); setError(null); setPassword(''); }}
-                    className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white/70 hover:bg-white/[0.1] transition-colors"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handleUnlock}
-                    disabled={!password || isLoading}
-                    className="flex-1 py-4 rounded-2xl font-medium text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: BRAND_LAVENDER }}
-                  >
-                    {isLoading ? 'Unlocking...' : 'Unlock'}
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Confirm Step */}
-            {step === 'confirm' && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <p className="text-white/50 text-sm mb-1">Confirm sending</p>
-                  <p className="text-3xl font-medium text-white">${formatAmount(amount)}</p>
-                </div>
-                
-                <div className="bg-white/[0.03] rounded-2xl p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-white/50 text-sm">To</span>
-                    <span className="text-white text-sm font-mono">
-                      {recipient.slice(0, 6)}...{recipient.slice(-4)}
-                    </span>
+
+                  {/* Summary */}
+                  <div className="px-6 sm:px-8 py-6 sm:py-8">
+                    <div className="text-center mb-8">
+                      <p className="text-4xl sm:text-5xl font-light text-white">
+                        ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-white/40 text-sm mt-2">
+                        to {getRecipientDisplay()}
+                      </p>
+                    </div>
+
+                    <div className="bg-white/[0.03] rounded-2xl p-4 space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-white/50">Network Fee</span>
+                        <span className="text-green-400 font-medium">Free ✨</span>
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs text-white/30 text-center mt-4">
+                      Gas fees are sponsored by Yuki
+                    </p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/50 text-sm">Network</span>
-                    <span className="text-white text-sm">Base</span>
+
+                  {/* Actions */}
+                  <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-4 flex gap-3">
+                    <button
+                      onClick={() => setStep('compose')}
+                      className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-colors cursor-pointer active:scale-[0.98]"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleSend}
+                      className="flex-1 py-4 rounded-2xl font-medium transition-all cursor-pointer active:scale-[0.98]"
+                      style={{ backgroundColor: BRAND_LAVENDER, color: '#1a0a1f' }}
+                    >
+                      Send
+                    </button>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/50 text-sm">Token</span>
-                    <span className="text-white text-sm">yUSD</span>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setStep('recipient')}
-                    className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white/70 hover:bg-white/[0.1] transition-colors"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handleSend}
-                    className="flex-1 py-4 rounded-2xl font-medium text-black transition-all"
-                    style={{ backgroundColor: BRAND_LAVENDER }}
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Signing Step */}
-            {step === 'signing' && (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 rounded-full border-2 border-white/10 border-t-white/50 animate-spin mx-auto mb-6" />
-                <h3 className="text-lg font-medium text-white mb-2">Sending...</h3>
-                <p className="text-white/50 text-sm">Signing and submitting your transaction</p>
-              </div>
-            )}
-            
-            {/* Success Step */}
-            {step === 'success' && (
-              <div className="text-center py-4">
-                <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"
-                  style={{ backgroundColor: `${BRAND_LAVENDER}20` }}
+                </motion.div>
+              )}
+
+              {step === 'sending' && (
+                <motion.div
+                  key="sending"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-12 sm:py-16 px-6 sm:px-8"
                 >
-                  <svg className="w-8 h-8" style={{ color: BRAND_LAVENDER }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-medium text-white mb-2">Transaction sent!</h3>
-                <p className="text-white/50 text-sm mb-6">
-                  ${formatAmount(amount)} has been sent to {recipient.slice(0, 6)}...{recipient.slice(-4)}
-                </p>
-                
-                {txHash && (
-                  <a
-                    href={`https://basescan.org/tx/${txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm mb-6"
-                    style={{ color: BRAND_LAVENDER }}
-                  >
-                    View on BaseScan
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                )}
-                
-                <button
-                  onClick={onClose}
-                  className="w-full py-4 rounded-2xl font-medium text-black transition-all"
-                  style={{ backgroundColor: BRAND_LAVENDER }}
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full border-2 border-white/10 border-t-white/50 animate-spin mx-auto mb-6" />
+                    <p className="text-white font-medium">Sending...</p>
+                    <p className="text-white/50 text-sm mt-2">Confirming your transaction</p>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === 'success' && (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-10 sm:py-12 px-6 sm:px-8"
                 >
-                  Done
-                </button>
-              </div>
-            )}
-            
-            {/* Error Step */}
-            {step === 'error' && (
-              <div className="text-center py-4">
-                <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-medium text-white mb-2">Transaction failed</h3>
-                <p className="text-white/50 text-sm mb-6">{error}</p>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setStep('confirm')}
-                    className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white/70 hover:bg-white/[0.1] transition-colors"
-                  >
-                    Try again
-                  </button>
-                  <button
-                    onClick={onClose}
-                    className="flex-1 py-4 rounded-2xl font-medium text-black transition-all"
-                    style={{ backgroundColor: BRAND_LAVENDER }}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+                  <div className="text-center">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.1, duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+                      className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
+                      style={{ backgroundColor: `${BRAND_LAVENDER}15` }}
+                    >
+                      <svg 
+                        className="w-8 h-8"
+                        style={{ color: BRAND_LAVENDER }}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </motion.div>
+                    
+                    <p className="text-white text-lg font-medium mb-1">Sent!</p>
+                    <p className="text-white/50 text-sm">
+                      ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} to {getRecipientDisplay()}
+                    </p>
+                    
+                    {txHash && (
+                      <a
+                        href={`https://basescan.org/tx/${txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block mt-4 text-sm hover:underline"
+                        style={{ color: BRAND_LAVENDER }}
+                      >
+                        View on Basescan →
+                      </a>
+                    )}
+                    
+                    <button
+                      onClick={handleClose}
+                      className="w-full mt-8 py-4 rounded-2xl font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-colors cursor-pointer active:scale-[0.98]"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === 'error' && (
+                <motion.div
+                  key="error"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-10 sm:py-12 px-6 sm:px-8"
+                >
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-5">
+                      <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                    
+                    <p className="text-white text-lg font-medium mb-1">Transaction Failed</p>
+                    <p className="text-white/50 text-sm">{error}</p>
+                    
+                    <div className="flex gap-3 mt-8">
+                      <button
+                        onClick={handleClose}
+                        className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-colors cursor-pointer active:scale-[0.98]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => setStep('confirm')}
+                        className="flex-1 py-4 rounded-2xl font-medium cursor-pointer active:scale-[0.98]"
+                        style={{ backgroundColor: BRAND_LAVENDER, color: '#1a0a1f' }}
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
     </AnimatePresence>
   );
 }
-

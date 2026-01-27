@@ -1,29 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useSmartAccountClient } from '@account-kit/react';
+import { useTransactionHistory, type Transaction } from '@/lib/hooks/useTransactionHistory';
 
 const BRAND_LAVENDER = "#e1a8f0";
-
-// Only show sent and received transactions on profiles
-type TransactionType = "sent" | "received";
-
-interface Transaction {
-  id: string;
-  type: TransactionType;
-  description: string;
-  counterparty: string;
-  amount: number;
-  timestamp: Date;
-  status: "completed" | "pending";
-}
 
 interface ProfileTransactionFeedProps {
   isPrivate: boolean;
   isOwner: boolean;
+  walletAddress?: string; // Optional: for viewing other users' profiles
 }
 
-function getTransactionIcon(type: TransactionType) {
+function getTransactionIcon(type: Transaction['type']) {
   const baseClass = "w-4 h-4";
   
   if (type === "sent") {
@@ -34,6 +24,7 @@ function getTransactionIcon(type: TransactionType) {
     );
   }
   
+  // received and other types
   return (
     <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
@@ -56,62 +47,11 @@ function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// Mock transaction generator - in production, fetch from API
-// Only includes sent/received transactions (no deposits, withdrawals, or yield)
-function generateMockTransactions(): Transaction[] {
-  return [
-    {
-      id: "1",
-      type: "received",
-      description: "From Mike",
-      counterparty: "Mike",
-      amount: 250.00,
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "2",
-      type: "sent",
-      description: "To Alex",
-      counterparty: "Alex",
-      amount: -150.00,
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "3",
-      type: "received",
-      description: "From Sarah",
-      counterparty: "Sarah",
-      amount: 75.00,
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "4",
-      type: "sent",
-      description: "To Jordan",
-      counterparty: "Jordan",
-      amount: -30.00,
-      timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-    {
-      id: "5",
-      type: "received",
-      description: "From Taylor",
-      counterparty: "Taylor",
-      amount: 100.00,
-      timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      status: "completed",
-    },
-  ];
-}
 
 function TransactionItem({ transaction }: { transaction: Transaction }) {
   const [isHovered, setIsHovered] = useState(false);
   const isPositive = transaction.amount > 0;
-  const isYield = transaction.type === "yield";
+  const isYield = false; // Profile feed only shows sent/received
   
   return (
     <div
@@ -178,19 +118,20 @@ function TransactionItem({ transaction }: { transaction: Transaction }) {
   );
 }
 
-export function ProfileTransactionFeed({ isPrivate, isOwner }: ProfileTransactionFeedProps) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function ProfileTransactionFeed({ isPrivate, isOwner, walletAddress: propWalletAddress }: ProfileTransactionFeedProps) {
+  const { client } = useSmartAccountClient({});
   
-  useEffect(() => {
-    // In production, fetch from API based on user handle
-    const timer = setTimeout(() => {
-      setTransactions(generateMockTransactions());
-      setIsLoading(false);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
+  // Use provided wallet address or fall back to current user's wallet
+  const effectiveAddress = (propWalletAddress || client?.account?.address) as `0x${string}` | undefined;
+  
+  // Fetch real transaction history from blockchain
+  const { transactions: allTransactions, isLoading } = useTransactionHistory(effectiveAddress, { 
+    enabled: !!effectiveAddress && (!isPrivate || isOwner),
+    limit: 10 // Only show last 10 on profile
+  });
+  
+  // Filter to only show sent/received transactions on profiles
+  const transactions = allTransactions.filter(tx => tx.type === 'sent' || tx.type === 'received');
   
   // If profile is private and viewer is not the owner, show private message
   if (isPrivate && !isOwner) {

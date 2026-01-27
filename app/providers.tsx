@@ -1,34 +1,18 @@
 "use client";
 
 import * as React from 'react';
-import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RainbowKitProvider, lightTheme } from '@rainbow-me/rainbowkit';
-import { config } from '@/lib/wagmi';
-import { WalletProvider } from '@/lib/context/WalletContext';
-import '@rainbow-me/rainbowkit/styles.css';
+import { AlchemyAccountProvider } from "@account-kit/react";
+import { alchemyConfig } from "@/lib/alchemy-config";
 
 const queryClient = new QueryClient();
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider
-          theme={lightTheme({
-            accentColor: '#0F52FB',
-            accentColorForeground: 'white',
-            borderRadius: 'medium',
-            fontStack: 'system',
-            overlayBlur: 'small',
-          })}
-        >
-          <WalletProvider>
-            {children}
-          </WalletProvider>
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <QueryClientProvider client={queryClient}>
+      <AlchemyAccountProvider config={alchemyConfig} queryClient={queryClient}>
+        {children}
+      </AlchemyAccountProvider>
+    </QueryClientProvider>
   );
 }
-

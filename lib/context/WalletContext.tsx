@@ -1,54 +1,54 @@
 /**
  * Wallet Context Provider
  * 
- * Provides embedded wallet state and actions throughout the app.
- * Auth is handled by Clerk, this context manages wallet-specific operations.
+ * Provides wallet state throughout the app.
+ * With Alchemy Smart Wallets, wallet management is simplified.
  */
 
 'use client';
 
-import React, { createContext, useContext, useEffect, ReactNode } from 'react';
-import { useAuth, type UserData } from '@/lib/hooks/useAuth';
-import { useEmbeddedWallet, type UseEmbeddedWalletReturn } from '@/lib/hooks/useEmbeddedWallet';
+import React, { createContext, useContext, ReactNode } from 'react';
+import { 
+  useSignerStatus,
+  useSmartAccountClient,
+  useUser as useAlchemyUser,
+  useLogout,
+} from '@account-kit/react';
 
-interface WalletContextType extends UseEmbeddedWalletReturn {
-  // Auth state (from Clerk)
-  user: UserData | null;
-  isAuthLoading: boolean;
-  isAuthenticated: boolean;
-  authError: string | null;
+interface WalletContextType {
+  // Connection state
+  isConnected: boolean;
+  isInitializing: boolean;
   
-  // Auth actions
+  // Wallet info
+  walletAddress: `0x${string}` | undefined;
+  email: string | null;
+  
+  // Actions
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const auth = useAuth();
-  const wallet = useEmbeddedWallet();
-
-  // Fetch wallet when authenticated
-  useEffect(() => {
-    if (auth.isAuthenticated && !auth.isLoading) {
-      wallet.fetchWallet();
-    }
-  }, [auth.isAuthenticated, auth.isLoading, wallet.fetchWallet]);
+  const { isConnected, isInitializing } = useSignerStatus();
+  const { client } = useSmartAccountClient({});
+  const alchemyUser = useAlchemyUser();
+  const { logout: alchemyLogout } = useLogout();
+  
+  // Get wallet address from smart account client
+  const walletAddress = client?.account?.address as `0x${string}` | undefined;
+  
+  const logout = async () => {
+    await alchemyLogout();
+  };
 
   const value: WalletContextType = {
-    // Auth state (from Clerk)
-    user: auth.user,
-    isAuthLoading: auth.isLoading,
-    isAuthenticated: auth.isAuthenticated,
-    authError: auth.error,
-    
-    // Auth actions
-    logout: auth.logout,
-    refreshUser: auth.refreshUser,
-    
-    // Wallet state and actions
-    ...wallet,
+    isConnected,
+    isInitializing,
+    walletAddress,
+    email: alchemyUser?.email || null,
+    logout,
   };
 
   return (

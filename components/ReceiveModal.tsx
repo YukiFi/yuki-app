@@ -9,7 +9,7 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { useWalletContext } from '@/lib/context/WalletContext';
+import { useSmartAccountClient } from '@account-kit/react';
 
 const BRAND_LAVENDER = '#e1a8f0';
 
@@ -19,10 +19,10 @@ interface ReceiveModalProps {
 }
 
 export function ReceiveModal({ isOpen, onClose }: ReceiveModalProps) {
-  const { encryptedWallet } = useWalletContext();
+  const { client } = useSmartAccountClient({});
   const [copied, setCopied] = useState(false);
   
-  const address = encryptedWallet?.address || '';
+  const address = client?.account?.address || '';
   
   const handleCopy = useCallback(async () => {
     if (!address) return;

@@ -1,4 +1,10 @@
-import { clerkClient } from "@clerk/nextjs/server";
+/**
+ * User Check API
+ * 
+ * Check if a username exists in the system.
+ * With Alchemy Smart Wallets, we only check our internal database.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByUsername } from "@/lib/db";
 
@@ -13,31 +19,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = await clerkClient();
-
-    if (type === "phone") {
-      // Search for user by phone number (should be in E.164 format like +17143164753)
-      const users = await client.users.getUserList({
-        phoneNumber: [identifier],
-      });
-
-      return NextResponse.json({ exists: users.totalCount > 0 });
-    } else if (type === "username") {
-      // Check both Clerk and our internal database
+    if (type === "username") {
+      // Check our internal database
       const cleanUsername = identifier.startsWith("@") ? identifier : `@${identifier}`;
       
-      // Check our internal database first
       const internalUser = await getUserByUsername(cleanUsername);
-      if (internalUser) {
-        return NextResponse.json({ exists: true });
-      }
-      
-      // Also check Clerk (in case username is stored there too)
-      const users = await client.users.getUserList({
-        username: [identifier.toLowerCase().replace('@', '')],
-      });
+      return NextResponse.json({ exists: !!internalUser });
+    }
 
-      return NextResponse.json({ exists: users.totalCount > 0 });
+    // Phone lookup is no longer supported with Alchemy (no Clerk)
+    if (type === "phone") {
+      return NextResponse.json({ 
+        error: "Phone lookup not supported", 
+        exists: false 
+      });
     }
 
     return NextResponse.json(
