@@ -19,14 +19,14 @@ function checkUsernameCooldown(lastChanged: Date | null): { canChange: boolean; 
   if (!lastChanged) {
     return { canChange: true, daysRemaining: 0 };
   }
-  
+
   const now = new Date();
   const daysSinceChange = (now.getTime() - new Date(lastChanged).getTime()) / (1000 * 60 * 60 * 24);
-  
+
   if (daysSinceChange < COOLDOWN_DAYS) {
     return { canChange: false, daysRemaining: Math.ceil(COOLDOWN_DAYS - daysSinceChange) };
   }
-  
+
   return { canChange: true, daysRemaining: 0 };
 }
 
@@ -49,17 +49,17 @@ function getWalletAddressFromRequest(request: NextRequest): string | null {
 export async function GET(request: NextRequest) {
   try {
     const walletAddress = getWalletAddressFromRequest(request);
-    
+
     if (!walletAddress) {
       return NextResponse.json(
         { error: 'Not authenticated', code: 'UNAUTHORIZED' },
         { status: 401 }
       );
     }
-    
+
     const user = await getOrCreateUserByWalletAddress(walletAddress);
     const cooldown = checkUsernameCooldown(user.username_last_changed);
-    
+
     const fullProfile: FullProfile = {
       id: user.id,
       walletAddress: walletAddress,
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       canChangeUsername: user.username ? cooldown.canChange : true,
       daysUntilUsernameChange: cooldown.daysRemaining,
     };
-    
+
     return NextResponse.json(fullProfile);
   } catch (error) {
     console.error('[API] Get profile me error:', error);
@@ -93,14 +93,14 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const walletAddress = getWalletAddressFromRequest(request);
-    
+
     if (!walletAddress) {
       return NextResponse.json(
         { error: 'Not authenticated', code: 'UNAUTHORIZED' },
         { status: 401 }
       );
     }
-    
+
     // Parse request body
     let body: unknown;
     try {
@@ -111,7 +111,9 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    console.log('[API] PATCH /api/profile/me - Request body:', JSON.stringify(body, null, 2));
+
     // Validate input
     const result = profileUpdateSchema.safeParse(body);
     if (!result.success) {
@@ -121,16 +123,18 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
+    console.log('[API] Validated data:', JSON.stringify(result.data, null, 2));
+
     const { displayName, bio, avatarUrl, bannerUrl, username } = result.data;
-    
+
     // Get current user
     const user = await getOrCreateUserByWalletAddress(walletAddress);
-    
+
     // Handle username change separately (has cooldown)
     if (username !== undefined) {
       const normalizedUsername = `@${username.replace(/^@/, '')}`;
-      
+
       // Check if trying to set same username
       if (user.username?.toLowerCase() !== normalizedUsername.toLowerCase()) {
         // Check cooldown
@@ -138,7 +142,7 @@ export async function PATCH(request: NextRequest) {
           const cooldown = checkUsernameCooldown(user.username_last_changed);
           if (!cooldown.canChange) {
             return NextResponse.json(
-              { 
+              {
                 error: `Username can only be changed once every ${COOLDOWN_DAYS} days. Try again in ${cooldown.daysRemaining} days.`,
                 code: 'RATE_LIMITED',
                 daysRemaining: cooldown.daysRemaining
@@ -147,7 +151,7 @@ export async function PATCH(request: NextRequest) {
             );
           }
         }
-        
+
         // Check if reserved
         if (isReservedRoute(username)) {
           return NextResponse.json(
@@ -155,7 +159,7 @@ export async function PATCH(request: NextRequest) {
             { status: 400 }
           );
         }
-        
+
         // Check if taken
         const existingUser = await getUserByUsername(normalizedUsername);
         if (existingUser && existingUser.id !== user.id) {
@@ -164,7 +168,7 @@ export async function PATCH(request: NextRequest) {
             { status: 409 }
           );
         }
-        
+
         // Update username
         try {
           await updateUsername(user.id, normalizedUsername);
@@ -179,7 +183,7 @@ export async function PATCH(request: NextRequest) {
         }
       }
     }
-    
+
     // Update profile fields
     const profileUpdates: Record<string, string | boolean | null | undefined> = {};
     if (displayName !== undefined) profileUpdates.display_name = displayName;
@@ -187,15 +191,18 @@ export async function PATCH(request: NextRequest) {
     if (avatarUrl !== undefined) profileUpdates.avatar_url = avatarUrl;
     if (bannerUrl !== undefined) profileUpdates.banner_url = bannerUrl;
     if (result.data.isPrivate !== undefined) profileUpdates.is_private = result.data.isPrivate;
-    
+
+    console.log('[API] Profile updates to be saved:', JSON.stringify(profileUpdates, null, 2));
+
     if (Object.keys(profileUpdates).length > 0) {
       await updateUserProfile(user.id, profileUpdates);
+      console.log('[API] Profile updated in database for user:', user.id);
     }
-    
+
     // Fetch updated user
     const updatedUser = await getOrCreateUserByWalletAddress(walletAddress);
     const cooldown = checkUsernameCooldown(updatedUser.username_last_changed);
-    
+
     const fullProfile: FullProfile = {
       id: updatedUser.id,
       walletAddress: walletAddress,
@@ -210,16 +217,22 @@ export async function PATCH(request: NextRequest) {
       canChangeUsername: updatedUser.username ? cooldown.canChange : true,
       daysUntilUsernameChange: cooldown.daysRemaining,
     };
-    
+
+    console.log('[API] Returning updated profile:', JSON.stringify({
+      avatarUrl: fullProfile.avatarUrl,
+      bannerUrl: fullProfile.bannerUrl,
+      displayName: fullProfile.displayName,
+    }, null, 2));
+
     return NextResponse.json({ success: true, profile: fullProfile });
   } catch (error) {
     console.error('[API] Update profile error:', error);
-    
+
     const isDev = process.env.NODE_ENV !== 'production';
-    const errorMessage = isDev && error instanceof Error 
+    const errorMessage = isDev && error instanceof Error
       ? `Internal server error: ${error.message}`
       : 'Internal server error';
-    
+
     return NextResponse.json(
       { error: errorMessage, code: 'INTERNAL_ERROR' },
       { status: 500 }

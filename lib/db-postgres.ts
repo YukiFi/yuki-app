@@ -11,14 +11,14 @@
 import { Pool, PoolClient } from 'pg';
 
 // Create connection pool
-const pool = process.env.DATABASE_URL 
+const pool = process.env.DATABASE_URL
   ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    })
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  })
   : null;
 
 // Initialize database schema
@@ -27,7 +27,7 @@ export async function initializeDatabase(): Promise<void> {
     console.log('[DB] No DATABASE_URL set, using in-memory storage');
     return;
   }
-  
+
   const client = await pool.connect();
   try {
     // Create users table (Clerk-first design with optional local auth)
@@ -101,7 +101,7 @@ export async function initializeDatabase(): Promise<void> {
         END IF;
       END $$;
     `);
-    
+
     // Make password_hash nullable (Clerk users don't need passwords)
     // This is safe to run multiple times - PostgreSQL handles it gracefully
     await client.query(`
@@ -109,14 +109,14 @@ export async function initializeDatabase(): Promise<void> {
     `).catch(() => {
       // Column might already be nullable, ignore error
     });
-    
+
     // Make email nullable (Clerk users authenticate via phone, may not have email)
     await client.query(`
       ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
     `).catch(() => {
       // Column might already be nullable, ignore error
     });
-    
+
     // Add CHECK constraint for local auth (password required only for local users)
     await client.query(`
       DO $$ 
@@ -151,7 +151,7 @@ export async function initializeDatabase(): Promise<void> {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_users_wallet_address ON users(wallet_address) WHERE wallet_address IS NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     `);
-    
+
     // Drop old username index and create case-insensitive one
     await client.query(`
       DROP INDEX IF EXISTS idx_users_username;
@@ -159,7 +159,7 @@ export async function initializeDatabase(): Promise<void> {
     `).catch(() => {
       // Indexes might not exist, ignore
     });
-    
+
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower ON users(LOWER(username)) WHERE username IS NOT NULL;
     `);
@@ -209,7 +209,7 @@ export async function initializeDatabase(): Promise<void> {
         END IF;
       END $$;
     `);
-    
+
     // Add profile field constraints (safe to run multiple times)
     await client.query(`
       DO $$ 
@@ -309,7 +309,22 @@ export async function initializeDatabase(): Promise<void> {
 
       CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON withdrawals(user_id);
     `);
-    
+
+    // Create contacts table for saved contacts
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS contacts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        contact_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        nickname TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, contact_user_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON contacts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_contacts_contact_user_id ON contacts(contact_user_id);
+    `);
+
     console.log('[DB] PostgreSQL schema initialized successfully');
   } finally {
     client.release();
@@ -359,9 +374,9 @@ export async function createUserPg(
   passwordHash: string
 ): Promise<User | null> {
   if (!pool) return null;
-  
+
   const normalizedEmail = email.toLowerCase();
-  
+
   try {
     const result = await pool.query<User>(
       `INSERT INTO users (id, email, password_hash, created_at, updated_at)
@@ -370,7 +385,7 @@ export async function createUserPg(
        RETURNING *`,
       [id, normalizedEmail, passwordHash]
     );
-    
+
     return result.rows[0] || null;
   } catch (error) {
     console.error('[DB] createUser error:', error);
@@ -380,35 +395,35 @@ export async function createUserPg(
 
 export async function getUserByIdPg(id: string): Promise<User | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<User>(
     'SELECT * FROM users WHERE id = $1',
     [id]
   );
-  
+
   return result.rows[0] || null;
 }
 
 export async function getUserByEmailPg(email: string): Promise<User | null> {
   if (!pool) return null;
-  
+
   const normalizedEmail = email.toLowerCase();
   const result = await pool.query<User>(
     'SELECT * FROM users WHERE email = $1',
     [normalizedEmail]
   );
-  
+
   return result.rows[0] || null;
 }
 
 export async function getUserByClerkIdPg(clerkUserId: string): Promise<User | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<User>(
     'SELECT * FROM users WHERE clerk_user_id = $1',
     [clerkUserId]
   );
-  
+
   return result.rows[0] || null;
 }
 
@@ -426,9 +441,9 @@ export async function getOrCreateUserByClerkIdPg(clerkUserId: string): Promise<U
   if (!pool) {
     throw new Error('[DB] PostgreSQL pool not available - DATABASE_URL not set');
   }
-  
+
   const id = `user_${clerkUserId}`;
-  
+
   // Single atomic upsert - no race conditions possible
   const result = await pool.query<User>(
     `INSERT INTO users (id, clerk_user_id, auth_provider, created_at, updated_at, email_verified)
@@ -437,11 +452,11 @@ export async function getOrCreateUserByClerkIdPg(clerkUserId: string): Promise<U
      RETURNING *`,
     [id, clerkUserId]
   );
-  
+
   if (!result.rows[0]) {
     throw new Error(`[DB] Failed to create/get user for Clerk ID: ${clerkUserId}`);
   }
-  
+
   return result.rows[0];
 }
 
@@ -457,22 +472,22 @@ export async function getOrCreateUserByWalletAddressPg(walletAddress: string): P
   if (!pool) {
     throw new Error('[DB] PostgreSQL pool not available - DATABASE_URL not set');
   }
-  
+
   const normalizedAddress = walletAddress.toLowerCase();
-  
+
   // First try to find existing user
   const existing = await pool.query<User>(
     `SELECT * FROM users WHERE LOWER(wallet_address) = LOWER($1)`,
     [normalizedAddress]
   );
-  
+
   if (existing.rows[0]) {
     return existing.rows[0];
   }
-  
+
   // Create new user - use a simple insert
   const id = `user_${normalizedAddress.slice(2, 10)}_${Date.now()}`;
-  
+
   try {
     const result = await pool.query<User>(
       `INSERT INTO users (id, wallet_address, auth_provider, created_at, updated_at, email_verified)
@@ -480,7 +495,7 @@ export async function getOrCreateUserByWalletAddressPg(walletAddress: string): P
        RETURNING *`,
       [id, normalizedAddress]
     );
-    
+
     if (result.rows[0]) {
       return result.rows[0];
     }
@@ -492,14 +507,14 @@ export async function getOrCreateUserByWalletAddressPg(walletAddress: string): P
         `SELECT * FROM users WHERE LOWER(wallet_address) = LOWER($1)`,
         [normalizedAddress]
       );
-      
+
       if (retryFind.rows[0]) {
         return retryFind.rows[0];
       }
     }
     throw error;
   }
-  
+
   throw new Error(`[DB] Failed to create/get user for wallet: ${normalizedAddress}`);
 }
 
@@ -508,18 +523,18 @@ export async function getOrCreateUserByWalletAddressPg(walletAddress: string): P
  */
 export async function getUserByWalletAddressPg(walletAddress: string): Promise<User | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<User>(
     'SELECT * FROM users WHERE LOWER(wallet_address) = LOWER($1)',
     [walletAddress]
   );
-  
+
   return result.rows[0] || null;
 }
 
 export async function updateUsernamePg(userId: string, username: string): Promise<void> {
   if (!pool) return;
-  
+
   await pool.query(
     `UPDATE users 
      SET username = $1, username_last_changed = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -530,12 +545,12 @@ export async function updateUsernamePg(userId: string, username: string): Promis
 
 export async function getUserByUsernamePg(username: string): Promise<User | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<User>(
     'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
     [username]
   );
-  
+
   return result.rows[0] || null;
 }
 
@@ -549,12 +564,14 @@ export interface ProfileUpdateData {
 
 export async function updateUserProfilePg(userId: string, data: ProfileUpdateData): Promise<void> {
   if (!pool) return;
-  
+
+  console.log('[DB] updateUserProfilePg called with:', JSON.stringify({ userId, data }, null, 2));
+
   // Build dynamic update query based on provided fields
   const updates: string[] = [];
   const values: (string | boolean | null)[] = [];
   let paramIndex = 1;
-  
+
   if (data.display_name !== undefined) {
     updates.push(`display_name = $${paramIndex++}`);
     values.push(data.display_name);
@@ -566,25 +583,30 @@ export async function updateUserProfilePg(userId: string, data: ProfileUpdateDat
   if (data.avatar_url !== undefined) {
     updates.push(`avatar_url = $${paramIndex++}`);
     values.push(data.avatar_url);
+    console.log('[DB] Setting avatar_url to:', data.avatar_url);
   }
   if (data.banner_url !== undefined) {
     updates.push(`banner_url = $${paramIndex++}`);
     values.push(data.banner_url);
+    console.log('[DB] Setting banner_url to:', data.banner_url);
   }
   if (data.is_private !== undefined) {
     updates.push(`is_private = $${paramIndex++}`);
     values.push(data.is_private);
   }
-  
+
   if (updates.length === 0) return;
-  
+
   updates.push('updated_at = CURRENT_TIMESTAMP');
   values.push(userId);
-  
-  await pool.query(
-    `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
-    values
-  );
+
+  const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+  console.log('[DB] Executing query:', query);
+  console.log('[DB] With values:', values);
+
+  await pool.query(query, values);
+
+  console.log('[DB] Profile update completed successfully');
 }
 
 export async function updateUserPasskeyPg(
@@ -599,7 +621,7 @@ export async function updateUserPasskeyPg(
   }
 ): Promise<void> {
   if (!pool) return;
-  
+
   await pool.query(
     `UPDATE users 
      SET passkey_credential_id = $1,
@@ -625,7 +647,7 @@ export async function updateUserPasskeyPg(
 
 export async function updatePasskeyCounterPg(userId: string, newCounter: number): Promise<void> {
   if (!pool) return;
-  
+
   await pool.query(
     'UPDATE users SET passkey_counter = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
     [newCounter, userId]
@@ -648,14 +670,14 @@ export interface HandleHistoryRecord {
  * Record a handle change in history for redirects
  */
 export async function addHandleHistoryPg(
-  userId: string, 
-  oldHandle: string, 
+  userId: string,
+  oldHandle: string,
   newHandle: string
 ): Promise<void> {
   if (!pool) return;
-  
+
   const id = `handle_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  
+
   await pool.query(
     `INSERT INTO handle_history (id, user_id, old_handle, new_handle, changed_at)
      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
@@ -671,7 +693,7 @@ export async function addHandleHistoryPg(
  */
 export async function getHandleRedirectPg(oldHandle: string): Promise<string | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<HandleHistoryRecord>(
     `SELECT new_handle FROM handle_history 
      WHERE LOWER(old_handle) = LOWER($1)
@@ -679,7 +701,7 @@ export async function getHandleRedirectPg(oldHandle: string): Promise<string | n
      LIMIT 1`,
     [oldHandle]
   );
-  
+
   return result.rows[0]?.new_handle || null;
 }
 
@@ -722,7 +744,7 @@ export async function createWalletPg(
   }
 ): Promise<WalletRecord | null> {
   if (!pool) return null;
-  
+
   try {
     const result = await pool.query<WalletRecord>(
       `INSERT INTO wallets (id, user_id, address, chain_id, version, cipher_priv, iv_priv, kdf_salt, kdf_params, security_level, created_at, updated_at)
@@ -731,7 +753,7 @@ export async function createWalletPg(
        RETURNING *`,
       [id, userId, data.address, data.chainId, data.version, data.cipherPriv, data.ivPriv, data.kdfSalt, JSON.stringify(data.kdfParams), data.securityLevel]
     );
-    
+
     return result.rows[0] || null;
   } catch (error) {
     console.error('[DB] createWallet error:', error);
@@ -741,23 +763,23 @@ export async function createWalletPg(
 
 export async function getWalletByUserIdPg(userId: string): Promise<WalletRecord | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<WalletRecord>(
     'SELECT * FROM wallets WHERE user_id = $1',
     [userId]
   );
-  
+
   return result.rows[0] || null;
 }
 
 export async function getWalletByAddressPg(address: string): Promise<WalletRecord | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<WalletRecord>(
     'SELECT * FROM wallets WHERE address = $1',
     [address]
   );
-  
+
   return result.rows[0] || null;
 }
 
@@ -775,7 +797,7 @@ export async function updateWalletPasskeyPg(
   }
 ): Promise<void> {
   if (!pool) return;
-  
+
   await pool.query(
     `UPDATE wallets 
      SET cipher_priv = $1,
@@ -832,7 +854,7 @@ export async function createDepositPg(
   }
 ): Promise<Deposit | null> {
   if (!pool) return null;
-  
+
   const result = await pool.query<Deposit>(
     `INSERT INTO deposits (id, user_id, wallet_address, tx_hash, amount_wei, token_address, status, coinbase_charge_id, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
@@ -840,24 +862,24 @@ export async function createDepositPg(
      RETURNING *`,
     [id, userId, data.walletAddress, data.txHash || null, data.amountWei, data.tokenAddress, data.status || 'pending', data.coinbaseChargeId || null]
   );
-  
+
   return result.rows[0] || null;
 }
 
 export async function getDepositsByUserIdPg(userId: string): Promise<Deposit[]> {
   if (!pool) return [];
-  
+
   const result = await pool.query<Deposit>(
     'SELECT * FROM deposits WHERE user_id = $1 ORDER BY created_at DESC',
     [userId]
   );
-  
+
   return result.rows;
 }
 
 export async function updateDepositStatusPg(txHash: string, status: string): Promise<void> {
   if (!pool) return;
-  
+
   await pool.query(
     `UPDATE deposits 
      SET status = $1, confirmed_at = CASE WHEN $1 = 'confirmed' THEN CURRENT_TIMESTAMP ELSE confirmed_at END
@@ -867,12 +889,110 @@ export async function updateDepositStatusPg(txHash: string, status: string): Pro
 }
 
 // ============================================
+// Contact Operations
+// ============================================
+
+export interface Contact {
+  id: string;
+  user_id: string;
+  contact_user_id: string;
+  nickname: string | null;
+  created_at: Date;
+  // Joined fields from users table
+  contact_username?: string;
+  contact_display_name?: string;
+  contact_avatar_url?: string;
+  contact_wallet_address?: string;
+}
+
+export async function addContactPg(
+  userId: string,
+  contactUserId: string,
+  nickname?: string
+): Promise<Contact | null> {
+  if (!pool) return null;
+
+  const id = `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  try {
+    const result = await pool.query<Contact>(
+      `INSERT INTO contacts (id, user_id, contact_user_id, nickname)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, contact_user_id) DO UPDATE SET nickname = COALESCE($4, contacts.nickname)
+       RETURNING *`,
+      [id, userId, contactUserId, nickname || null]
+    );
+
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('[DB] Failed to add contact:', error);
+    return null;
+  }
+}
+
+export async function removeContactPg(userId: string, contactUserId: string): Promise<boolean> {
+  if (!pool) return false;
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM contacts WHERE user_id = $1 AND contact_user_id = $2',
+      [userId, contactUserId]
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  } catch (error) {
+    console.error('[DB] Failed to remove contact:', error);
+    return false;
+  }
+}
+
+export async function getContactsPg(userId: string): Promise<Contact[]> {
+  if (!pool) return [];
+
+  try {
+    const result = await pool.query<Contact>(
+      `SELECT c.*, 
+              u.username as contact_username,
+              u.display_name as contact_display_name,
+              u.avatar_url as contact_avatar_url,
+              u.wallet_address as contact_wallet_address
+       FROM contacts c
+       JOIN users u ON c.contact_user_id = u.id
+       WHERE c.user_id = $1
+       ORDER BY c.created_at DESC`,
+      [userId]
+    );
+
+    return result.rows;
+  } catch (error) {
+    console.error('[DB] Failed to get contacts:', error);
+    return [];
+  }
+}
+
+export async function isContactPg(userId: string, contactUserId: string): Promise<boolean> {
+  if (!pool) return false;
+
+  try {
+    const result = await pool.query(
+      'SELECT 1 FROM contacts WHERE user_id = $1 AND contact_user_id = $2',
+      [userId, contactUserId]
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  } catch (error) {
+    console.error('[DB] Failed to check contact:', error);
+    return false;
+  }
+}
+
+// ============================================
 // Utility functions
 // ============================================
 
 export async function healthCheck(): Promise<boolean> {
   if (!pool) return false;
-  
+
   try {
     await pool.query('SELECT 1');
     return true;

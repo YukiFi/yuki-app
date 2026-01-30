@@ -23,18 +23,18 @@ interface DayYield {
 function generateYieldHistory(balance: number, days: number = 14): DayYield[] {
   const data: DayYield[] = [];
   const baseDaily = balance * (0.078 / 365); // 7.8% APY base
-  
+
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
-    
+
     // Slight natural variance (±15%) to feel real
     const variance = 0.85 + Math.random() * 0.30;
     const amount = baseDaily * variance;
-    
+
     data.push({ date, amount });
   }
-  
+
   return data;
 }
 
@@ -44,10 +44,10 @@ interface YieldHistoryChartProps {
 
 function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  
+
   const [data, setData] = useState<DayYield[]>([]);
   const initializedRef = useRef(false);
-  
+
   useEffect(() => {
     if (balance > 0 && !initializedRef.current) {
       setData(generateYieldHistory(balance, 14));
@@ -69,7 +69,7 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
   const displayData = data[displayIndex];
 
   if (data.length === 0) {
-  return (
+    return (
       <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <p className="text-white/50 text-xs sm:text-sm font-medium">Daily Yield</p>
@@ -97,10 +97,10 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
 
       {/* Selected day display */}
       <div className="mb-4 sm:mb-6">
-        <p 
+        <p
           className="text-xl sm:text-2xl font-medium tabular-nums mb-0.5 sm:mb-1"
-              style={{ color: BRAND_LAVENDER, fontFeatureSettings: "'tnum' 1" }}
-            >
+          style={{ color: BRAND_LAVENDER, fontFeatureSettings: "'tnum' 1" }}
+        >
           +${displayData?.amount.toFixed(2) || '0.00'}
         </p>
         <p className="text-white/40 text-xs sm:text-sm">
@@ -110,7 +110,7 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
       </div>
 
       {/* Chart - touch-friendly on mobile */}
-      <div 
+      <div
         className="flex items-end gap-1 sm:gap-1.5 h-20 sm:h-[100px] touch-pan-x"
         onTouchStart={(e) => {
           const touch = e.touches[0];
@@ -138,7 +138,7 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
           const isToday = index === data.length - 1;
           const isActive = isHovered || (hoveredIndex === null && isToday);
 
-  return (
+          return (
             <div
               key={index}
               className="flex-1 h-full flex items-end"
@@ -147,12 +147,12 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
             >
               <div
                 className="w-full rounded-sm transition-all duration-100"
-                    style={{
+                style={{
                   height: `${heightPercent}%`,
                   backgroundColor: isActive ? BRAND_LAVENDER : 'rgba(255,255,255,0.08)',
                   opacity: isActive ? 1 : (hoveredIndex !== null ? 0.5 : 1)
-                    }}
-        />
+                }}
+              />
             </div>
           );
         })}
@@ -185,7 +185,7 @@ function formatPhoneDisplay(value: string): string {
 
 // Check if user exists via API
 async function checkUserExists(
-  identifier: string, 
+  identifier: string,
   mode: "email" | "username"
 ): Promise<boolean> {
   try {
@@ -207,14 +207,14 @@ async function checkUserExists(
 // REQUEST MODAL - "This is simple. This is safe."
 // ============================================================================
 
-function RequestModal({ 
-  open, 
+function RequestModal({
+  open,
   onClose,
   userIdentifier,
   currentUserEmail,
   currentUserUsername,
-}: { 
-  open: boolean; 
+}: {
+  open: boolean;
   onClose: () => void;
   userIdentifier: string;
   currentUserEmail: string;
@@ -229,10 +229,10 @@ function RequestModal({
   const [isChecking, setIsChecking] = useState(false);
 
   const numericAmount = parseFloat(amount) || 0;
-  const isFromValid = fromMode === "email" 
-    ? from.includes("@") && from.length >= 5 
+  const isFromValid = fromMode === "email"
+    ? from.includes("@") && from.length >= 5
     : from.length >= 3;
-  
+
   const isRequestingFromSelf = isFromValid && (
     fromMode === "email"
       ? from.toLowerCase() === currentUserEmail.toLowerCase()
@@ -246,10 +246,10 @@ function RequestModal({
       setIsChecking(false);
       return;
     }
-    
+
     setIsChecking(true);
     let cancelled = false;
-    
+
     // Debounce the API call
     const debounceId = setTimeout(async () => {
       try {
@@ -265,14 +265,14 @@ function RequestModal({
         }
       }
     }, 400);
-    
+
     // Safety timeout - if still checking after 5s, give up
     const safetyId = setTimeout(() => {
       if (!cancelled) {
         setIsChecking(false);
       }
     }, 5000);
-    
+
     return () => {
       cancelled = true;
       clearTimeout(debounceId);
@@ -281,7 +281,7 @@ function RequestModal({
   }, [from, fromMode, isFromValid, isRequestingFromSelf]);
 
   // Reset when mode changes
-  useEffect(() => { 
+  useEffect(() => {
     setFromExists(null);
     setIsChecking(false);
   }, [fromMode]);
@@ -342,13 +342,13 @@ function RequestModal({
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
           onClick={handleClose}
         >
-          <motion.div 
+          <motion.div
             className="absolute inset-0 bg-black/90"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           />
-          
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -380,7 +380,7 @@ function RequestModal({
                         </svg>
                       </button>
                     </div>
-                </div>
+                  </div>
 
                   {/* Amount */}
                   <div className="px-6 sm:px-8 py-6 sm:py-8">
@@ -401,8 +401,8 @@ function RequestModal({
 
                   {/* From - optional */}
                   <div className="px-6 sm:px-8 pb-4">
-                    <p className="text-white/40 text-sm font-medium mb-3">From (optional)</p>
-                    
+                    <p className="text-white/40 text-sm font-medium mb-3">From</p>
+
                     <div className="flex items-center gap-1">
                       {fromMode === "username" && (
                         <span style={{ color: BRAND_LAVENDER }} className="text-lg font-medium">@</span>
@@ -416,10 +416,10 @@ function RequestModal({
                         className="flex-1 bg-transparent text-white text-lg focus:outline-none placeholder:text-white/25"
                       />
                     </div>
-                    
+
                     {/* Status row */}
                     <div className="flex items-center justify-between mt-3 min-h-[20px]">
-                  <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                         {isChecking && hasSpecificFrom && (
                           <motion.div
                             initial={{ opacity: 0 }}
@@ -451,7 +451,7 @@ function RequestModal({
                             {isRequestingFromSelf ? "Can't request from yourself" : "User not found"}
                           </motion.p>
                         )}
-                  </div>
+                      </div>
                       <button
                         onClick={() => {
                           setFromMode(fromMode === "email" ? "username" : "email");
@@ -461,8 +461,8 @@ function RequestModal({
                       >
                         {fromMode === "email" ? "use @username" : "use email"}
                       </button>
-                </div>
-              </div>
+                    </div>
+                  </div>
 
                   {/* Action */}
                   <div className="px-6 sm:px-8 pb-8 pt-4">
@@ -471,21 +471,21 @@ function RequestModal({
                       disabled={!canRequest}
                       className={`
                         w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 cursor-pointer touch-manipulation
-                        ${canRequest 
-                          ? "bg-white text-black active:scale-[0.98]" 
+                        ${canRequest
+                          ? "bg-white text-black active:scale-[0.98]"
                           : hasFromError
                             ? "bg-red-500/10 text-red-400"
                             : "bg-white/[0.05] text-white/30"
                         }
                       `}
                     >
-                      {canRequest 
-                        ? "Continue" 
+                      {canRequest
+                        ? "Continue"
                         : hasFromError && hasSpecificFrom
                           ? "Can't request"
                           : "Enter amount"
                       }
-                  </button>
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -501,14 +501,14 @@ function RequestModal({
                 >
                   <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-6">
                     <div className="flex items-center justify-between mb-6">
-                    <button
-                      onClick={() => setStep("compose")}
+                      <button
+                        onClick={() => setStep("compose")}
                         className="text-white/40 hover:text-white/60 transition-colors cursor-pointer p-1 -ml-1"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                      </svg>
-                    </button>
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                        </svg>
+                      </button>
                       <button
                         onClick={handleClose}
                         className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
@@ -521,7 +521,7 @@ function RequestModal({
 
                     <div className="text-center py-6">
                       <p className="text-white/50 text-sm font-medium mb-3">Requesting</p>
-                      <p 
+                      <p
                         className="text-4xl sm:text-5xl font-light text-white mb-3"
                         style={{ fontFeatureSettings: "'tnum' 1" }}
                       >
@@ -530,15 +530,15 @@ function RequestModal({
                       </p>
                       <p className="text-white/50 text-base">
                         from <span className="text-white/80">{displayFrom}</span>
-                </p>
-            </div>
+                      </p>
+                    </div>
 
                     <button
                       onClick={handleConfirm}
                       className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
                     >
                       Send Request
-                  </button>
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -560,7 +560,7 @@ function RequestModal({
                       className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5"
                       style={{ backgroundColor: `${BRAND_LAVENDER}15` }}
                     >
-                      <svg 
+                      <svg
                         className="w-8 h-8"
                         style={{ color: BRAND_LAVENDER }}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
@@ -568,12 +568,12 @@ function RequestModal({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                       </svg>
                     </motion.div>
-                    
+
                     <p className="text-white text-lg font-medium mb-1">Request Sent</p>
                     <p className="text-white/50 text-sm">
                       ${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} from {displayFrom}
                     </p>
-          </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -594,10 +594,10 @@ export default function Dashboard() {
   // Get wallet address from smart account client
   const walletAddress = client?.account?.address as `0x${string}` | undefined;
   const { total, isLoading: balanceLoading } = useBalance(walletAddress, { enabled: !!walletAddress });
-  
+
   // Parse balance from string to number
   const balance = parseFloat(total) || 0;
-  
+
   // Calculate today's yield at 7.8% APY
   const todayYield = balance * (0.078 / 365);
 
@@ -611,7 +611,7 @@ export default function Dashboard() {
   // Split balance for typography control
   const [dollars, cents] = balance.toFixed(2).split(".");
   const formattedDollars = parseInt(dollars).toLocaleString("en-US");
-  
+
   // Show skeleton-like state while loading, but with stable layout
   const isReady = !balanceLoading;
 
@@ -624,40 +624,40 @@ export default function Dashboard() {
       */}
       <div className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center px-4 sm:px-8 lg:px-12 py-6 sm:py-10 lg:py-16">
         <div className="w-full max-w-[1100px]">
-        
-        {/* Page Title */}
-        <h1 className="text-lg sm:text-xl lg:text-2xl text-white mb-6 sm:mb-8">
-          Dashboard
-        </h1>
 
-        {/* Hero Balance Section */}
-        <div 
-          className="transition-opacity duration-200"
-          style={{ opacity: isReady ? 1 : 0.5 }}
-        >
-          {/* Balance Card */}
-          <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+          {/* Page Title */}
+          <h1 className="text-lg sm:text-xl lg:text-2xl text-white mb-6 sm:mb-8">
+            Dashboard
+          </h1>
+
+          {/* Hero Balance Section */}
+          <div
+            className="transition-opacity duration-200"
+            style={{ opacity: isReady ? 1 : 0.5 }}
+          >
+            {/* Balance Card */}
+            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
               {/* Top row with label and status */}
               <div className="flex items-center justify-between mb-4 sm:mb-6 lg:mb-8">
                 <p className="text-white/50 text-xs sm:text-sm font-medium">
                   Total Balance
-          </p>
+                </p>
                 <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span 
+                  <span
                     className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full"
                     style={{ backgroundColor: BRAND_LAVENDER }}
                   />
                   <span className="text-white/50 text-[10px] sm:text-xs font-medium">7.8% APY</span>
                 </div>
               </div>
-              
+
               {/* The Balance */}
               <p
                 className="text-[2.5rem] sm:text-[4rem] lg:text-[5.5rem] font-light text-white leading-none tracking-tight"
-            style={{ fontFeatureSettings: "'tnum' 1" }}
-          >
+                style={{ fontFeatureSettings: "'tnum' 1" }}
+              >
                 <span style={{ color: BRAND_LAVENDER }}>$</span>
-            {formattedDollars}
+                {formattedDollars}
                 <span className="text-white/30 text-[0.35em] font-normal ml-0.5 sm:ml-1">.{cents}</span>
               </p>
 
@@ -676,98 +676,98 @@ export default function Dashboard() {
                   <p className="text-white/40 text-xs sm:text-sm">Est. this month</p>
                 </div>
               </div>
+            </div>
           </div>
-        </div>
 
-        {/* Yield History Section */}
-        <div className="mt-6 sm:mt-10 lg:mt-16">
+          {/* Yield History Section */}
+          <div className="mt-6 sm:mt-10 lg:mt-16">
             <YieldHistoryChart balance={balance} />
-        </div>
+          </div>
 
-        {/* Flexible spacer - pushes actions to bottom */}
-        <div className="flex-1 min-h-8 sm:min-h-12 lg:min-h-16" />
+          {/* Flexible spacer - pushes actions to bottom */}
+          <div className="flex-1 min-h-8 sm:min-h-12 lg:min-h-16" />
 
-        {/* 
+          {/* 
           Action bar - Mobile-first grid layout
           Primary actions full width on mobile, inline on larger screens
         */}
-        <div className="w-full">
-          {/* Primary actions - Send & Request */}
-          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-3">
-          <button
-            onClick={() => setSendOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white text-black text-sm sm:text-[13px] font-semibold cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-            </svg>
-            Send
-          </button>
-
-          <button
-            onClick={() => setRequestOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 sm:px-5 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white/[0.08] text-white/80 text-sm sm:text-[13px] font-medium cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
-            </svg>
-            Request
-          </button>
-
-            {/* Separator - hidden on mobile */}
-            <div className="hidden sm:block w-px h-4 bg-white/[0.08] mx-1" />
-
-            {/* Tertiary actions - hidden on mobile, shown in second row */}
-            <Link href="/deposit" className="hidden sm:block">
-            <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Add
-            </div>
-          </Link>
-
-            <Link href="/withdraw" className="hidden sm:block">
-            <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
-              Withdraw
-            </div>
-          </Link>
-        </div>
-
-          {/* Secondary actions row - mobile only */}
-          <div className="grid grid-cols-2 gap-3 mt-3 sm:hidden">
-            <Link href="/deposit">
-              <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.05] text-white/60 text-sm font-medium cursor-pointer active:scale-[0.98] transition-all duration-100 touch-manipulation">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          <div className="w-full">
+            {/* Primary actions - Send & Request */}
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-3">
+              <button
+                onClick={() => setSendOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white text-black text-sm sm:text-[13px] font-semibold cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
                 </svg>
-                Add
-              </div>
-            </Link>
+                Send
+              </button>
 
-            <Link href="/withdraw">
-              <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.05] text-white/60 text-sm font-medium cursor-pointer active:scale-[0.98] transition-all duration-100 touch-manipulation">
+              <button
+                onClick={() => setRequestOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 sm:px-5 py-3.5 sm:py-3 rounded-xl sm:rounded-full bg-white/[0.08] text-white/80 text-sm sm:text-[13px] font-medium cursor-pointer active:scale-[0.98] sm:active:scale-[0.985] transition-all duration-100 touch-manipulation"
+              >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
                 </svg>
-                Withdraw
-              </div>
-            </Link>
+                Request
+              </button>
+
+              {/* Separator - hidden on mobile */}
+              <div className="hidden sm:block w-px h-4 bg-white/[0.08] mx-1" />
+
+              {/* Tertiary actions - hidden on mobile, shown in second row */}
+              <Link href="/deposit" className="hidden sm:block">
+                <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Add
+                </div>
+              </Link>
+
+              <Link href="/withdraw" className="hidden sm:block">
+                <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] text-white/50 text-[13px] font-medium cursor-pointer hover:bg-white/[0.07] hover:text-white/75 active:scale-[0.985] transition-all duration-100">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Withdraw
+                </div>
+              </Link>
+            </div>
+
+            {/* Secondary actions row - mobile only */}
+            <div className="grid grid-cols-2 gap-3 mt-3 sm:hidden">
+              <Link href="/deposit">
+                <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.05] text-white/60 text-sm font-medium cursor-pointer active:scale-[0.98] transition-all duration-100 touch-manipulation">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Add
+                </div>
+              </Link>
+
+              <Link href="/withdraw">
+                <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/[0.05] text-white/60 text-sm font-medium cursor-pointer active:scale-[0.98] transition-all duration-100 touch-manipulation">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Withdraw
+                </div>
+              </Link>
+            </div>
           </div>
-        </div>
         </div>
       </div>
 
       {/* Modals */}
-      <SendModal 
-        isOpen={sendOpen} 
-        onClose={() => setSendOpen(false)} 
+      <SendModal
+        isOpen={sendOpen}
+        onClose={() => setSendOpen(false)}
       />
-      <RequestModal 
-        open={requestOpen} 
+      <RequestModal
+        open={requestOpen}
         onClose={() => setRequestOpen(false)}
         userIdentifier={userIdentifier}
         currentUserEmail={currentUserEmail}

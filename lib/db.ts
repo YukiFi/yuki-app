@@ -1090,3 +1090,71 @@ export async function checkRateLimit(
 export async function resetRateLimit(key: string): Promise<void> {
   db.rateLimits.delete(key);
 }
+
+// ============================================
+// Contact Operations
+// ============================================
+
+import type { Contact } from './db-postgres';
+export type { Contact };
+
+export async function addContact(
+  userId: string,
+  contactUserId: string,
+  nickname?: string
+): Promise<Contact | null> {
+  if (USE_POSTGRES && pgDb) {
+    try {
+      return await pgDb.addContactPg(userId, contactUserId, nickname);
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'addContact');
+      if (!shouldFallback) return null;
+    }
+  }
+  
+  // In-memory fallback not implemented for contacts
+  console.warn('[DB] Contacts require PostgreSQL');
+  return null;
+}
+
+export async function removeContact(userId: string, contactUserId: string): Promise<boolean> {
+  if (USE_POSTGRES && pgDb) {
+    try {
+      return await pgDb.removeContactPg(userId, contactUserId);
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'removeContact');
+      if (!shouldFallback) return false;
+    }
+  }
+  
+  console.warn('[DB] Contacts require PostgreSQL');
+  return false;
+}
+
+export async function getContacts(userId: string): Promise<Contact[]> {
+  if (USE_POSTGRES && pgDb) {
+    try {
+      return await pgDb.getContactsPg(userId);
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'getContacts');
+      if (!shouldFallback) return [];
+    }
+  }
+  
+  console.warn('[DB] Contacts require PostgreSQL');
+  return [];
+}
+
+export async function isContact(userId: string, contactUserId: string): Promise<boolean> {
+  if (USE_POSTGRES && pgDb) {
+    try {
+      return await pgDb.isContactPg(userId, contactUserId);
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'isContact');
+      if (!shouldFallback) return false;
+    }
+  }
+  
+  console.warn('[DB] Contacts require PostgreSQL');
+  return false;
+}

@@ -4,13 +4,15 @@ import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
-  LayoutDashboard,
+  Home,
   Activity,
-  Send,
+  User,
+  Users,
   Settings,
   HelpCircle,
   FileText,
 } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
@@ -25,24 +27,6 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
-
-const navMain = [
-  {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Activity",
-    url: "/activity",
-    icon: Activity,
-  },
-  {
-    title: "Send",
-    url: "/send",
-    icon: Send,
-  },
-]
 
 const navSecondary = [
   {
@@ -63,6 +47,38 @@ const navSecondary = [
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuth()
+  
+  // Build nav items with dynamic profile URL
+  const navMain = React.useMemo(() => {
+    // Strip the @ from username for the URL (e.g. @haruxe -> /haruxe)
+    const cleanUsername = user?.username?.replace(/^@/, '')
+    const profileUrl = cleanUsername ? `/${cleanUsername}` : "/settings"
+    
+    return [
+      {
+        title: "Home",
+        url: "/",
+        icon: Home,
+      },
+      {
+        title: "Activity",
+        url: "/activity",
+        icon: Activity,
+      },
+      {
+        title: "Profile",
+        url: profileUrl,
+        icon: User,
+      },
+      {
+        title: "Contacts",
+        url: "/contacts",
+        icon: Users,
+      },
+    ]
+  }, [user?.username])
+
   return (
     <Sidebar collapsible="icon" {...props}>
       {/* Header - refined spacing, centered in collapsed state */}

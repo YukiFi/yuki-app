@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import { useSmartAccountClient } from '@account-kit/react';
 import type { PublicProfile } from '@/lib/validation/profile';
 import { ImageCropper } from './ImageCropper';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 const BRAND_LAVENDER = "#e1a8f0";
 const MAX_DISPLAY_NAME = 50;
@@ -35,25 +38,25 @@ type CropperType = 'avatar' | 'banner' | null;
  * Compress and resize an image blob
  */
 async function compressImage(
-  blob: Blob, 
+  blob: Blob,
   type: 'avatar' | 'banner'
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(blob);
-    
+
     img.onload = () => {
       URL.revokeObjectURL(url);
-      
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('Failed to get canvas context'));
         return;
       }
-      
+
       let { width, height } = img;
-      
+
       // Calculate new dimensions
       if (type === 'avatar') {
         // Square crop for avatar
@@ -67,15 +70,15 @@ async function compressImage(
           width = BANNER_MAX_WIDTH;
         }
       }
-      
+
       canvas.width = width;
       canvas.height = height;
-      
+
       // Draw with white background (for transparency)
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      
+
       // Convert to JPEG for better compression
       canvas.toBlob(
         (compressedBlob) => {
@@ -90,12 +93,12 @@ async function compressImage(
         COMPRESSION_QUALITY
       );
     };
-    
+
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error('Failed to load image'));
     };
-    
+
     img.src = url;
   });
 }
@@ -103,30 +106,38 @@ async function compressImage(
 /**
  * Upload image via our API endpoint
  */
-async function uploadImage(blob: Blob, type: 'avatar' | 'banner'): Promise<string> {
+async function uploadImage(blob: Blob, type: 'avatar' | 'banner', walletAddress: string): Promise<string> {
   const formData = new FormData();
   formData.append('file', blob, `${type}-${Date.now()}.jpg`);
   formData.append('type', type);
-  
+
   const response = await fetch('/api/profile/upload', {
     method: 'POST',
+    headers: {
+      'x-wallet-address': walletAddress,
+    },
     body: formData,
   });
-  
+
   const data = await response.json();
-  
+
   if (!response.ok) {
     throw new Error(data.error || 'Upload failed');
   }
-  
+
   if (!data.url) {
     throw new Error('No URL returned from upload');
   }
-  
+
   return data.url;
 }
 
 export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalProps) {
+  const router = useRouter();
+  const { client } = useSmartAccountClient({});
+  const walletAddress = client?.account?.address;
+  const { refreshUser } = useAuth();
+
   const initialData: FormData = {
     displayName: profile.displayName || '',
     bio: profile.bio || '',
@@ -135,29 +146,29 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
     bannerUrl: profile.bannerUrl || '',
     isPrivate: profile.isPrivate ?? false,
   };
-  
+
   const [formData, setFormData] = useState<FormData>(initialData);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
+
   // Image cropper state
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperType, setCropperType] = useState<CropperType>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
-  
+
   const modalRef = useRef<HTMLDivElement>(null);
   const usernameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Check for unsaved changes
   useEffect(() => {
-    const hasChanges = 
+    const hasChanges =
       formData.displayName !== initialData.displayName ||
       formData.bio !== initialData.bio ||
       formData.username !== initialData.username ||
@@ -166,7 +177,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       formData.isPrivate !== initialData.isPrivate;
     setHasUnsavedChanges(hasChanges);
   }, [formData, initialData.displayName, initialData.bio, initialData.username, initialData.avatarUrl, initialData.bannerUrl, initialData.isPrivate]);
-  
+
   // Focus trap
   useEffect(() => {
     if (isOpen) {
@@ -177,7 +188,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       firstElement?.focus();
     }
   }, [isOpen]);
-  
+
   // Escape key handler
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -185,11 +196,11 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
         handleClose();
       }
     };
-    
+
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, hasUnsavedChanges, cropperOpen]);
-  
+
   // Debounced username check
   const checkUsernameAvailability = useCallback(async (username: string) => {
     // Skip if same as current
@@ -198,38 +209,38 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       setUsernameError(null);
       return;
     }
-    
+
     // Basic validation
     if (username.length < 3) {
       setUsernameStatus('invalid');
       setUsernameError('At least 3 characters');
       return;
     }
-    
+
     if (username.length > 20) {
       setUsernameStatus('invalid');
       setUsernameError('At most 20 characters');
       return;
     }
-    
+
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       setUsernameStatus('invalid');
       setUsernameError('Letters, numbers, underscores only');
       return;
     }
-    
+
     setUsernameStatus('checking');
     setUsernameError(null);
-    
+
     try {
       const response = await fetch('/api/profile/handle-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ handle: username }),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.available) {
         setUsernameStatus('available');
         setUsernameError(null);
@@ -242,13 +253,13 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       setUsernameError('Could not check availability');
     }
   }, [profile.handle]);
-  
+
   // Trigger username check with debounce
   useEffect(() => {
     if (usernameCheckTimeout.current) {
       clearTimeout(usernameCheckTimeout.current);
     }
-    
+
     if (formData.username && formData.username !== profile.handle.replace('@', '')) {
       usernameCheckTimeout.current = setTimeout(() => {
         checkUsernameAvailability(formData.username);
@@ -257,14 +268,14 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       setUsernameStatus('idle');
       setUsernameError(null);
     }
-    
+
     return () => {
       if (usernameCheckTimeout.current) {
         clearTimeout(usernameCheckTimeout.current);
       }
     };
   }, [formData.username, profile.handle, checkUsernameAvailability]);
-  
+
   const handleClose = () => {
     if (hasUnsavedChanges) {
       if (confirm('You have unsaved changes. Discard them?')) {
@@ -275,7 +286,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       onClose();
     }
   };
-  
+
   const handleFileSelect = (type: 'avatar' | 'banner') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -286,33 +297,38 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
     // Reset input so same file can be selected again
     e.target.value = '';
   };
-  
+
   const handleCropComplete = async (croppedBlob: Blob) => {
     // Close the cropper first
     setCropperOpen(false);
-    
+
     const uploadType = cropperType;
     setSelectedFile(null);
     setCropperType(null);
-    
+
     if (!uploadType) return;
-    
+
+    if (!walletAddress) {
+      setError('Wallet not connected');
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress('Compressing...');
     setError(null);
-    
+
     try {
       // Compress the image
       console.log('[Upload] Compressing image...');
       const compressedBlob = await compressImage(croppedBlob, uploadType);
-      
+
       // Upload
       setUploadProgress('Uploading...');
       console.log('[Upload] Uploading to server...');
-      const url = await uploadImage(compressedBlob, uploadType);
-      
+      const url = await uploadImage(compressedBlob, uploadType, walletAddress);
+
       console.log('[Upload] Success! URL:', url);
-      
+
       // Update form data
       if (uploadType === 'avatar') {
         setFormData(prev => ({ ...prev, avatarUrl: url }));
@@ -327,20 +343,20 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       setUploadProgress(null);
     }
   };
-  
+
   const handleSave = async () => {
     // Validate username if changed
     if (formData.username !== initialData.username && usernameStatus !== 'available' && usernameStatus !== 'idle') {
       setError('Please fix username issues before saving');
       return;
     }
-    
+
     setIsSaving(true);
     setError(null);
-    
+
     try {
       const updates: Record<string, string | boolean | null> = {};
-      
+
       if (formData.displayName !== initialData.displayName) {
         updates.displayName = formData.displayName || null;
       }
@@ -359,36 +375,52 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
       if (formData.isPrivate !== initialData.isPrivate) {
         updates.isPrivate = formData.isPrivate;
       }
-      
+
+      if (!walletAddress) {
+        throw new Error('Wallet not connected');
+      }
+
+      if (Object.keys(updates).length === 0) {
+        setError('No changes detected');
+        return;
+      }
+
       const response = await fetch('/api/profile/me', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-wallet-address': walletAddress,
+        },
         body: JSON.stringify(updates),
         credentials: 'include',
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to save profile');
       }
-      
-      // Success - reload page to reflect changes
-      window.location.reload();
+
+      // Success - refresh both client and server state
+      await refreshUser(); // Refresh auth state for sidebar
+      router.refresh(); // Invalidate server component cache for profile page
+
+      // Close modal after successful save
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setIsSaving(false);
     }
   };
-  
-  const canSave = hasUnsavedChanges && 
-    !isSaving && 
+
+  const canSave = hasUnsavedChanges &&
+    !isSaving &&
     !isUploading &&
     (usernameStatus === 'idle' || usernameStatus === 'available') &&
     formData.displayName.length <= MAX_DISPLAY_NAME &&
     formData.bio.length <= MAX_BIO;
-  
+
   return (
     <>
       <AnimatePresence>
@@ -402,7 +434,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
           >
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/80" />
-            
+
             {/* Modal */}
             <motion.div
               ref={modalRef}
@@ -426,7 +458,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                   </button>
                   <h2 className="text-lg font-bold text-white">Edit profile</h2>
                 </div>
-                
+
                 <motion.button
                   onClick={handleSave}
                   disabled={!canSave}
@@ -441,7 +473,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                   {isSaving ? 'Saving...' : 'Save'}
                 </motion.button>
               </div>
-              
+
               {/* Hidden file inputs */}
               <input
                 ref={bannerInputRef}
@@ -457,24 +489,24 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                 onChange={handleFileSelect('avatar')}
                 className="hidden"
               />
-              
+
               {/* Banner upload area */}
               <div className="relative h-32 bg-white/[0.03] group">
                 {formData.bannerUrl ? (
-                  <img 
-                    src={formData.bannerUrl} 
+                  <img
+                    src={formData.bannerUrl}
                     alt="Banner preview"
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div 
+                  <div
                     className="w-full h-full flex items-center justify-center"
                     style={{
                       background: `linear-gradient(135deg, ${BRAND_LAVENDER}10 0%, transparent 50%)`,
                     }}
                   />
                 )}
-                
+
                 {/* Upload button overlay */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <button
@@ -490,22 +522,22 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                   </button>
                 </div>
               </div>
-              
+
               {/* Avatar */}
               <div className="px-4 -mt-12 relative z-10 mb-4">
                 <div className="w-24 h-24 rounded-full border-4 border-zinc-950 overflow-hidden bg-zinc-950 relative group">
                   {formData.avatarUrl ? (
-                    <img 
-                      src={formData.avatarUrl} 
+                    <img
+                      src={formData.avatarUrl}
                       alt="Avatar preview"
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div 
+                    <div
                       className="w-full h-full flex items-center justify-center"
                       style={{ backgroundColor: `${BRAND_LAVENDER}20` }}
                     >
-                      <span 
+                      <span
                         className="text-2xl font-bold"
                         style={{ color: BRAND_LAVENDER }}
                       >
@@ -513,7 +545,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                       </span>
                     </div>
                   )}
-                  
+
                   {/* Upload button overlay */}
                   <button
                     onClick={() => avatarInputRef.current?.click()}
@@ -527,7 +559,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                   </button>
                 </div>
               </div>
-              
+
               {/* Upload progress indicator */}
               {uploadProgress && (
                 <div className="px-4 mb-4">
@@ -537,17 +569,17 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                   </div>
                 </div>
               )}
-              
+
               {/* Form fields */}
               <div className="px-4 pb-6 space-y-4">
                 {/* Display name */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-white/50 text-xs">Display name</label>
-                    <span 
+                    <span
                       className="text-xs"
-                      style={{ 
-                        color: formData.displayName.length > MAX_DISPLAY_NAME ? '#ef4444' : 'rgba(255,255,255,0.3)' 
+                      style={{
+                        color: formData.displayName.length > MAX_DISPLAY_NAME ? '#ef4444' : 'rgba(255,255,255,0.3)'
                       }}
                     >
                       {formData.displayName.length}/{MAX_DISPLAY_NAME}
@@ -562,15 +594,15 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                     className="w-full bg-white/[0.04] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-white/20 placeholder:text-white/20"
                   />
                 </div>
-                
+
                 {/* Bio */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-white/50 text-xs">Bio</label>
-                    <span 
+                    <span
                       className="text-xs"
-                      style={{ 
-                        color: formData.bio.length > MAX_BIO ? '#ef4444' : 'rgba(255,255,255,0.3)' 
+                      style={{
+                        color: formData.bio.length > MAX_BIO ? '#ef4444' : 'rgba(255,255,255,0.3)'
                       }}
                     >
                       {formData.bio.length}/{MAX_BIO}
@@ -585,7 +617,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                     className="w-full bg-white/[0.04] text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-white/20 placeholder:text-white/20 resize-none"
                   />
                 </div>
-                
+
                 {/* Username */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -598,7 +630,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                     )}
                     {usernameStatus === 'available' && (
                       <div className="flex items-center gap-1.5">
-                        <div 
+                        <div
                           className="w-2 h-2 rounded-full"
                           style={{ backgroundColor: '#22c55e' }}
                         />
@@ -617,9 +649,9 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                     <input
                       type="text"
                       value={formData.username}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
-                        username: e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20) 
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        username: e.target.value.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20)
                       }))}
                       placeholder="username"
                       className="w-full bg-white/[0.04] text-white pl-8 pr-4 py-3 rounded-xl focus:outline-none focus:ring-1 focus:ring-white/20 placeholder:text-white/20"
@@ -629,7 +661,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                     Can be changed once every 30 days
                   </p>
                 </div>
-                
+
                 {/* Privacy toggle */}
                 <div className="flex items-center justify-between py-2">
                   <div>
@@ -639,19 +671,17 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
                   <button
                     type="button"
                     onClick={() => setFormData(prev => ({ ...prev, isPrivate: !prev.isPrivate }))}
-                    className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-                      formData.isPrivate ? '' : 'bg-white/10'
-                    }`}
+                    className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${formData.isPrivate ? '' : 'bg-white/10'
+                      }`}
                     style={formData.isPrivate ? { backgroundColor: BRAND_LAVENDER } : {}}
                   >
-                    <div 
-                      className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                        formData.isPrivate ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                    <div
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${formData.isPrivate ? 'translate-x-6' : 'translate-x-1'
+                        }`}
                     />
                   </button>
                 </div>
-                
+
                 {/* Error message */}
                 {error && (
                   <motion.p
@@ -667,7 +697,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {/* Image Cropper Modal */}
       <ImageCropper
         isOpen={cropperOpen}

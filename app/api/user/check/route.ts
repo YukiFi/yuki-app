@@ -24,7 +24,19 @@ export async function POST(request: NextRequest) {
       const cleanUsername = identifier.startsWith("@") ? identifier : `@${identifier}`;
       
       const internalUser = await getUserByUsername(cleanUsername);
-      return NextResponse.json({ exists: !!internalUser });
+      
+      if (internalUser) {
+        return NextResponse.json({ 
+          exists: true,
+          user: {
+            username: internalUser.username,
+            displayName: internalUser.display_name,
+            avatarUrl: internalUser.avatar_url,
+          }
+        });
+      }
+      
+      return NextResponse.json({ exists: false });
     }
 
     // Phone lookup is no longer supported with Alchemy (no Clerk)

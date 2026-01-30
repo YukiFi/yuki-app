@@ -1,16 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { 
   useUser as useAlchemyUser,
   useLogout,
-  useSignerStatus,
-  useSmartAccountClient,
 } from "@account-kit/react"
 import {
   IconLogout,
   IconDotsVertical,
 } from "@tabler/icons-react"
+import { useAuth } from "@/lib/hooks/useAuth"
 
 import {
   DropdownMenu,
@@ -25,78 +23,34 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-interface ProfileData {
-  handle: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-}
-
 export function NavUser() {
   const { isMobile } = useSidebar()
   const alchemyUser = useAlchemyUser()
   const { logout } = useLogout()
-  const { isConnected } = useSignerStatus()
-  const { client } = useSmartAccountClient({})
-  
-  // Get wallet address from smart account client
-  const walletAddress = client?.account?.address
-  
-  const [profile, setProfile] = useState<ProfileData | null>(null)
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
-
-  // Fetch profile data on mount
-  useEffect(() => {
-    async function fetchProfile() {
-      if (!walletAddress) {
-        setIsLoadingProfile(false)
-        return
-      }
-      
-      try {
-        const response = await fetch('/api/profile/me', {
-          headers: {
-            'x-wallet-address': walletAddress,
-          },
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setProfile({
-            handle: data.handle || '',
-            displayName: data.displayName || null,
-            avatarUrl: data.avatarUrl || null,
-          })
-        }
-      } catch (error) {
-        console.error('Failed to fetch profile:', error)
-      } finally {
-        setIsLoadingProfile(false)
-      }
-    }
-    
-    if (isConnected && walletAddress) {
-      fetchProfile()
-    }
-  }, [isConnected, walletAddress])
+  const { user, isLoading } = useAuth()
 
   // Get first letter for fallback avatar
   const getInitial = () => {
-    if (profile?.handle) {
-      return profile.handle.replace('@', '').charAt(0).toUpperCase()
+    if (user?.username) {
+      return user.username.replace('@', '').charAt(0).toUpperCase()
+    }
+    if (user?.displayName) {
+      return user.displayName.charAt(0).toUpperCase()
     }
     if (alchemyUser?.email) {
       return alchemyUser.email.charAt(0).toUpperCase()
     }
-    if (walletAddress) {
-      return walletAddress.slice(2, 3).toUpperCase()
+    if (user?.walletAddress) {
+      return user.walletAddress.slice(2, 3).toUpperCase()
     }
     return "U"
   }
 
   // Get @username for primary display
   const getUsername = () => {
-    if (profile?.handle) {
-      const handle = profile.handle.startsWith('@') ? profile.handle : `@${profile.handle}`
-      return handle
+    if (user?.username) {
+      const username = user.username.startsWith('@') ? user.username : `@${user.username}`
+      return username
     }
     return "@user"
   }
@@ -106,8 +60,8 @@ export function NavUser() {
     if (alchemyUser?.email) {
       return alchemyUser.email
     }
-    if (walletAddress) {
-      return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    if (user?.walletAddress) {
+      return `${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`
     }
     return null
   }
@@ -125,11 +79,11 @@ export function NavUser() {
       ? 'text-base' 
       : 'text-sm group-data-[collapsible=icon]:text-base'
     
-    if (profile?.avatarUrl) {
+    if (user?.avatarUrl) {
       return (
         <div className={`flex ${sizeClasses} items-center justify-center rounded-full overflow-hidden shrink-0 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
           <img 
-            src={profile.avatarUrl} 
+            src={user.avatarUrl} 
             alt="Profile" 
             className="w-full h-full object-cover"
           />
@@ -160,7 +114,7 @@ export function NavUser() {
               {/* Info - hidden in collapsed state */}
               <div className="grid flex-1 text-left leading-tight transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden">
                 <span className="truncate text-sm font-medium text-white/80">
-                  {isLoadingProfile ? '...' : getUsername()}
+                  {isLoading ? '...' : getUsername()}
                 </span>
                 {getSubtitle() && (
                   <span className="truncate text-xs text-white/40">{getSubtitle()}</span>
@@ -181,7 +135,7 @@ export function NavUser() {
                 <Avatar size="large" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">
-                    {isLoadingProfile ? '...' : getUsername()}
+                    {isLoading ? '...' : getUsername()}
                   </p>
                   {getSubtitle() && (
                     <p className="text-xs text-white/40 truncate">
