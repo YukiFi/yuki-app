@@ -5,7 +5,7 @@ import { getContacts, addContact, removeContact, getUserByWalletAddress, getUser
 export async function GET(request: NextRequest) {
   try {
     const walletAddress = request.headers.get("x-wallet-address");
-    
+
     if (!walletAddress) {
       return NextResponse.json(
         { error: "Wallet address required" },
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     const contacts = await getContacts(user.id);
-    
+
     // Transform to a cleaner format
     const formattedContacts = contacts.map(c => ({
       id: c.id,
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const walletAddress = request.headers.get("x-wallet-address");
-    
+
     if (!walletAddress) {
       return NextResponse.json(
         { error: "Wallet address required" },
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     // Find the user to add as contact
     const cleanUsername = username.startsWith("@") ? username : `@${username}`;
     const contactUser = await getUserByUsername(cleanUsername);
-    
+
     if (!contactUser) {
       return NextResponse.json(
         { error: "User not found" },
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // Add the contact
     const contact = await addContact(currentUser.id, contactUser.id, nickname);
-    
+
     if (!contact) {
       return NextResponse.json(
         { error: "Failed to add contact" },
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const walletAddress = request.headers.get("x-wallet-address");
-    
+
     if (!walletAddress) {
       return NextResponse.json(
         { error: "Wallet address required" },
@@ -159,8 +159,21 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const removed = await removeContact(currentUser.id, contactUserId);
-    
+    // Resolve target user ID if it's a wallet address
+    let targetUserId = contactUserId;
+    if (contactUserId.startsWith('0x') && contactUserId.length === 42) {
+      const targetUser = await getUserByWalletAddress(contactUserId);
+      if (targetUser) {
+        targetUserId = targetUser.id;
+      } else {
+        // If wallet address not found, it might simply be that the user doesn't exist
+        // But we should try to remove by the exact ID passed anyway just in case
+        console.warn('Could not resolve wallet address to user ID:', contactUserId);
+      }
+    }
+
+    const removed = await removeContact(currentUser.id, targetUserId);
+
     if (!removed) {
       return NextResponse.json(
         { error: "Contact not found" },

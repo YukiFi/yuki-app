@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrCreateUserByWalletAddress } from '@/lib/db';
+import { getOrCreateUserByWalletAddress, getUserByWalletAddress } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,8 +37,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create user by wallet address
-    const user = await getOrCreateUserByWalletAddress(walletAddress.toLowerCase());
+    // Get user by wallet address (no auto-creation)
+    const user = await getUserByWalletAddress(walletAddress.toLowerCase());
+
+    if (!user) {
+      return NextResponse.json({
+        completed: false,
+        username: null,
+        steps: {
+          username: false,
+        },
+      });
+    }
 
     console.log('[Onboarding] Checking user:', {
       walletAddress: walletAddress.toLowerCase(),

@@ -83,10 +83,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html 
-      lang="en" 
+    <html
+      lang="en"
       className="scroll-smooth"
-      style={{ backgroundColor: '#000000', colorScheme: 'dark' }}
+      style={{ backgroundColor: '#0b0b0f', colorScheme: 'dark' }}
     >
       <head>
         {/* Prevent background flash - set background before any CSS loads */}
@@ -94,7 +94,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                document.documentElement.style.backgroundColor = '#000000';
+                document.documentElement.style.backgroundColor = '#0b0b0f';
                 document.documentElement.style.colorScheme = 'dark';
               })();
             `,
@@ -105,7 +105,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               html, body { 
-                background-color: #000000; 
+                background-color: #0b0b0f; 
                 color: #ffffff;
                 color-scheme: dark;
               }
@@ -118,7 +118,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-black text-white antialiased`}>
+      <body className={`${geist.className} ${geistMono.variable} min-h-screen bg-[#0b0b0f] text-white antialiased`}>
         <Providers>
           <OnboardingGuard>
             <LayoutContent>{children}</LayoutContent>

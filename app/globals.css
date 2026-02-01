@@ -16,8 +16,8 @@
 :root {
   --radius: 0.75rem;
 
-  /* Dark colors - pure black */
-  --background: oklch(0 0 0);
+  /* Dark colors - calm dark */
+  --background: #0b0b0f;
   --foreground: oklch(0.98 0 0);
 
   /* Card - glassmorphic surface */
@@ -59,8 +59,8 @@
   --chart-4: oklch(0.75 0.18 280);
   --chart-5: oklch(0.8 0.15 40);
 
-  /* Sidebar - pure black */
-  --sidebar: oklch(0 0 0);
+  /* Sidebar - calm dark */
+  --sidebar: #0b0b0f;
   --sidebar-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.78 0.12 320);
   --sidebar-primary-foreground: oklch(0.15 0.05 320);
@@ -72,13 +72,13 @@
 
 /* Prevent flash of white background */
 html {
-  background-color: #000000;
+  background-color: #0b0b0f;
   color-scheme: dark;
 }
 
 body {
   color: #ffffff;
-  background: #000000;
+  background: #0b0b0f;
   /* Prevent font flash */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -106,9 +106,11 @@ body {
   0% {
     transform: translateY(0px);
   }
+
   50% {
     transform: translateY(-10px);
   }
+
   100% {
     transform: translateY(0px);
   }
@@ -119,6 +121,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -126,13 +129,24 @@ body {
 }
 
 @keyframes shake {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateX(0);
   }
-  10%, 30%, 50%, 70%, 90% {
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
     transform: translateX(-4px);
   }
-  20%, 40%, 60%, 80% {
+
+  20%,
+  40%,
+  60%,
+  80% {
     transform: translateX(4px);
   }
 }
@@ -142,10 +156,12 @@ body {
     transform: scale(1);
     opacity: 1;
   }
+
   50% {
     transform: scale(1.05);
     opacity: 0.8;
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -157,6 +173,7 @@ body {
     transform: scale(0.95);
     opacity: 0;
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -168,6 +185,7 @@ body {
     transform: translateY(10px);
     opacity: 0;
   }
+
   100% {
     transform: translateY(0);
     opacity: 1;
@@ -244,9 +262,11 @@ body {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   /* Remove all outlines and rings globally */
   *:focus,
   *:focus-visible,
@@ -254,6 +274,7 @@ body {
     outline: none !important;
     box-shadow: none !important;
   }
+
   /* Override any ring utilities */
   .ring-0,
   [class*="focus-visible:ring"],
@@ -263,7 +284,7 @@ body {
 }
 
 .dark {
-  --sidebar: oklch(0 0 0);
+  --sidebar: #0b0b0f;
   --sidebar-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.78 0.12 320);
   --sidebar-primary-foreground: oklch(0.15 0.05 320);
@@ -277,6 +298,7 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }

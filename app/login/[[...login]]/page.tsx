@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const BRAND_LAVENDER = "#e1a8f0";
-const easeOut = [0.22, 1, 0.36, 1] as const;
+const ease = [0.22, 1, 0.36, 1] as const;
 
 function LoginContent() {
   const router = useRouter();
@@ -35,14 +35,16 @@ function LoginContent() {
   // Local state for custom email OTP flow
   const [email, setEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
-  const [step, setStep] = useState<"input" | "verify" | "success">("input");
+  const [step, setStep] = useState<"input" | "verify" | "passkey" | "success">("input");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false);
 
   // Ref to track if error animation should play
   const errorRef = useRef<HTMLDivElement>(null);
+
+  // Ref to track if user manually changed step (to prevent auto-switching)
+  const manualStepChangeRef = useRef(false);
 
   // Debug: Log signer status changes
   useEffect(() => {
@@ -51,7 +53,7 @@ function LoginContent() {
 
   // Automatically switch to verify step when signer is awaiting OTP
   useEffect(() => {
-    if (isAwaitingOtp && step === "input") {
+    if (isAwaitingOtp && step === "input" && !manualStepChangeRef.current) {
       console.log("[Auth] Signer is awaiting OTP, switching to verify step");
       setStep("verify");
       setResendCooldown(60);
@@ -71,6 +73,17 @@ function LoginContent() {
     return () => clearTimeout(timer);
   }, [isConnected, isInitializing, router]);
 
+  // Also redirect if manually set to success step
+  useEffect(() => {
+    if (step === "success" && isConnected) {
+      const timer = setTimeout(() => {
+        router.push("/");
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [step, isConnected, router]);
+
   // Cooldown timer for resend
   useEffect(() => {
     if (resendCooldown > 0) {
@@ -86,24 +99,23 @@ function LoginContent() {
     }
   }, [verificationCode, step]);
 
-  // Trigger shake animation on error
-  useEffect(() => {
-    if (error && errorRef.current) {
-      errorRef.current.classList.remove('animate-shake');
-      // Force reflow
-      void errorRef.current.offsetWidth;
-      errorRef.current.classList.add('animate-shake');
-    }
-  }, [error]);
-
   // Show loading while Alchemy initializes
   if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0f0f12]">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b0f] px-4">
+        <div className="mb-12">
+          <Image
+            src="/images/Yuki.svg"
+            alt="Yuki"
+            width={56}
+            height={56}
+            priority
+          />
+        </div>
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-white/20 border-t-[#e1a8f0] rounded-full"
+          className="w-8 h-8 border-2 border-white/10 border-t-white/30 rounded-full"
         />
       </div>
     );
@@ -112,29 +124,30 @@ function LoginContent() {
   // Already connected - show success state
   if (isConnected || step === "success") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0f0f12]">
+      <div className="min-h-screen flex items-center justify-center bg-[#0b0b0f]">
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, ease }}
           className="text-center"
         >
           <motion.div
-            initial={{ scale: 0 }}
+            initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-            className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#e1a8f0]/20 to-[#e1a8f0]/5 flex items-center justify-center"
+            transition={{ duration: 0.3, ease }}
+            className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.04] flex items-center justify-center"
           >
-            <svg className="w-8 h-8 text-[#e1a8f0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <svg className="w-7 h-7 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </motion.div>
           <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-white/70"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.3, ease }}
+            className="text-white/60 text-sm"
           >
-            Welcome back!
+            Welcome back
           </motion.p>
         </motion.div>
       </div>
@@ -147,6 +160,8 @@ function LoginContent() {
 
     setLoading(true);
     setError(null);
+    // Reset manual step change flag so auto-switching works
+    manualStepChangeRef.current = false;
 
     try {
       console.log("[Auth] Starting email authentication for:", email);
@@ -188,10 +203,8 @@ function LoginContent() {
         otpCode: verificationCode,
       });
 
-      // Success! Show passkey prompt after a brief delay
-      setTimeout(() => {
-        setShowPasskeyPrompt(true);
-      }, 500);
+      // Success! Go to passkey step
+      setStep("passkey");
     } catch (err: unknown) {
       console.error("Error verifying code:", err);
       const errorMessage = err instanceof Error ? err.message : "Invalid verification code";
@@ -233,7 +246,7 @@ function LoginContent() {
         username: email || "yuki-user",
       });
 
-      setShowPasskeyPrompt(false);
+      // Passkey created, will redirect via the isConnected effect
     } catch (err: unknown) {
       console.error("Passkey creation error:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to create passkey";
@@ -264,81 +277,59 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f0f12] px-4 relative overflow-hidden">
-      {/* Animated background gradient */}
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#e1a8f0]/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#c47de0]/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      </div>
-
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b0f] px-4">
       {/* Logo */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: easeOut }}
-        className="mb-8 relative z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, ease }}
+        className="mb-12"
       >
         <Image
-          src="/images/Yuki.svg"
+          src="/images/appletname.svg"
           alt="Yuki"
-          width={64}
-          height={64}
+          width={120}
+          height={94}
           priority
-          className="drop-shadow-2xl"
         />
       </motion.div>
 
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-[420px]">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: easeOut }}
+          transition={{ duration: 0.4, delay: 0.1, ease }}
         >
-          <Card className="border-white/10 bg-white/[0.02] backdrop-blur-xl shadow-2xl">
-            <CardHeader className="text-center pb-2">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-                className="mx-auto mb-4 w-12 h-12 rounded-full bg-gradient-to-br from-[#e1a8f0]/20 to-[#e1a8f0]/5 flex items-center justify-center"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  style={{ color: BRAND_LAVENDER }}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
-                </svg>
-              </motion.div>
-              <CardTitle className="text-3xl sm:text-4xl">
-                {step === "input" ? "Welcome" : "Verify"}
+          <Card className="border-0 bg-white/[0.04] backdrop-blur-[40px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] rounded-[32px]">
+            <CardHeader className="text-center pb-6 pt-8 px-8">
+              <CardTitle className="text-2xl font-medium text-white mb-2">
+                {step === "input" ? "Sign in" : step === "verify" ? "Verify" : "Secure your wallet"}
               </CardTitle>
-              <CardDescription className="text-base">
+              <CardDescription className="text-white/50 text-sm">
                 {step === "input"
-                  ? "Sign in to your smart wallet"
-                  : `Enter the 6-digit code sent to ${email}`
+                  ? "Access your wallet"
+                  : step === "verify"
+                    ? `Code sent to ${email}`
+                    : "Add biometric authentication"
                 }
               </CardDescription>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="px-8 pb-8">
               <AnimatePresence mode="wait">
                 {step === "input" ? (
                   <motion.div
                     key="input"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-5"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25, ease }}
+                    className="space-y-6"
                   >
                     {/* Email input */}
-                    <form onSubmit={handleSendCode} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-white/70">Email Address</Label>
+                    <form onSubmit={handleSendCode} className="space-y-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="email" className="text-white/60 text-sm font-normal">Email</Label>
                         <Input
                           id="email"
                           type="email"
@@ -347,7 +338,7 @@ function LoginContent() {
                           placeholder="you@example.com"
                           required
                           autoFocus
-                          className="transition-all duration-200 focus:scale-[1.01]"
+                          className="transition-all duration-250 focus:shadow-[0_0_0_2px_rgba(225,168,240,0.3)]"
                         />
                       </div>
 
@@ -355,12 +346,13 @@ function LoginContent() {
                         {error && (
                           <motion.div
                             ref={errorRef}
-                            initial={{ opacity: 0, y: -10 }}
+                            initial={{ opacity: 0, y: -5 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="p-4 bg-red-500/10 rounded-xl border border-red-500/20"
+                            exit={{ opacity: 0, y: -5 }}
+                            transition={{ duration: 0.2, ease }}
+                            className="p-4 bg-red-500/10 rounded-2xl"
                           >
-                            <p className="text-sm text-red-400">{error}</p>
+                            <p className="text-sm text-red-400/90">{error}</p>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -368,7 +360,7 @@ function LoginContent() {
                       <Button
                         type="submit"
                         disabled={loading || !email}
-                        className="w-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                        className="w-full transition-all duration-250"
                         size="lg"
                       >
                         {loading ? (
@@ -376,12 +368,12 @@ function LoginContent() {
                             <motion.span
                               animate={{ rotate: 360 }}
                               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                              className="w-5 h-5 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
+                              className="w-4 h-4 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
                             />
-                            Sending...
+                            Sending
                           </span>
                         ) : (
-                          "Continue with Email"
+                          "Continue"
                         )}
                       </Button>
                     </form>
@@ -389,10 +381,10 @@ function LoginContent() {
                     {/* Divider */}
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-white/10" />
+                        <span className="w-full border-t border-white/[0.06]" />
                       </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-[#0f0f12] px-2 text-white/40">or</span>
+                      <div className="relative flex justify-center text-xs">
+                        <span className="bg-white/[0.04] backdrop-blur-sm px-4 py-1 rounded-full text-white/30">or</span>
                       </div>
                     </div>
 
@@ -402,29 +394,29 @@ function LoginContent() {
                       variant="outline"
                       onClick={handlePasskeyAuth}
                       disabled={loading}
-                      className="w-full border-white/10 hover:bg-white/5 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:border-[#e1a8f0]/30"
+                      className="w-full border-0 bg-white/[0.03] hover:bg-white/[0.05] transition-all duration-250 focus:shadow-[0_0_0_2px_rgba(225,168,240,0.3)]"
                       size="lg"
                     >
                       <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33" />
                       </svg>
-                      Sign in with Passkey
+                      Passkey
                     </Button>
                   </motion.div>
-                ) : (
+                ) : step === "verify" ? (
                   /* Verification step */
                   <motion.form
                     key="verify"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25, ease }}
                     id="verify-form"
                     onSubmit={(e) => { e.preventDefault(); handleVerifyCode(); }}
-                    className="space-y-5"
+                    className="space-y-6"
                   >
                     <div className="space-y-4">
-                      <Label className="text-white/70">Verification Code</Label>
+                      <Label className="text-white/60 text-sm font-normal">Verification code</Label>
                       <div className="flex justify-center mt-2">
                         <InputOTP
                           maxLength={6}
@@ -442,21 +434,19 @@ function LoginContent() {
                           </InputOTPGroup>
                         </InputOTP>
                       </div>
-                      <p className="text-sm text-white/40 text-center">
-                        Sent to {email}
-                      </p>
                     </div>
 
                     <AnimatePresence>
                       {error && (
                         <motion.div
                           ref={errorRef}
-                          initial={{ opacity: 0, y: -10 }}
+                          initial={{ opacity: 0, y: -5 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="p-4 bg-red-500/10 rounded-xl border border-red-500/20"
+                          exit={{ opacity: 0, y: -5 }}
+                          transition={{ duration: 0.2, ease }}
+                          className="p-4 bg-red-500/10 rounded-2xl"
                         >
-                          <p className="text-sm text-red-400">{error}</p>
+                          <p className="text-sm text-red-400/90">{error}</p>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -464,7 +454,7 @@ function LoginContent() {
                     <Button
                       type="submit"
                       disabled={loading || verificationCode.length !== 6}
-                      className="w-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                      className="w-full transition-all duration-250"
                       size="lg"
                     >
                       {loading ? (
@@ -472,12 +462,12 @@ function LoginContent() {
                           <motion.span
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="w-5 h-5 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
+                            className="w-4 h-4 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
                           />
-                          Verifying...
+                          Verifying
                         </span>
                       ) : (
-                        "Verify & Continue"
+                        "Verify"
                       )}
                     </Button>
 
@@ -487,11 +477,12 @@ function LoginContent() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
+                          manualStepChangeRef.current = true;
                           setStep("input");
                           setVerificationCode("");
                           setError(null);
                         }}
-                        className="transition-all duration-200 hover:scale-105"
+                        className="transition-all duration-250 text-white/40 hover:text-white/60"
                       >
                         ← Change email
                       </Button>
@@ -501,88 +492,94 @@ function LoginContent() {
                         size="sm"
                         onClick={handleResendCode}
                         disabled={loading || resendCooldown > 0}
-                        className="transition-all duration-200 hover:scale-105"
+                        className="transition-all duration-250 text-white/40 hover:text-white/60"
                       >
-                        {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+                        {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend"}
                       </Button>
                     </div>
                   </motion.form>
+                ) : (
+                  /* Passkey step */
+                  <motion.div
+                    key="passkey"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25, ease }}
+                    className="space-y-6"
+                  >
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-white/[0.06] flex items-center justify-center">
+                        <svg className="w-8 h-8 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                      </div>
+                      <p className="text-white/60 text-sm max-w-[280px]">
+                        Sign in faster next time with biometric authentication
+                      </p>
+                    </div>
+
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -5 }}
+                          transition={{ duration: 0.2, ease }}
+                          className="p-4 bg-red-500/10 rounded-2xl"
+                        >
+                          <p className="text-sm text-red-400/90">{error}</p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="space-y-3">
+                      <Button
+                        onClick={handleCreatePasskey}
+                        disabled={loading}
+                        className="w-full transition-all duration-250"
+                        size="lg"
+                      >
+                        {loading ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <motion.span
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              className="w-4 h-4 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
+                            />
+                            Creating
+                          </span>
+                        ) : (
+                          "Create passkey"
+                        )}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          // Skip passkey, will redirect via isConnected effect
+                          setStep("success");
+                        }}
+                        variant="ghost"
+                        className="w-full transition-all duration-250 text-white/40 hover:text-white/60"
+                        size="lg"
+                      >
+                        Skip for now
+                      </Button>
+                    </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Passkey Creation Prompt */}
-        <AnimatePresence>
-          {showPasskeyPrompt && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="mt-4"
-            >
-              <Card className="border-[#e1a8f0]/20 bg-gradient-to-br from-[#e1a8f0]/5 to-transparent backdrop-blur-xl">
-                <CardContent className="pt-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-[#e1a8f0]/20 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-5 h-5 text-[#e1a8f0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-white mb-1">Secure your account with a passkey</h3>
-                      <p className="text-sm text-white/60 mb-4">
-                        Sign in faster and more securely next time with biometric authentication.
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleCreatePasskey}
-                          disabled={loading}
-                          size="sm"
-                          className="transition-all duration-200 hover:scale-105"
-                        >
-                          Create Passkey
-                        </Button>
-                        <Button
-                          onClick={() => setShowPasskeyPrompt(false)}
-                          variant="ghost"
-                          size="sm"
-                          className="transition-all duration-200 hover:scale-105"
-                        >
-                          Maybe Later
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="text-xs text-white/25 mt-8 text-center"
+          transition={{ delay: 0.4, duration: 0.4, ease }}
+          className="text-xs text-white/20 mt-8 text-center"
         >
-          By continuing, you agree to Yuki&apos;s Terms of Service and Privacy Policy
+          By continuing, you agree to Yuki's Terms and Privacy Policy
         </motion.p>
-
-        {/* Debug: Show signer status (remove in production) */}
-        {process.env.NODE_ENV === 'development' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="mt-4 p-3 bg-white/5 rounded-lg text-xs text-white/40 font-mono"
-          >
-            <p>Signer: {status}</p>
-            <p>Step: {step} | Loading: {loading ? 'yes' : 'no'}</p>
-            <p>Awaiting OTP: {isAwaitingOtp ? 'yes' : 'no'}</p>
-          </motion.div>
-        )}
       </div>
     </div>
   );
@@ -592,11 +589,20 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#0f0f12]">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b0f] px-4">
+          <div className="mb-12">
+            <Image
+              src="/images/appletname.svg"
+              alt="Yuki"
+              width={120}
+              height={94}
+              priority
+            />
+          </div>
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-8 h-8 border-2 border-white/20 border-t-[#e1a8f0] rounded-full"
+            className="w-8 h-8 border-2 border-white/10 border-t-white/30 rounded-full"
           />
         </div>
       }

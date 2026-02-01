@@ -6,12 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrCreateUserByWalletAddress } from '@/lib/db';
+import { getOrCreateUserByWalletAddress, getUserByWalletAddress } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
     let walletAddress: string;
-    
+
     try {
       const body = await request.json();
       walletAddress = body.walletAddress;
@@ -21,14 +21,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     if (!walletAddress) {
       return NextResponse.json(
         { error: 'Wallet address is required' },
         { status: 400 }
       );
     }
-    
+
     // Validate address format
     if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/i)) {
       return NextResponse.json(
@@ -36,13 +36,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     // Normalize to lowercase
     const normalizedAddress = walletAddress.toLowerCase();
-    
-    // Get or create user by wallet address
-    const user = await getOrCreateUserByWalletAddress(normalizedAddress);
-    
+
+    // Get user by wallet address (no auto-creation)
+    const user = await getUserByWalletAddress(normalizedAddress);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -68,20 +75,20 @@ export async function POST(request: NextRequest) {
 // Keep GET for backwards compatibility, but it now requires wallet address in headers
 export async function GET(request: NextRequest) {
   const walletAddress = request.headers.get('x-wallet-address');
-  
+
   if (!walletAddress) {
     return NextResponse.json(
       { error: 'Not authenticated' },
       { status: 401 }
     );
   }
-  
+
   // Create a mock request with the wallet address in the body
   const mockRequest = new Request(request.url, {
     method: 'POST',
     body: JSON.stringify({ walletAddress }),
     headers: { 'Content-Type': 'application/json' },
   });
-  
+
   return POST(mockRequest as NextRequest);
 }

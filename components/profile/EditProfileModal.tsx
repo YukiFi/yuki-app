@@ -491,7 +491,7 @@ export function EditProfileModal({ profile, isOpen, onClose }: EditProfileModalP
               />
 
               {/* Banner upload area */}
-              <div className="relative h-32 bg-white/[0.03] group">
+              <div className="relative w-full aspect-[3/1] bg-white/[0.03] group">
                 {formData.bannerUrl ? (
                   <img
                     src={formData.bannerUrl}

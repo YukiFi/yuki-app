@@ -8,7 +8,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { 
+import {
   useUser as useAlchemyUser,
   useLogout as useAlchemyLogout,
   useSignerStatus,
@@ -38,7 +38,7 @@ export function useAuth() {
   const { isConnected, isInitializing } = useSignerStatus();
   const { logout: alchemyLogout } = useAlchemyLogout();
   const { client } = useSmartAccountClient({});
-  
+
   const [state, setState] = useState<AuthState>({
     user: null,
     isLoading: true,
@@ -52,7 +52,7 @@ export function useAuth() {
   const fetchUserData = useCallback(async () => {
     // Still initializing Alchemy
     if (isInitializing) return;
-    
+
     // Not connected
     if (!isConnected || !walletAddress) {
       setState({
@@ -63,7 +63,7 @@ export function useAuth() {
       });
       return;
     }
-    
+
     try {
       // Fetch user data from our API using wallet address
       const response = await fetch('/api/auth/me', {
@@ -71,7 +71,7 @@ export function useAuth() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress }),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setState({
@@ -89,19 +89,11 @@ export function useAuth() {
           error: null,
         });
       } else if (response.status === 404) {
-        // User doesn't exist in our DB yet - they need to complete onboarding
+        // User doesn't exist in our DB yet - they are NOT authenticated
         setState({
-          user: {
-            id: walletAddress,
-            walletAddress: walletAddress,
-            email: alchemyUser?.email || null,
-            username: null,
-            displayName: null,
-            avatarUrl: null,
-            hasWallet: true,
-          },
+          user: null,
           isLoading: false,
-          isAuthenticated: true,
+          isAuthenticated: false,
           error: null,
         });
       } else {

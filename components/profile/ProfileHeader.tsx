@@ -21,6 +21,7 @@ export function ProfileHeader({ profile, isOwner: serverIsOwner }: ProfileHeader
   const [isContact, setIsContact] = useState(false);
   const [isLoadingContact, setIsLoadingContact] = useState(false);
   const [contactId, setContactId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   // Determine ownership client-side by comparing wallet addresses
   const isOwner = useMemo(() => {
@@ -46,7 +47,9 @@ export function ProfileHeader({ profile, isOwner: serverIsOwner }: ProfileHeader
       .then(res => res.ok ? res.json() : { contacts: [] })
       .then(data => {
         const contact = data.contacts?.find((c: any) =>
-          c.walletAddress.toLowerCase() === profile.walletAddress?.toLowerCase()
+          // Check by user ID (preferred) or wallet address fallback
+          (profile.id && c.userId === profile.id) ||
+          (profile.walletAddress && c.walletAddress?.toLowerCase() === profile.walletAddress.toLowerCase())
         );
         setIsContact(!!contact);
         setContactId(contact?.id || null);
@@ -56,7 +59,7 @@ export function ProfileHeader({ profile, isOwner: serverIsOwner }: ProfileHeader
         setContactId(null);
       })
       .finally(() => setIsLoadingContact(false));
-  }, [isAuthenticated, walletAddress, isOwner, profile.walletAddress]);
+  }, [isAuthenticated, walletAddress, isOwner, profile.walletAddress, profile.id]);
 
   const handleAddContact = async () => {
     if (!walletAddress) return;
@@ -89,8 +92,8 @@ export function ProfileHeader({ profile, isOwner: serverIsOwner }: ProfileHeader
 
     setIsLoadingContact(true);
     try {
-      // Get the user ID from the profile (use walletAddress as identifier)
-      const profileUserId = profile.walletAddress;
+      // Get the user ID from the profile (use ID if available, otherwise wallet address)
+      const profileUserId = profile.id || profile.walletAddress;
 
       if (!profileUserId) {
         console.error('No profile user ID available');
@@ -123,7 +126,7 @@ export function ProfileHeader({ profile, isOwner: serverIsOwner }: ProfileHeader
     <>
       <div className="relative">
         {/* Banner */}
-        <div className="relative h-32 sm:h-48 bg-white/[0.03] overflow-hidden">
+        <div className="relative w-full max-w-[600px] mx-auto aspect-[3/1] bg-white/[0.03] overflow-hidden rounded-b-2xl">
           {profile.bannerUrl ? (
             <img
               src={profile.bannerUrl}
@@ -185,19 +188,41 @@ export function ProfileHeader({ profile, isOwner: serverIsOwner }: ProfileHeader
             ) : isAuthenticated && (
               <div className="mt-3 sm:mt-4">
                 <motion.button
-                  onClick={isContact ? handleRemoveContact : handleAddContact}
+                  onClick={() => {
+                    if (isContact) {
+                      if (confirmRemove) {
+                        handleRemoveContact();
+                        setConfirmRemove(false);
+                      } else {
+                        setConfirmRemove(true);
+                      }
+                    } else {
+                      handleAddContact();
+                    }
+                  }}
                   disabled={isLoadingContact}
-                  className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-sm font-medium border border-white/20 text-white hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-sm font-medium border text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${confirmRemove
+                    ? 'bg-red-500/10 border-red-500/50 hover:bg-red-500/20 text-red-200'
+                    : 'border-white/20 hover:bg-white/5'
+                    }`}
                   whileHover={{ scale: isLoadingContact ? 1 : 1.02 }}
                   whileTap={{ scale: isLoadingContact ? 1 : 0.98 }}
+                  onMouseLeave={() => {
+                    // key enhancement: reset confirmation if mouse leaves (optional but good for preventing accidental clicks)
+                    if (confirmRemove) {
+                      setConfirmRemove(false);
+                    }
+                  }}
                 >
                   {isLoadingContact ? (
                     <span className="flex items-center gap-2">
-                      <div className="w-3 h-3 border-2 border-white/20 border-t-white/50 rounded-full animate-spin" />
+                      <div className={`w-3 h-3 border-2 border-t-transparent rounded-full animate-spin ${confirmRemove ? 'border-red-500' : 'border-white/20 border-t-white/50'}`} />
                       {isContact ? 'Removing...' : 'Adding...'}
                     </span>
                   ) : (
-                    isContact ? 'Remove from Contacts' : 'Add to Contacts'
+                    isContact
+                      ? (confirmRemove ? 'Are you sure?' : 'Remove from Contacts')
+                      : 'Add to Contacts'
                   )}
                 </motion.button>
               </div>

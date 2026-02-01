@@ -70,7 +70,7 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+      <div className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-8 py-8">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <p className="text-white/50 text-xs sm:text-sm font-medium">Daily Yield</p>
         </div>
@@ -86,7 +86,7 @@ function YieldHistoryChart({ balance }: YieldHistoryChartProps) {
   }
 
   return (
-    <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+    <div className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-8 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 sm:mb-6">
         <p className="text-white/50 text-xs sm:text-sm font-medium">Daily Yield</p>
@@ -343,7 +343,7 @@ function RequestModal({
           onClick={handleClose}
         >
           <motion.div
-            className="absolute inset-0 bg-black/90"
+            className="absolute inset-0 bg-[#0b0b0f]/90"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -364,8 +364,8 @@ function RequestModal({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.15 }}
-                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
+                  transition={{ duration: 0.25 }}
+                  className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
                 >
                   {/* Header */}
                   <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
@@ -470,9 +470,9 @@ function RequestModal({
                       onClick={() => canRequest && setStep("confirm")}
                       disabled={!canRequest}
                       className={`
-                        w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 cursor-pointer touch-manipulation
+                        w-full py-4 rounded-xl text-base font-medium transition-all duration-250 cursor-pointer touch-manipulation
                         ${canRequest
-                          ? "bg-white text-black active:scale-[0.98]"
+                          ? "bg-white text-black"
                           : hasFromError
                             ? "bg-red-500/10 text-red-400"
                             : "bg-white/[0.05] text-white/30"
@@ -496,8 +496,8 @@ function RequestModal({
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden"
+                  transition={{ duration: 0.25 }}
+                  className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] overflow-hidden"
                 >
                   <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-6">
                     <div className="flex items-center justify-between mb-6">
@@ -535,7 +535,7 @@ function RequestModal({
 
                     <button
                       onClick={handleConfirm}
-                      className="w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium bg-white text-black cursor-pointer active:scale-[0.98] transition-all duration-150 touch-manipulation"
+                      className="w-full py-4 rounded-xl text-base font-medium bg-white text-black cursor-pointer transition-all duration-250 touch-manipulation"
                     >
                       Send Request
                     </button>
@@ -550,7 +550,7 @@ function RequestModal({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden py-10 sm:py-12 px-6 sm:px-8"
+                  className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] overflow-hidden py-12 px-8"
                 >
                   <div className="text-center">
                     <motion.div
@@ -636,7 +636,7 @@ export default function Dashboard() {
             style={{ opacity: isReady ? 1 : 0.5 }}
           >
             {/* Balance Card */}
-            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+            <div className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-8 py-10">
               {/* Top row with label and status */}
               <div className="flex items-center justify-between mb-4 sm:mb-6 lg:mb-8">
                 <p className="text-white/50 text-xs sm:text-sm font-medium">

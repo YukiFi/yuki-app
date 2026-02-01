@@ -34,13 +34,13 @@ interface TransactionContact {
 // Extract unique contacts from transactions
 function extractContacts(transactions: { counterparty?: string; amount: number; timestamp: Date; type: string }[]): TransactionContact[] {
   const contactMap = new Map<string, TransactionContact>();
-  
+
   transactions.forEach(tx => {
     if (!tx.counterparty) return;
-    
+
     const address = tx.counterparty.toLowerCase();
     const existing = contactMap.get(address);
-    
+
     if (existing) {
       existing.transactionCount++;
       if (tx.type === 'sent') {
@@ -61,7 +61,7 @@ function extractContacts(transactions: { counterparty?: string; amount: number; 
       });
     }
   });
-  
+
   // Sort by most recent transaction
   return Array.from(contactMap.values())
     .sort((a, b) => b.lastTransaction.getTime() - a.lastTransaction.getTime());
@@ -71,7 +71,7 @@ function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  
+
   if (days === 0) return "Today";
   if (days === 1) return "Yesterday";
   if (days < 7) return `${days} days ago`;
@@ -87,7 +87,7 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
     displayName?: string;
     avatarUrl?: string;
   } | null>(null);
-  
+
   // Try to resolve the address to a user
   useEffect(() => {
     async function resolveUser() {
@@ -103,14 +103,14 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
     }
     resolveUser();
   }, [contact.address]);
-  
-  const displayName = resolvedUser?.displayName || resolvedUser?.username?.replace('@', '') || 
+
+  const displayName = resolvedUser?.displayName || resolvedUser?.username?.replace('@', '') ||
     `${contact.address.slice(0, 6)}...${contact.address.slice(-4)}`;
   const username = resolvedUser?.username;
   const profileUrl = username ? `/${username.replace('@', '')}` : undefined;
-  
+
   const netAmount = contact.totalReceived - contact.totalSent;
-  
+
   const content = (
     <div
       onMouseEnter={() => setIsHovered(true)}
@@ -126,7 +126,7 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
         }}
         transition={{ duration: 0.2 }}
       />
-      
+
       <div className="relative flex items-center gap-3 sm:gap-4">
         {/* Avatar */}
         <motion.div
@@ -140,8 +140,8 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
           transition={{ duration: 0.2 }}
         >
           {resolvedUser?.avatarUrl ? (
-            <img 
-              src={resolvedUser.avatarUrl} 
+            <img
+              src={resolvedUser.avatarUrl}
               alt={displayName}
               className="w-full h-full object-cover"
             />
@@ -172,7 +172,7 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
         {/* Net amount */}
         <motion.div
           className="text-sm sm:text-base font-medium tabular-nums flex-shrink-0 text-right"
-          style={{ 
+          style={{
             color: netAmount >= 0 ? "white" : "rgba(255,255,255,0.5)",
             fontFeatureSettings: "'tnum' 1"
           }}
@@ -182,9 +182,9 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
           transition={{ duration: 0.2 }}
         >
           <div>
-            {netAmount >= 0 ? "+" : "-"}${Math.abs(netAmount).toLocaleString("en-US", { 
+            {netAmount >= 0 ? "+" : "-"}${Math.abs(netAmount).toLocaleString("en-US", {
               minimumFractionDigits: 2,
-              maximumFractionDigits: 2 
+              maximumFractionDigits: 2
             })}
           </div>
           <div className="text-white/30 text-xs font-normal">
@@ -196,9 +196,9 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
         <motion.div
           className="text-white/20 hidden sm:block"
           initial={{ opacity: 0, x: -10 }}
-          animate={{ 
-            opacity: isHovered ? 1 : 0, 
-            x: isHovered ? 0 : -10 
+          animate={{
+            opacity: isHovered ? 1 : 0,
+            x: isHovered ? 0 : -10
           }}
           transition={{ duration: 0.2 }}
         >
@@ -209,20 +209,20 @@ function ContactRow({ contact, index }: { contact: TransactionContact; index: nu
       </div>
     </div>
   );
-  
+
   if (profileUrl) {
     return <Link href={profileUrl}>{content}</Link>;
   }
-  
+
   return content;
 }
 
 function SavedContactRow({ contact, onRemove }: { contact: SavedContact; onRemove: () => void }) {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   const displayName = contact.displayName || contact.username?.replace('@', '') || 'Unknown';
   const profileUrl = contact.username ? `/${contact.username.replace('@', '')}` : undefined;
-  
+
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
@@ -238,7 +238,7 @@ function SavedContactRow({ contact, onRemove }: { contact: SavedContact; onRemov
         }}
         transition={{ duration: 0.2 }}
       />
-      
+
       <div className="relative flex items-center gap-3 sm:gap-4">
         {/* Avatar */}
         <Link href={profileUrl || "#"} className="flex-shrink-0">
@@ -253,8 +253,8 @@ function SavedContactRow({ contact, onRemove }: { contact: SavedContact; onRemov
             transition={{ duration: 0.2 }}
           >
             {contact.avatarUrl ? (
-              <img 
-                src={contact.avatarUrl} 
+              <img
+                src={contact.avatarUrl}
                 alt={displayName}
                 className="w-full h-full object-cover"
               />
@@ -303,13 +303,13 @@ function SavedContactRow({ contact, onRemove }: { contact: SavedContact; onRemov
 }
 
 // Add Contact Modal
-function AddContactModal({ 
-  open, 
-  onClose, 
+function AddContactModal({
+  open,
+  onClose,
   onAdd,
-  walletAddress 
-}: { 
-  open: boolean; 
+  walletAddress
+}: {
+  open: boolean;
   onClose: () => void;
   onAdd: (contact: SavedContact) => void;
   walletAddress: string;
@@ -339,7 +339,7 @@ function AddContactModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ identifier: cleanUsername, type: "username" }),
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           setUserExists(data.exists);
@@ -419,13 +419,13 @@ function AddContactModal({
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
           onClick={handleClose}
         >
-          <motion.div 
-            className="absolute inset-0 bg-black/90"
+          <motion.div
+            className="absolute inset-0 bg-[#0b0b0f]/90"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           />
-          
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -434,7 +434,7 @@ function AddContactModal({
             className="relative w-full sm:max-w-[440px] mx-0 sm:mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-black sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden">
+            <div className="bg-[#0b0b0f] sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden">
               {/* Header */}
               <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
                 <div className="flex items-center justify-between mb-4">
@@ -465,7 +465,7 @@ function AddContactModal({
                       autoFocus
                     />
                   </div>
-                  
+
                   {/* Status */}
                   <div className="mt-3 min-h-[20px]">
                     {isChecking && username.length >= 3 && (
@@ -535,7 +535,7 @@ function AddContactModal({
                     className={`
                       w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 cursor-pointer touch-manipulation
                       ${userExists && !isLoading
-                        ? "bg-white text-black active:scale-[0.98]" 
+                        ? "bg-white text-black active:scale-[0.98]"
                         : "bg-white/[0.05] text-white/30"
                       }
                     `}
@@ -573,13 +573,13 @@ export default function ContactsPage() {
   // Fetch saved contacts
   const fetchSavedContacts = useCallback(async () => {
     if (!walletAddress) return;
-    
+
     setIsLoadingSaved(true);
     try {
       const response = await fetch("/api/contacts", {
         headers: { "x-wallet-address": walletAddress },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setSavedContacts(data.contacts || []);
@@ -604,13 +604,13 @@ export default function ContactsPage() {
 
   const handleRemoveContact = async (contactUserId: string) => {
     if (!walletAddress) return;
-    
+
     try {
       const response = await fetch(`/api/contacts?userId=${contactUserId}`, {
         method: "DELETE",
         headers: { "x-wallet-address": walletAddress },
       });
-      
+
       if (response.ok) {
         setSavedContacts(prev => prev.filter(c => c.userId !== contactUserId));
       }
@@ -636,7 +636,7 @@ export default function ContactsPage() {
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer"
-            style={{ 
+            style={{
               backgroundColor: `${BRAND_LAVENDER}20`,
               color: BRAND_LAVENDER
             }}
@@ -676,16 +676,16 @@ export default function ContactsPage() {
             </div>
           ) : isEmpty ? (
             <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-8 sm:px-5 sm:py-12 text-center">
-              <div 
+              <div
                 className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
                 style={{ backgroundColor: `${BRAND_LAVENDER}15` }}
               >
-                <svg 
-                  className="w-6 h-6" 
+                <svg
+                  className="w-6 h-6"
                   style={{ color: BRAND_LAVENDER }}
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor" 
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                   strokeWidth={1.5}
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
@@ -695,8 +695,8 @@ export default function ContactsPage() {
                 {filter === "saved" ? "No saved contacts yet" : "No recent transactions"}
               </p>
               <p className="text-white/25 text-xs mt-1">
-                {filter === "saved" 
-                  ? "Add contacts by username to send money quickly" 
+                {filter === "saved"
+                  ? "Add contacts by username to send money quickly"
                   : "Send or receive money to see your contacts here"
                 }
               </p>
@@ -704,7 +704,7 @@ export default function ContactsPage() {
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="mt-4 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer"
-                  style={{ 
+                  style={{
                     backgroundColor: `${BRAND_LAVENDER}20`,
                     color: BRAND_LAVENDER
                   }}
@@ -718,17 +718,17 @@ export default function ContactsPage() {
               <div className="divide-y divide-white/[0.04]">
                 {filter === "saved" ? (
                   savedContacts.map((contact) => (
-                    <SavedContactRow 
-                      key={contact.id} 
+                    <SavedContactRow
+                      key={contact.id}
                       contact={contact}
                       onRemove={() => handleRemoveContact(contact.userId)}
                     />
                   ))
                 ) : (
                   recentContacts.map((contact, index) => (
-                    <ContactRow 
-                      key={contact.address} 
-                      contact={contact} 
+                    <ContactRow
+                      key={contact.address}
+                      contact={contact}
                       index={index}
                     />
                   ))

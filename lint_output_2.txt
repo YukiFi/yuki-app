@@ -1,0 +1,348 @@
+$ eslint
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+/home/haruxe/Projects/Yuki/app/app/(profile)/[handle]/page.tsx
+   9:10  warning  'cookies' is defined but never used                 @typescript-eslint/no-unused-vars
+   9:19  warning  'headers' is defined but never used                 @typescript-eslint/no-unused-vars
+  11:49  warning  'getUserByWalletAddress' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/activity/page.tsx
+  89:3  warning  'index' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/api/auth/me/route.ts
+  9:10  warning  'getOrCreateUserByWalletAddress' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/api/auth/onboarding-status/route.ts
+  9:10  warning  'getOrCreateUserByWalletAddress' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/api/onramp/debug/route.ts
+   7:27  warning  'req' is defined but never used  @typescript-eslint/no-unused-vars
+  41:18  warning  'e' is defined but never used    @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/api/onramp/quote/route.ts
+  63:27  warning  'index' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/api/profile/me/route.ts
+  9:10  warning  'getOrCreateUserByWalletAddress' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/configure/page.tsx
+  57:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/haruxe/Projects/Yuki/app/app/configure/page.tsx:57:7
+  55 |     const storedComfort = localStorage.getItem("yuki_comfort_level") as ComfortLevel | null;
+  56 |     if (storedComfort) {
+> 57 |       setCurrentLevel(storedComfort);
+     |       ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  58 |       setSelected(storedComfort);
+  59 |     }
+  60 |   }, []);  react-hooks/set-state-in-effect
+
+/home/haruxe/Projects/Yuki/app/app/contacts/page.tsx
+   83:32  warning  'index' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  143:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  256:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  489:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/haruxe/Projects/Yuki/app/app/funds/page.tsx
+  8:10  warning  'OnrampComparison' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/help/page.tsx
+  180:68  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/home/haruxe/Projects/Yuki/app/app/login/[[...login]]/page.tsx
+   19:7   warning  'BRAND_LAVENDER' is assigned a value but never used                                                                  @typescript-eslint/no-unused-vars
+   27:66  warning  'signerAuthenticating' is assigned a value but never used                                                            @typescript-eslint/no-unused-vars
+   28:9   warning  'alchemyUser' is assigned a value but never used                                                                     @typescript-eslint/no-unused-vars
+   29:36  warning  'isAuthenticating' is assigned a value but never used                                                                @typescript-eslint/no-unused-vars
+  100:6   warning  React Hook useEffect has a missing dependency: 'handleVerifyCode'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  581:43  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                      react/no-unescaped-entities
+
+/home/haruxe/Projects/Yuki/app/app/onboarding/page.tsx
+    5:8   warning  'Link' is defined but never used                                 @typescript-eslint/no-unused-vars
+    6:8   warning  'Image' is defined but never used                                @typescript-eslint/no-unused-vars
+   18:20  warning  'setFormData' is assigned a value but never used                 @typescript-eslint/no-unused-vars
+  316:73  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/home/haruxe/Projects/Yuki/app/app/page.tsx
+   53:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/haruxe/Projects/Yuki/app/app/page.tsx:53:7
+  51 |   useEffect(() => {
+  52 |     if (balance > 0 && !initializedRef.current) {
+> 53 |       setData(generateYieldHistory(balance, 14));
+     |       ^^^^^^^ Avoid calling setState() directly within an effect
+  54 |       initializedRef.current = true;
+  55 |     }
+  56 |   }, [balance]);  react-hooks/set-state-in-effect
+   61:9   warning  'chartHeight' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  175:10  warning  'formatPhoneDisplay' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  213:3   warning  'userIdentifier' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  245:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/haruxe/Projects/Yuki/app/app/page.tsx:245:7
+  243 |   useEffect(() => {
+  244 |     if (!isFromValid || isRequestingFromSelf) {
+> 245 |       setFromExists(null);
+      |       ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  246 |       setIsChecking(false);
+  247 |       return;
+  248 |     }                         react-hooks/set-state-in-effect
+  285:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/haruxe/Projects/Yuki/app/app/page.tsx:285:5
+  283 |   // Reset when mode changes
+  284 |   useEffect(() => {
+> 285 |     setFromExists(null);
+      |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  286 |     setIsChecking(false);
+  287 |   }, [fromMode]);
+  288 |                                                    react-hooks/set-state-in-effect
+  588:11  warning  'isConnected' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/app/settings/page.tsx
+  160:21  error  Do not use an `<a>` element to navigate to `/setup/`. Use `<Link />` from `next/link` instead. See: https://nextjs.org/docs/messages/no-html-link-for-pages  @next/next/no-html-link-for-pages
+
+/home/haruxe/Projects/Yuki/app/app/settings/security/page.tsx
+    3:10  warning  'useState' is defined but never used              @typescript-eslint/no-unused-vars
+    6:18  warning  'AnimatePresence' is defined but never used       @typescript-eslint/no-unused-vars
+  121:11  warning  'isConnected' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/components/AllocationModal.tsx
+  59:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/haruxe/Projects/Yuki/app/components/AllocationModal.tsx:59:7
+  57 |   useEffect(() => {
+  58 |     if (isOpen) {
+> 59 |       setSelected(currentLevel);
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  60 |       setStep("select");
+  61 |     }
+  62 |   }, [isOpen, currentLevel]);  react-hooks/set-state-in-effect
+
+/home/haruxe/Projects/Yuki/app/components/DepositModal.tsx
+  215:26  error  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+/home/haruxe/Projects/Yuki/app/components/OnboardingGuard.tsx
+   77:16  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+  110:20  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+  117:20  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+  166:16  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/components/ReceiveModal.tsx
+  48:16  warning  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/components/SendModal.tsx
+  86:10  warning  'recentUsers' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  92:9   warning  'isRecipientValid' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/components/WithdrawModal.tsx
+  33:35  warning  'isSendingUserOperation' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/components/nav-user.tsx
+   85:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @next/next/no-img-element
+  113:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/haruxe/Projects/Yuki/app/components/nav-user.tsx:113:16
+  111 |             >
+  112 |               {/* Avatar */}
+> 113 |               <Avatar />
+      |                ^^^^^^ This component is created during render
+  114 |               {/* Info - hidden in collapsed state */}
+  115 |               <div className="grid flex-1 text-left leading-tight transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden">
+  116 |                 <span className="truncate text-sm font-medium text-white/80">
+
+/home/haruxe/Projects/Yuki/app/components/nav-user.tsx:74:18
+   72 |
+   73 |   // Avatar component with image or fallback
+>  74 |   const Avatar = ({ size = 'normal' }: { size?: 'normal' | 'large' }) => {
+      |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  75 |     const sizeClasses = size === 'large' 
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  76 |       ? 'size-10' 
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 100 |     )
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 101 |   }
+      | ^^^^ The component is created during render here
+  102 |
+  103 |   return (
+  104 |     <SidebarMenu>  react-hooks/static-components
+  135:18  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/home/haruxe/Projects/Yuki/app/components/nav-user.tsx:135:18
+  133 |             <div className="px-4 py-4 border-b border-white/[0.04]">
+  134 |               <div className="flex items-center gap-3">
+> 135 |                 <Avatar size="large" />
+      |                  ^^^^^^ This component is created during render
+  136 |                 <div className="flex-1 min-w-0">
+  137 |                   <p className="text-sm font-medium text-white truncate">
+  138 |                     {isLoading ? '...' : getUsername()}
+
+/home/haruxe/Projects/Yuki/app/components/nav-user.tsx:74:18
+   72 |
+   73 |   // Avatar component with image or fallback
+>  74 |   const Avatar = ({ size = 'normal' }: { size?: 'normal' | 'large' }) => {
+      |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  75 |     const sizeClasses = size === 'large' 
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  76 |       ? 'size-10' 
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 100 |     )
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 101 |   }
+      | ^^^^ The component is created during render here
+  102 |
+  103 |   return (
+  104 |     <SidebarMenu>                                                                                                 react-hooks/static-components
+
+/home/haruxe/Projects/Yuki/app/components/onramp/OnrampComparison.tsx
+  67:8  warning  React Hook useEffect has a missing dependency: 'fetchQuotes'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  78:8  warning  React Hook useEffect has a missing dependency: 'fetchQuotes'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/home/haruxe/Projects/Yuki/app/components/onramp/ProviderModal.tsx
+   29:5   warning  'onSuccess' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+   35:13  error    Error: Cannot access variable before it is declared
+
+`openCoinbaseWidget` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+/home/haruxe/Projects/Yuki/app/components/onramp/ProviderModal.tsx:35:13
+  33 |
+  34 |         if (provider === "coinbase") {
+> 35 |             openCoinbaseWidget();
+     |             ^^^^^^^^^^^^^^^^^^ `openCoinbaseWidget` accessed before it is declared
+  36 |         }
+  37 |     }, [isOpen, provider, quote, walletAddress]);
+  38 |
+
+/home/haruxe/Projects/Yuki/app/components/onramp/ProviderModal.tsx:39:5
+  37 |     }, [isOpen, provider, quote, walletAddress]);
+  38 |
+> 39 |     const openCoinbaseWidget = () => {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 40 |         // Build Coinbase Onramp URL with correct parameters
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 41 |         // Using the simpler URL format that Coinbase expects
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 74 |         // Note: We don't auto-close anymore - user manually closes when done
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 75 |     };
+     | ^^^^^^^ `openCoinbaseWidget` is declared here
+  76 |
+  77 |     if (!isOpen) return null;
+  78 |  react-hooks/immutability
+   37:8   warning  React Hook useEffect has a missing dependency: 'openCoinbaseWidget'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/exhaustive-deps
+  145:76  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react/no-unescaped-entities
+
+/home/haruxe/Projects/Yuki/app/components/onramp/QuoteCard.tsx
+  12:7   warning  'BRAND_LAVENDER' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  21:11  warning  'savingsVsBest' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/components/profile/EditProfileModal.tsx
+  202:6   warning  React Hook useEffect has a missing dependency: 'handleClose'. Either include it or remove the dependency array                                                                                                                                                                           react-hooks/exhaustive-deps
+  496:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  530:21  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/haruxe/Projects/Yuki/app/components/profile/ImageCropper.tsx
+  196:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/haruxe/Projects/Yuki/app/components/profile/ProfileHeader.tsx
+   49:49  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  131:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  155:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/haruxe/Projects/Yuki/app/components/ui/sidebar.tsx
+   31:7   warning  'SIDEBAR_WIDTH_MOBILE' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  660:26  error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+/home/haruxe/Projects/Yuki/app/components/ui/sidebar.tsx:660:26
+  658 |   // Random width between 50 to 90%.
+  659 |   const width = React.useMemo(() => {
+> 660 |     return `${Math.floor(Math.random() * 40) + 50}%`
+      |                          ^^^^^^^^^^^^^ Cannot call impure function
+  661 |   }, [])
+  662 |
+  663 |   return (  react-hooks/purity
+
+/home/haruxe/Projects/Yuki/app/components/wallet/WalletSettings.tsx
+  13:7  warning  'BRAND_LAVENDER' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/lib/auth.ts
+   9:10  warning  'createHash' is defined but never used   @typescript-eslint/no-unused-vars
+  22:20  error    A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  37:20  error    A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+/home/haruxe/Projects/Yuki/app/lib/db-postgres.ts
+  11:16  warning  'PoolClient' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/lib/db.ts
+  25:7  warning  'PG_ERROR_CODES' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/lib/hooks/useAuth.ts
+  116:14  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/haruxe/Projects/Yuki/app/lib/hooks/useBalance.ts
+  89:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/haruxe/Projects/Yuki/app/lib/hooks/useBalance.ts:89:7
+  87 |   useEffect(() => {
+  88 |     if (enabled && address) {
+> 89 |       fetchBalances();
+     |       ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  90 |     }
+  91 |   }, [enabled, address, fetchBalances]);
+  92 |     react-hooks/set-state-in-effect
+
+/home/haruxe/Projects/Yuki/app/noop.js
+  1:1  warning  Assign object to a variable before exporting as module default  import/no-anonymous-default-export
+
+/home/haruxe/Projects/Yuki/app/tailwind.config.js
+  116:32  warning  'theme' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 78 problems (19 errors, 59 warnings)
+
+error: script "lint" exited with code 1

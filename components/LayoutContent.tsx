@@ -22,10 +22,10 @@ import { Separator } from "@/components/ui/separator"
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { isConnected, isInitializing } = useSignerStatus()
-  
+
   // Consider loaded when not initializing
   const isLoaded = !isInitializing
-  
+
   // Pages that should NOT show the sidebar (full-bleed layouts)
   const isLoginPage = pathname === "/login" || pathname?.startsWith("/login/")
   const isOnboardingPage = pathname === "/onboarding"
@@ -48,24 +48,24 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     <SidebarProvider>
       {/* Sidebar - always rendered to prevent layout shift */}
       {/* Visibility controlled by opacity, not mount/unmount */}
-      <div 
+      <div
         className="transition-opacity duration-150"
         style={{ opacity: isLoaded && isConnected ? 1 : 0 }}
       >
         <AppSidebar />
       </div>
-      
+
       <SidebarInset>
         {/* Header - always visible, provides visual stability */}
-        <header 
-          className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.04] bg-black px-4 transition-opacity duration-150"
+        <header
+          className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.04] bg-[#0b0b0f] px-4 transition-opacity duration-150"
           style={{ opacity: isLoaded && isConnected ? 1 : 0 }}
         >
           <SidebarTrigger className="-ml-1 text-white/50 hover:text-white/80 hover:bg-white/[0.04]" />
           <Separator orientation="vertical" className="mr-2 h-4 bg-white/[0.06]" />
           <div className="flex-1" />
         </header>
-        
+
         {/* Main content area - always has consistent padding */}
         <div className="flex-1">
           {/* Show content when auth is resolved, or show immediately if loading takes too long */}

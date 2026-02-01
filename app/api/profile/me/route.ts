@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrCreateUserByWalletAddress, updateUserProfile, updateUsername, getUserByUsername } from '@/lib/db';
+import { getOrCreateUserByWalletAddress, updateUserProfile, updateUsername, getUserByUsername, getUserByWalletAddress } from '@/lib/db';
 import { profileUpdateSchema, type FullProfile } from '@/lib/validation/profile';
 import { isReservedRoute } from '@/lib/constants/reserved-routes';
 
@@ -57,7 +57,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = await getOrCreateUserByWalletAddress(walletAddress);
+    // Get user by wallet address (no auto-creation)
+    const user = await getUserByWalletAddress(walletAddress);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
     const cooldown = checkUsernameCooldown(user.username_last_changed);
 
     const fullProfile: FullProfile = {
@@ -128,8 +136,15 @@ export async function PATCH(request: NextRequest) {
 
     const { displayName, bio, avatarUrl, bannerUrl, username } = result.data;
 
-    // Get current user
-    const user = await getOrCreateUserByWalletAddress(walletAddress);
+    // Get current user (no auto-creation)
+    const user = await getUserByWalletAddress(walletAddress);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      );
+    }
 
     // Handle username change separately (has cooldown)
     if (username !== undefined) {
@@ -200,7 +215,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Fetch updated user
-    const updatedUser = await getOrCreateUserByWalletAddress(walletAddress);
+    const updatedUser = await getUserByWalletAddress(walletAddress);
+
+    if (!updatedUser) {
+      throw new Error("User disappeared after update");
+    }
     const cooldown = checkUsernameCooldown(updatedUser.username_last_changed);
 
     const fullProfile: FullProfile = {

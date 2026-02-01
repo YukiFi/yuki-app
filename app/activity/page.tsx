@@ -41,7 +41,7 @@ function groupTransactionsByDate(transactions: Transaction[]) {
 
 function getTransactionIcon(type: TransactionType) {
   const baseClass = "w-5 h-5";
-  
+
   switch (type) {
     case "sent":
       return (
@@ -77,25 +77,25 @@ function getTransactionIcon(type: TransactionType) {
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", { 
-    hour: "numeric", 
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
     minute: "2-digit",
-    hour12: true 
+    hour12: true
   });
 }
 
-function TransactionRow({ 
-  transaction, 
-  index 
-}: { 
-  transaction: Transaction; 
+function TransactionRow({
+  transaction,
+  index
+}: {
+  transaction: Transaction;
   index: number;
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   const isPositive = transaction.amount > 0;
   const isYield = transaction.type === "yield";
-  
+
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
@@ -111,19 +111,19 @@ function TransactionRow({
         }}
         transition={{ duration: 0.2 }}
       />
-      
+
       <div className="relative flex items-center gap-3 sm:gap-4">
         {/* Icon */}
         <motion.div
           className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{
-            backgroundColor: isYield 
-              ? `${BRAND_LAVENDER}15` 
+            backgroundColor: isYield
+              ? `${BRAND_LAVENDER}15`
               : "rgba(255,255,255,0.05)",
-            color: isYield 
-              ? BRAND_LAVENDER 
-              : isPositive 
-                ? "rgba(255,255,255,0.7)" 
+            color: isYield
+              ? BRAND_LAVENDER
+              : isPositive
+                ? "rgba(255,255,255,0.7)"
                 : "rgba(255,255,255,0.4)"
           }}
           animate={{
@@ -154,11 +154,11 @@ function TransactionRow({
         {/* Amount */}
         <motion.div
           className="text-base sm:text-lg font-medium tabular-nums flex-shrink-0"
-          style={{ 
+          style={{
             color: isYield
               ? BRAND_LAVENDER
-              : isPositive 
-                ? "white" 
+              : isPositive
+                ? "white"
                 : "rgba(255,255,255,0.5)",
             fontFeatureSettings: "'tnum' 1"
           }}
@@ -168,9 +168,9 @@ function TransactionRow({
           transition={{ duration: 0.2 }}
         >
           {isPositive ? "+" : ""}
-          ${Math.abs(transaction.amount).toLocaleString("en-US", { 
+          ${Math.abs(transaction.amount).toLocaleString("en-US", {
             minimumFractionDigits: 2,
-            maximumFractionDigits: 2 
+            maximumFractionDigits: 2
           })}
         </motion.div>
 
@@ -178,9 +178,9 @@ function TransactionRow({
         <motion.div
           className="text-white/20 hidden sm:block"
           initial={{ opacity: 0, x: -10 }}
-          animate={{ 
-            opacity: isHovered ? 1 : 0, 
-            x: isHovered ? 0 : -10 
+          animate={{
+            opacity: isHovered ? 1 : 0,
+            x: isHovered ? 0 : -10
           }}
           transition={{ duration: 0.2 }}
         >
@@ -225,71 +225,71 @@ export default function ActivityPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Activity</h1>
           <p className="text-white/40 text-sm sm:text-base">
             <span style={{ color: BRAND_LAVENDER }}>${totalYield.toFixed(2)}</span> earned all time
-        </p>
-      </div>
+          </p>
+        </div>
 
         {/* Filter tabs */}
         <div className="flex gap-1 mb-8 sm:mb-10">
-        {[
-          { key: "all", label: "All" },
-          { key: "yield", label: "Yield" },
-          { key: "transfers", label: "Transfers" },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key as typeof filter)}
+          {[
+            { key: "all", label: "All" },
+            { key: "yield", label: "Yield" },
+            { key: "transfers", label: "Transfers" },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key as typeof filter)}
               className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer"
               style={{
                 backgroundColor: filter === key ? `${BRAND_LAVENDER}20` : "transparent",
                 color: filter === key ? BRAND_LAVENDER : "rgba(255,255,255,0.4)"
               }}
-          >
-            {label}
-          </button>
-        ))}
-                  </div>
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {/* Transaction groups */}
+        {/* Transaction groups */}
         <div className="space-y-6 sm:space-y-8">
-        {isLoading ? (
-          <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-8 sm:px-5 sm:py-12 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-          </div>
-        ) : transactions.length === 0 ? (
-          <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-8 sm:px-5 sm:py-12 text-center">
-            <p className="text-white/40 text-sm">No transactions yet</p>
-            <p className="text-white/25 text-xs mt-1">Your transaction history will appear here</p>
-          </div>
-        ) : Object.keys(groupedTransactions)
-          .sort((a, b) => {
-            const aIndex = groupOrder.indexOf(a);
-            const bIndex = groupOrder.indexOf(b);
-            if (aIndex === -1 && bIndex === -1) return 0;
-            if (aIndex === -1) return 1;
-            if (bIndex === -1) return -1;
-            return aIndex - bIndex;
-          })
-          .map((groupName) => (
-              <div key={groupName} className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-              {/* Group header */}
+          {isLoading ? (
+            <div className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-4 py-8 sm:px-5 sm:py-12 flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-4 py-8 sm:px-5 sm:py-12 text-center">
+              <p className="text-white/40 text-sm">No transactions yet</p>
+              <p className="text-white/25 text-xs mt-1">Your transaction history will appear here</p>
+            </div>
+          ) : Object.keys(groupedTransactions)
+            .sort((a, b) => {
+              const aIndex = groupOrder.indexOf(a);
+              const bIndex = groupOrder.indexOf(b);
+              if (aIndex === -1 && bIndex === -1) return 0;
+              if (aIndex === -1) return 1;
+              if (bIndex === -1) return -1;
+              return aIndex - bIndex;
+            })
+            .map((groupName) => (
+              <div key={groupName} className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-4 py-2 sm:px-5 sm:py-3">
+                {/* Group header */}
                 <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                {groupName}
-              </p>
+                  {groupName}
+                </p>
 
-              {/* Transactions in group */}
-              <div className="divide-y divide-white/[0.04]">
-                {groupedTransactions[groupName].map((tx) => (
-                  <TransactionRow 
-                    key={tx.id} 
-                    transaction={tx} 
-                    index={rowIndex++}
-                  />
-                ))}
-                  </div>
+                {/* Transactions in group */}
+                <div className="divide-y divide-white/[0.04]">
+                  {groupedTransactions[groupName].map((tx) => (
+                    <TransactionRow
+                      key={tx.id}
+                      transaction={tx}
+                      index={rowIndex++}
+                    />
+                  ))}
                 </div>
+              </div>
             ))
-        }
-          </div>
+          }
+        </div>
       </div>
     </div>
   );

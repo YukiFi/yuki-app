@@ -51,6 +51,8 @@ export interface PublicProfile {
   createdAt: string;
   // Wallet address for ownership check (client-side)
   walletAddress?: string | null;
+  // User ID for reliable identification (e.g. contact management)
+  id?: string;
 }
 
 // Full profile (for owner)

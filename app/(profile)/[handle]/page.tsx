@@ -53,10 +53,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     createdAt: profile.created_at.toISOString(),
     // Pass wallet address so client can check ownership
     walletAddress: profile.wallet_address,
+    // Pass user ID for contact management
+    id: profile.id,
   };
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-[#0b0b0f]">
       <ProfileHeader profile={publicProfile} isOwner={isOwner} />
     </div>
   );

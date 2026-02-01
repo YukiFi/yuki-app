@@ -299,7 +299,7 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/80"
+            className="absolute inset-0 bg-[#0b0b0f]/90"
           />
 
           {/* Modal */}
@@ -318,8 +318,8 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.15 }}
-                  className="bg-[#0a0a0a] sm:bg-[#0a0a0a] border border-white/[0.08] rounded-t-3xl sm:rounded-3xl overflow-hidden"
+                  transition={{ duration: 0.25 }}
+                  className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
                 >
                   {/* Header */}
                   <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
@@ -393,7 +393,7 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                             <button
                               key={contact.id}
                               onClick={() => handleSelectUser(contact)}
-                              className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-white/[0.04] hover:bg-white/[0.08] rounded-xl transition-colors cursor-pointer"
+                              className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-white/[0.04] hover:bg-white/[0.08] rounded-xl transition-all duration-250 cursor-pointer"
                             >
                               <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60">
                                 {(contact.displayName || contact.username || '?').charAt(0).toUpperCase()}
@@ -423,7 +423,7 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                             setError(null);
                           }}
                           placeholder="username"
-                          className="w-full bg-white/[0.04] border border-white/[0.06] rounded-2xl py-4 pr-4 pl-9 text-white focus:outline-none focus:border-white/20 transition-colors placeholder:text-white/20 font-medium"
+                          className="w-full bg-white/[0.04] rounded-xl py-4 pr-4 pl-9 text-white focus:outline-none focus:bg-white/[0.06] transition-all duration-250 placeholder:text-white/20 font-medium border-0"
                         />
 
                         {/* Resolving indicator */}
@@ -448,7 +448,7 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                         <motion.div
                           initial={{ opacity: 0, y: -5 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="flex items-center gap-3 p-3 bg-white/[0.03] rounded-xl"
+                          className="flex items-center gap-3 p-3 bg-white/[0.04] rounded-xl"
                         >
                           <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60">
                             {(resolvedUser.displayName || resolvedUser.username || '?').charAt(0).toUpperCase()}
@@ -478,7 +478,7 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                     <button
                       onClick={handleContinue}
                       disabled={!amount || !recipient || !resolvedUser}
-                      className="w-full py-4 rounded-2xl font-medium transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
+                      className="w-full py-4 rounded-xl text-base font-medium transition-all duration-250 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                       style={{ backgroundColor: BRAND_LAVENDER, color: '#1a0a1f' }}
                     >
                       Continue
@@ -493,8 +493,8 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.15 }}
-                  className="bg-[#0a0a0a] sm:bg-[#0a0a0a] border border-white/[0.08] rounded-t-3xl sm:rounded-3xl overflow-hidden"
+                  transition={{ duration: 0.25 }}
+                  className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.35)]"
                 >
                   {/* Header */}
                   <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
@@ -538,13 +538,13 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                   <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-4 flex gap-3">
                     <button
                       onClick={() => setStep('compose')}
-                      className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-colors cursor-pointer active:scale-[0.98]"
+                      className="flex-1 py-4 rounded-xl text-base font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-all duration-250 cursor-pointer"
                     >
                       Back
                     </button>
                     <button
                       onClick={handleSend}
-                      className="flex-1 py-4 rounded-2xl font-medium transition-all cursor-pointer active:scale-[0.98]"
+                      className="flex-1 py-4 rounded-xl text-base font-medium transition-all duration-250 cursor-pointer"
                       style={{ backgroundColor: BRAND_LAVENDER, color: '#1a0a1f' }}
                     >
                       Send
@@ -559,8 +559,8 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="bg-[#0a0a0a] sm:bg-[#0a0a0a] rounded-t-3xl sm:rounded-3xl overflow-hidden border border-white/[0.08] py-12 sm:py-16 px-6 sm:px-8"
+                  transition={{ duration: 0.25 }}
+                  className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.35)] py-12 sm:py-16 px-6 sm:px-8"
                 >
                   <div className="text-center">
                     <div className="w-16 h-16 rounded-full border-2 border-white/10 border-t-white/50 animate-spin mx-auto mb-6" />
@@ -615,7 +615,7 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
 
                     <button
                       onClick={handleClose}
-                      className="w-full mt-8 py-4 rounded-2xl font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-colors cursor-pointer active:scale-[0.98]"
+                      className="w-full mt-8 py-4 rounded-xl text-base font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-all duration-250 cursor-pointer"
                     >
                       Done
                     </button>
@@ -645,13 +645,13 @@ export function SendModal({ isOpen, onClose, onSuccess }: SendModalProps) {
                     <div className="flex gap-3 mt-8">
                       <button
                         onClick={handleClose}
-                        className="flex-1 py-4 rounded-2xl font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-colors cursor-pointer active:scale-[0.98]"
+                        className="flex-1 py-4 rounded-xl text-base font-medium bg-white/[0.06] text-white hover:bg-white/[0.1] transition-all duration-250 cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={() => setStep('confirm')}
-                        className="flex-1 py-4 rounded-2xl font-medium cursor-pointer active:scale-[0.98]"
+                        className="flex-1 py-4 rounded-xl text-base font-medium transition-all duration-250 cursor-pointer"
                         style={{ backgroundColor: BRAND_LAVENDER, color: '#1a0a1f' }}
                       >
                         Try Again

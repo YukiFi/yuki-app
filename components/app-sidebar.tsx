@@ -11,6 +11,7 @@ import {
   Settings,
   HelpCircle,
   FileText,
+  PieChart,
 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 
@@ -28,56 +29,65 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 
-const navSecondary = [
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
-  {
-    title: "Help",
-    url: "/help",
-    icon: HelpCircle,
-  },
-  {
-    title: "Legal",
-    url: "/legal",
-    icon: FileText,
-  },
-]
+
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user } = useAuth()
-  
+  const { user, isLoading } = useAuth()
+
   // Build nav items with dynamic profile URL
-  const navMain = React.useMemo(() => {
+  // Build nav items with dynamic profile URL
+  const { navMain, navSecondary } = React.useMemo(() => {
     // Strip the @ from username for the URL (e.g. @haruxe -> /haruxe)
     const cleanUsername = user?.username?.replace(/^@/, '')
-    const profileUrl = cleanUsername ? `/${cleanUsername}` : "/settings"
-    
-    return [
-      {
-        title: "Home",
-        url: "/",
-        icon: Home,
-      },
-      {
-        title: "Activity",
-        url: "/activity",
-        icon: Activity,
-      },
-      {
-        title: "Profile",
-        url: profileUrl,
-        icon: User,
-      },
-      {
-        title: "Contacts",
-        url: "/contacts",
-        icon: Users,
-      },
-    ]
-  }, [user?.username])
+    const profileUrl = isLoading ? '#' : (cleanUsername ? `/${cleanUsername}` : "/settings")
+
+    return {
+      navMain: [
+        {
+          title: "Home",
+          url: "/",
+          icon: Home,
+        },
+        {
+          title: "Allocations",
+          url: "/allocations",
+          icon: PieChart,
+        },
+        {
+          title: "Activity",
+          url: "/activity",
+          icon: Activity,
+        },
+        {
+          title: "Contacts",
+          url: "/contacts",
+          icon: Users,
+        },
+      ],
+      navSecondary: [
+        {
+          title: "Settings",
+          url: "/settings",
+          icon: Settings,
+        },
+        {
+          title: "Profile",
+          url: profileUrl,
+          icon: User,
+        },
+        {
+          title: "Help",
+          url: "/help",
+          icon: HelpCircle,
+        },
+        {
+          title: "Legal",
+          url: "/legal",
+          icon: FileText,
+        },
+      ]
+    }
+  }, [user?.username, isLoading])
 
   return (
     <Sidebar collapsible="icon" {...props}>
