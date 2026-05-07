@@ -13,7 +13,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
-import { getBalance, vaultStatus, type VaultStatus } from '@/lib/yusd';
+import { formatUnits } from 'viem';
+import { getBalance, getEarned, vaultStatus, type VaultStatus, YUSD_DECIMALS } from '@/lib/yusd';
 import { DEMO_MODE, demoStore } from '@/lib/demo-fixtures';
 
 export interface BalanceState {
@@ -77,16 +78,37 @@ export function useBalance(
     }
 
     try {
-      const [bal, status] = await Promise.all([
+      // Three reads in parallel. The cost-basis fetch is the new piece in
+      // sub-phase 2a — it sums confirmed deposits minus completed withdrawals
+      // from the DB, so `earned` reflects "balance gained beyond what I put
+      // in." In stub mode this clamps to 0.00 (raw USDC doesn't accrue), but
+      // the data accumulates correctly so vault cutover starts from a real
+      // basis on day one.
+      const [bal, status, costBasisRes] = await Promise.all([
         getBalance(address),
         vaultStatus(),
+        fetch('/api/transfers/cost-basis', {
+          headers: { 'x-wallet-address': address },
+        }).catch(() => null),
       ]);
-      // Cost basis isn't tracked yet in stub mode (no deposits write-path
-      // wired); pass current balance as the basis so earned = 0. Phase 2
-      // wires the deposits totals through here.
+
+      // Convert wei basis to a human-readable string. Network failures here
+      // shouldn't break the dashboard — fall back to passing the live
+      // balance as the basis, which makes earned = 0 (the safest default).
+      let costBasisAssets = bal.assets;
+      if (costBasisRes && costBasisRes.ok) {
+        const j = (await costBasisRes.json()) as { basis: string };
+        try {
+          costBasisAssets = formatUnits(BigInt(j.basis), YUSD_DECIMALS);
+        } catch {
+          // unparseable basis — keep the safe fallback
+        }
+      }
+      const earned = await getEarned(address, costBasisAssets);
+
       setState({
         balance: bal.assets,
-        earned: '0.00',
+        earned,
         shares: bal.shares,
         vaultStatus: status,
         isLoading: false,
