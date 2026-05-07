@@ -128,6 +128,16 @@ export function useTransferStatus({
   // Last-known status, persisted across openOps cache evictions. When a row
   // transitions to terminal and drops from /api/transfers/open, the stepper
   // still wants to show the success state until the consumer unmounts.
+  //
+  // Known property — per-mount drift: this state is local to each hook call.
+  // If two consumers of the same {kind, id} are mounted at once, they hold
+  // independent last-known-phases until the next StatusContext poll cycle
+  // reconciles them (bounded at OPEN_OPS_POLL_MS ≈ 5s). For 2a/2b/3 no
+  // consumer mounts the same transfer in two places simultaneously, so the
+  // drift is unobservable. If a future feature does (e.g., a "transfer
+  // summary" widget rendered in two slots at once), lift this state into
+  // StatusContext keyed by id — until then, centralizing trades concrete
+  // complexity (Map, eviction, subscription bookkeeping) for no benefit.
   const [lastKnown, setLastKnown] = useState<TransferStatus>(INITIAL);
 
   useEffect(() => {
