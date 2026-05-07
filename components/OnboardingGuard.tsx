@@ -23,7 +23,7 @@ interface OnboardingGuardProps {
 }
 
 // Routes that don't need authentication at all
-const PUBLIC_ROUTES = ['/login', '/documents', '/legal', '/help'];
+const PUBLIC_ROUTES = ['/login', '/documents', '/legal', '/help', '/tx', '/r'];
 // Routes accessible during onboarding
 const ONBOARDING_ROUTES = ['/setup'];
 // Routes unauthenticated visitors can browse (exact match). Authed users

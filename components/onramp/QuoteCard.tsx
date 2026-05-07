@@ -1,153 +1,220 @@
-/**
- * Quote Card Component
- * 
- * Displays an individual onramp provider quote with fees and benefits
- */
-
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  ChevronDown,
+  Clock,
+  CreditCard,
+  Globe,
+  Sparkles,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import type { OnrampQuote } from "@/lib/types/onramp";
 
-const BRAND_LAVENDER = "#e1a8f0";
+const LAVENDER = "#e1a8f0";
+
+// Per-provider perks shown on the card. Keep these short and verifiable —
+// don't promise behavior the provider doesn't actually deliver.
+const PROVIDER_PERKS: Record<string, { Icon: LucideIcon; label: string }[]> = {
+  coinbase: [
+    { Icon: Zap, label: "Sponsored Base fees" },
+    { Icon: CreditCard, label: "Apple Pay supported" },
+  ],
+  moonpay: [
+    { Icon: CreditCard, label: "Cards & Apple Pay" },
+    { Icon: Globe, label: "170+ countries" },
+  ],
+  ramp: [{ Icon: Zap, label: "Fast bank transfers" }],
+  transak: [{ Icon: Globe, label: "Wide country support" }],
+};
 
 interface QuoteCardProps {
-    quote: OnrampQuote;
-    isBest: boolean;
-    onSelect: () => void;
+  quote: OnrampQuote;
+  isBest: boolean;
+  bestQuote?: OnrampQuote;
+  onSelect: () => void;
 }
 
-export function QuoteCard({ quote, isBest, onSelect }: QuoteCardProps) {
-    const savingsVsBest = 0; // TODO: Calculate savings vs best rate
+function providerInitial(name: string) {
+  return name.charAt(0).toUpperCase() || "·";
+}
 
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`relative bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-5 sm:px-6 sm:py-6 border transition-all duration-200 ${isBest
-                    ? "border-[#e1a8f0]/30"
-                    : "border-white/[0.05] hover:border-white/[0.1]"
-                }`}
+function formatUSD(v: number) {
+  return v.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function useExpiresIn(expiresAt?: string) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!expiresAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - now;
+  if (ms <= 0) return "Expired";
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}m ${r.toString().padStart(2, "0")}s`;
+}
+
+export function QuoteCard({
+  quote,
+  isBest,
+  bestQuote,
+  onSelect,
+}: QuoteCardProps) {
+  const expiresIn = useExpiresIn(quote.expiresAt);
+  const perks = PROVIDER_PERKS[quote.provider] ?? [];
+  const diffVsBest =
+    !isBest && bestQuote ? quote.totalFees - bestQuote.totalFees : 0;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      className={`relative rounded-[6px] border bg-zinc-950/40 transition-colors ${
+        isBest
+          ? "border-[rgba(225,168,240,0.35)]"
+          : "border-white/5 hover:border-white/10"
+      }`}
+    >
+      {/* Best-rate badge */}
+      {isBest && (
+        <span
+          className="absolute -top-2.5 left-4 inline-flex items-center gap-1 h-5 px-2 rounded-full text-[10px] font-medium tracking-tight"
+          style={{ backgroundColor: LAVENDER, color: "#000" }}
         >
-            {/* Best Rate Badge */}
-            {isBest && (
-                <div className="absolute -top-3 left-6 px-3 py-1 rounded-full bg-gradient-to-r from-[#e1a8f0] to-[#c48ef0] flex items-center gap-1.5">
-                    <svg
-                        className="w-3.5 h-3.5 text-black"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                    >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    <span className="text-black text-xs font-semibold">Best Rate</span>
-                </div>
-            )}
+          <Sparkles className="w-2.5 h-2.5" strokeWidth={2.5} />
+          Best rate
+        </span>
+      )}
 
-            {/* Provider Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white text-base sm:text-lg font-medium">
-                    {quote.providerName}
-                </h3>
-                {quote.expiresAt && (
-                    <span className="text-white/30 text-xs">
-                        Expires in {/* TODO: Add countdown */}
-                    </span>
-                )}
-            </div>
-
-            {/* Main Amount */}
-            <div className="mb-4">
-                <p className="text-white/50 text-xs sm:text-sm mb-2">You receive</p>
-                <p
-                    className="text-3xl sm:text-4xl font-light text-white tabular-nums"
-                    style={{ fontFeatureSettings: "'tnum' 1" }}
-                >
-                    {quote.cryptoAmount.toFixed(2)}{" "}
-                    <span className="text-white/40 text-lg">{quote.cryptoCurrency}</span>
-                </p>
-            </div>
-
-            {/* Fees */}
-            <div className="mb-5 pb-5 border-b border-white/[0.05]">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-white/40 text-sm">Total fees</span>
-                    <span className="text-white/60 text-sm tabular-nums">
-                        ${quote.totalFees.toFixed(2)} ({quote.feePercentage.toFixed(2)}%)
-                    </span>
-                </div>
-
-                {/* Fee Breakdown - Expandable */}
-                {quote.feeBreakdown.length > 0 && (
-                    <details className="group">
-                        <summary className="text-white/30 text-xs cursor-pointer hover:text-white/50 transition-colors list-none flex items-center gap-1">
-                            <svg
-                                className="w-3 h-3 transition-transform group-open:rotate-90"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M9 5l7 7-7 7"
-                                />
-                            </svg>
-                            See breakdown
-                        </summary>
-                        <div className="mt-2 space-y-1 pl-4">
-                            {quote.feeBreakdown.map((fee, i) => (
-                                <div
-                                    key={i}
-                                    className="flex items-center justify-between text-xs"
-                                >
-                                    <span className="text-white/30">{fee.name}</span>
-                                    <span className="text-white/40 tabular-nums">
-                                        ${fee.amount.toFixed(2)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </details>
-                )}
-            </div>
-
-            {/* Benefits (provider-specific) */}
-            {quote.provider === "coinbase" && (
-                <div className="mb-4 space-y-1.5">
-                    <div className="flex items-center gap-2 text-xs text-white/50">
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                                fillRule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                clipRule="evenodd"
-                            />
-                        </svg>
-                        <span>Zero fees on Base network</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-white/50">
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                                fillRule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                clipRule="evenodd"
-                            />
-                        </svg>
-                        <span>Apple Pay supported</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Select Button */}
-            <button
-                onClick={onSelect}
-                className={`w-full py-3.5 rounded-xl sm:rounded-2xl text-sm font-medium transition-all duration-150 active:scale-[0.98] ${isBest
-                        ? "bg-white text-black"
-                        : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/80"
-                    }`}
+      <div className="px-4 sm:px-5 py-5">
+        {/* Provider header */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="w-7 h-7 rounded-[4px] bg-zinc-800 flex items-center justify-center text-[12px] font-semibold tracking-tight text-white/85"
+              aria-hidden
             >
-                Select {quote.providerName}
-            </button>
-        </motion.div>
-    );
+              {providerInitial(quote.providerName)}
+            </div>
+            <p className="text-[14px] font-medium tracking-tight text-white">
+              {quote.providerName}
+            </p>
+          </div>
+          {expiresIn && (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] tabular-nums text-white/40"
+              aria-label={`Quote expires in ${expiresIn}`}
+            >
+              <Clock className="w-3 h-3" />
+              {expiresIn}
+            </span>
+          )}
+        </div>
+
+        {/* Receive amount */}
+        <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/45 mb-1">
+          You receive
+        </p>
+        <p className="text-3xl sm:text-4xl font-light tracking-tight tabular-nums text-white">
+          {formatUSD(quote.cryptoAmount)}{" "}
+          <span className="text-base sm:text-lg text-white/40 ml-0.5">
+            {quote.cryptoCurrency}
+          </span>
+        </p>
+
+        {/* Diff vs best */}
+        {diffVsBest > 0 && (
+          <p className="mt-1.5 text-[12px] text-white/45">
+            <span className="text-red-300/80 tabular-nums">
+              ${formatUSD(diffVsBest)}
+            </span>{" "}
+            more than {bestQuote!.providerName}
+          </p>
+        )}
+
+        {/* Fees */}
+        <div className="mt-5 rounded-[4px] border border-white/5 bg-zinc-900/40">
+          <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+            <span className="text-[12px] text-white/55">Total fees</span>
+            <span className="text-[12px] tabular-nums text-white/85">
+              ${formatUSD(quote.totalFees)}
+              <span className="text-white/40">
+                {" "}
+                · {quote.feePercentage.toFixed(2)}%
+              </span>
+            </span>
+          </div>
+          {quote.feeBreakdown.length > 0 && (
+            <details className="group border-t border-white/5">
+              <summary className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer text-[11px] text-white/40 hover:text-white/65 transition-colors list-none">
+                <span>Breakdown</span>
+                <ChevronDown
+                  className="w-3.5 h-3.5 transition-transform group-open:rotate-180"
+                  strokeWidth={2}
+                />
+              </summary>
+              <div className="px-3 pb-3 space-y-1.5">
+                {quote.feeBreakdown.map((fee, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between text-[11px]"
+                  >
+                    <span className="text-white/40">{fee.name}</span>
+                    <span className="tabular-nums text-white/55">
+                      ${formatUSD(fee.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+
+        {/* Perks */}
+        {perks.length > 0 && (
+          <ul className="mt-4 space-y-1.5">
+            {perks.map(({ Icon, label }) => (
+              <li
+                key={label}
+                className="flex items-center gap-2 text-[11px] text-white/45"
+              >
+                <Icon className="w-3 h-3" aria-hidden />
+                <span>{label}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Action */}
+        <button
+          type="button"
+          onClick={onSelect}
+          style={isBest ? { backgroundColor: LAVENDER } : undefined}
+          className={`mt-5 inline-flex w-full h-11 items-center justify-center gap-2 rounded-[4px] text-sm font-semibold tracking-tight outline-none transition-[box-shadow,filter,color,background-color] duration-150 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 ${
+            isBest
+              ? "text-black hover:brightness-105 hover:shadow-[0_0_28px_-4px_rgba(225,168,240,0.5)]"
+              : "bg-zinc-800 text-white hover:bg-zinc-700"
+          }`}
+        >
+          Continue with {quote.providerName}
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    </motion.div>
+  );
 }

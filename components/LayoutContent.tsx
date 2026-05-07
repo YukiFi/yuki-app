@@ -19,7 +19,12 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const isLoginPage = pathname === "/login" || pathname?.startsWith("/login/")
   const isOnboardingPage = pathname === "/onboarding"
   const isSetupPage = pathname === "/setup" || pathname?.startsWith("/setup/")
-  const isFullBleedPage = isLoginPage || isOnboardingPage || isSetupPage
+  // Transaction receipt pages render their own chrome — full-bleed so the
+  // shared link looks the same for everyone (signed-in or not).
+  const isTxPage = pathname?.startsWith("/tx/")
+  // Request pages (Phase 3) — same shared-link rationale.
+  const isRequestPage = pathname?.startsWith("/r/")
+  const isFullBleedPage = isLoginPage || isOnboardingPage || isSetupPage || isTxPage || isRequestPage
 
   if (isFullBleedPage) {
     return (

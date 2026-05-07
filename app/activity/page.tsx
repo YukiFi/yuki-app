@@ -1,12 +1,14 @@
 "use client"
 
 import { useMemo } from "react"
+import Link from "next/link"
 import {
   Activity as ActivityIcon,
   ArrowDownLeft,
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowUpRight,
+  ChevronRight,
   Sparkles,
   type LucideIcon,
 } from "lucide-react"
@@ -101,7 +103,7 @@ function Row({ tx }: { tx: Transaction }) {
   const meta = TYPE_META[tx.type]
   const { Icon, label, sign, accent } = meta
   const isPending = tx.status === "pending"
-  const hashHref = tx.txHash ? `https://basescan.org/tx/${tx.txHash}` : undefined
+  const detailHref = tx.txHash ? `/tx/${tx.txHash}` : undefined
 
   const inner = (
     <div
@@ -140,18 +142,24 @@ function Row({ tx }: { tx: Transaction }) {
           </p>
         </div>
       </div>
+
+      {detailHref && (
+        <ChevronRight
+          aria-hidden
+          className="w-4 h-4 text-white/20 shrink-0 transition-colors group-hover:text-white/55"
+        />
+      )}
     </div>
   )
 
-  return hashHref ? (
-    <a
-      href={hashHref}
-      target="_blank"
-      rel="noopener noreferrer"
+  return detailHref ? (
+    <Link
+      href={detailHref}
       className="block w-full outline-none rounded-[4px]"
+      aria-label={`View transaction ${tx.description}`}
     >
       {inner}
-    </a>
+    </Link>
   ) : (
     inner
   )
