@@ -56,6 +56,97 @@ function getPublicClient() {
   });
 }
 
+// Alchemy free tier caps eth_getLogs at a 10-block range. We poll inside
+// that limit explicitly instead of relying on viem's watchContractEvent,
+// which used node-side filters (eth_newFilter + eth_getFilterChanges) —
+// filters get GC'd between calls on load-balanced or free-tier RPCs and
+// surface as "filter not found" errors. Manual getLogs polling is
+// stateless and works on any tier.
+const MAX_LOGS_BLOCK_RANGE = 10n;
+
+/**
+ * Internal: manual getLogs polling loop. Stateless on the RPC side; bounded
+ * 10-block window per request to fit Alchemy free tier limits.
+ *
+ * On first tick we look at `currentBlock - 9..currentBlock` to catch arrivals
+ * that just landed before the watcher mounted. Subsequent ticks cover from
+ * the previous tick's lastSeen+1 forward, capped at 10 blocks. If the user is
+ * away from the page longer than 10 blocks (~20s on Base), we'll miss
+ * arrivals in the gap; the historical backstop (when re-mounted) covers it.
+ */
+function pollForDeposits(
+  tokenAddress: `0x${string}`,
+  receiver: `0x${string}`,
+  decimals: number,
+  tokenSymbol: DepositEvent['tokenSymbol'],
+  onDeposit: DepositCallback,
+): () => void {
+  const client = getPublicClient();
+  let lastSeenBlock: bigint | null = null;
+  let cancelled = false;
+  let timer: NodeJS.Timeout | null = null;
+  // Per-session de-dupe — overlapping poll windows can include the same log
+  // twice across consecutive ticks. Set is unbounded for the watcher's
+  // lifetime (one auth session); not a real leak risk.
+  const seen = new Set<string>();
+
+  const tick = async () => {
+    if (cancelled) return;
+    try {
+      const currentBlock = await client.getBlockNumber();
+      const fromBlock =
+        lastSeenBlock === null
+          ? currentBlock - (MAX_LOGS_BLOCK_RANGE - 1n)
+          : lastSeenBlock + 1n;
+      if (fromBlock > currentBlock) return;
+      const cappedFrom =
+        currentBlock - fromBlock >= MAX_LOGS_BLOCK_RANGE
+          ? currentBlock - (MAX_LOGS_BLOCK_RANGE - 1n)
+          : fromBlock;
+
+      const logs = await client.getContractEvents({
+        address: tokenAddress,
+        abi: [TRANSFER_EVENT],
+        eventName: 'Transfer',
+        args: { to: receiver },
+        fromBlock: cappedFrom,
+        toBlock: currentBlock,
+      });
+
+      lastSeenBlock = currentBlock;
+
+      for (const log of logs) {
+        const txHash = log.transactionHash!;
+        if (seen.has(txHash)) continue;
+        seen.add(txHash);
+        onDeposit({
+          txHash,
+          from: log.args.from as string,
+          to: log.args.to as string,
+          amount: formatUnits(log.args.value as bigint, decimals),
+          amountRaw: log.args.value as bigint,
+          tokenAddress,
+          tokenSymbol,
+          blockNumber: log.blockNumber!,
+        });
+      }
+    } catch (err) {
+      console.error(`${tokenSymbol} deposit watcher error:`, err);
+    } finally {
+      if (!cancelled) {
+        timer = setTimeout(tick, WATCHER_POLLING_INTERVAL_MS);
+      }
+    }
+  };
+
+  void tick();
+
+  return () => {
+    cancelled = true;
+    if (timer) clearTimeout(timer);
+  };
+}
+
 /**
  * Watch for incoming USDC transfers to a specific address
  */
@@ -63,40 +154,7 @@ export function watchUSDCDeposits(
   address: `0x${string}`,
   onDeposit: DepositCallback
 ): () => void {
-  const client = getPublicClient();
-  
-  const unwatch = client.watchContractEvent({
-    address: USDC_ADDRESS,
-    abi: [TRANSFER_EVENT],
-    eventName: 'Transfer',
-    args: { to: address },
-    // poll: true forces viem to use eth_getLogs polling rather than node-
-    // side filters (eth_newFilter + eth_getFilterChanges). Filters get GC'd
-    // by load-balanced public RPCs between calls, surfacing as
-    // "filter not found" errors. eth_getLogs is stateless and works on any
-    // RPC, public or dedicated.
-    poll: true,
-    onLogs: (logs) => {
-      logs.forEach(log => {
-        const deposit: DepositEvent = {
-          txHash: log.transactionHash!,
-          from: log.args.from as string,
-          to: log.args.to as string,
-          amount: formatUnits(log.args.value as bigint, USDC_DECIMALS),
-          amountRaw: log.args.value as bigint,
-          tokenAddress: USDC_ADDRESS,
-          tokenSymbol: 'USDC',
-          blockNumber: log.blockNumber!,
-        };
-        onDeposit(deposit);
-      });
-    },
-    onError: (error) => {
-      console.error('USDC deposit watcher error:', error);
-    },
-  });
-
-  return unwatch;
+  return pollForDeposits(USDC_ADDRESS, address, USDC_DECIMALS, 'USDC', onDeposit);
 }
 
 /**
@@ -106,42 +164,11 @@ export function watchYUSDDeposits(
   address: `0x${string}`,
   onDeposit: DepositCallback
 ): () => void {
-  const client = getPublicClient();
-
-  // Skip if yUSD address is not configured
+  // Skip if yUSD address is not configured (stub mode).
   if (YUSD_ADDRESS === '0x0000000000000000000000000000000000000000') {
-    console.log('[Indexer] yUSD address not configured, skipping watcher');
     return () => {};
   }
-
-  const unwatch = client.watchContractEvent({
-    address: YUSD_ADDRESS,
-    abi: [TRANSFER_EVENT],
-    eventName: 'Transfer',
-    args: { to: address },
-    // See comment on watchUSDCDeposits — same rationale.
-    poll: true,
-    onLogs: (logs) => {
-      logs.forEach(log => {
-        const deposit: DepositEvent = {
-          txHash: log.transactionHash!,
-          from: log.args.from as string,
-          to: log.args.to as string,
-          amount: formatUnits(log.args.value as bigint, YUSD_DECIMALS),
-          amountRaw: log.args.value as bigint,
-          tokenAddress: YUSD_ADDRESS,
-          tokenSymbol: 'yUSD',
-          blockNumber: log.blockNumber!,
-        };
-        onDeposit(deposit);
-      });
-    },
-    onError: (error) => {
-      console.error('yUSD deposit watcher error:', error);
-    },
-  });
-
-  return unwatch;
+  return pollForDeposits(YUSD_ADDRESS, address, YUSD_DECIMALS, 'yUSD', onDeposit);
 }
 
 /**

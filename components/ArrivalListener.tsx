@@ -60,6 +60,10 @@ export function ArrivalListener({ enabled }: ArrivalListenerProps) {
   const watchEnabled = enabled && !DEMO_MODE && !!walletAddress;
   const { newDeposit } = useDeposits(walletAddress, {
     enabled: watchEnabled,
+    // Skip historical fetch — ArrivalListener only cares about live
+    // arrivals (newDeposit signal). Avoids hitting Alchemy free tier's
+    // 10-block eth_getLogs cap on a 10k-block historical pull.
+    historyBlockCount: 0n,
   });
 
   // De-dupe: useDeposits clears `newDeposit` after 10s, but a remount could
