@@ -37,6 +37,7 @@ import { useDeposits } from "@/lib/hooks/useDeposits";
 import { useStatusContext } from "@/lib/context/StatusContext";
 import { buildDeposit, YUSD_DECIMALS } from "@/lib/yusd";
 import { DEMO_MODE } from "@/lib/demo-fixtures";
+import type { Deposit } from "@/lib/db-postgres";
 
 interface ArrivalListenerProps {
   /**
@@ -97,12 +98,34 @@ export function ArrivalListener({ enabled }: ArrivalListenerProps) {
           return;
         }
         const { deposit } = (await recordRes.json()) as {
-          deposit: { id: string } | null;
+          deposit: Deposit | null;
         };
         if (!deposit) {
           await statusContext.refresh();
           return;
         }
+
+        // ─── Durable idempotency guard ──────────────────────────────────
+        // Session-scoped processedRef catches double-fire within one tab,
+        // but not hard-refresh-mid-arrival or cross-tab races. The DB row's
+        // deposit_op_hash is the durable marker: if it's already set, a
+        // previous handler (this tab or another) has already fired the
+        // deposit UserOp. Skip re-firing — receipt-tracking will pick up
+        // from there.
+        //
+        // KNOWN LIMITATION (vault cutover concern, not 2a's): mid-flight
+        // races where the first call has POSTed confirm but not yet
+        // updated deposit_op_hash. In that window, this guard sees NULL
+        // and a second tab could double-fire. Stub mode is unexposed
+        // (uo is empty, no UserOp). Vault cutover should add a server-
+        // side lock — atomic UPDATE deposit_op_hash = 'lock:<uuid>'
+        // WHERE deposit_op_hash IS NULL, with TTL — before this client
+        // fires sendUserOperationAsync. Out of 2a scope.
+        if (deposit.deposit_op_hash) {
+          await statusContext.refresh();
+          return;
+        }
+        // ────────────────────────────────────────────────────────────────
 
         // 2. Fire auto-deposit UserOp (or skip in stub mode).
         const { uo } = buildDeposit(amountAssets);
