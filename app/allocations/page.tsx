@@ -223,7 +223,7 @@ export default function AllocationsPage() {
 
   const { client } = useSmartAccountClient({})
   const walletAddress = client?.account?.address as `0x${string}` | undefined
-  const { total } = useBalance(walletAddress, { enabled: !!walletAddress })
+  const { balance: total } = useBalance(walletAddress, { enabled: !!walletAddress })
   const balance = parseFloat(total) || 0
 
   const allocations = ALLOCATIONS

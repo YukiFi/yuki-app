@@ -37,7 +37,7 @@ export default function FundsPage() {
   const router = useRouter()
   const { client } = useSmartAccountClient({})
   const walletAddress = client?.account?.address as `0x${string}` | undefined
-  const { total, refetch } = useBalance(walletAddress, {
+  const { balance: total, refetch } = useBalance(walletAddress, {
     enabled: !!walletAddress,
   })
   const balance = parseFloat(total) || 0
@@ -213,7 +213,7 @@ export default function FundsPage() {
               {mode === "add" ? (
                 numeric > 0 ? (
                   <section>
-                    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 mb-3">
+                    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 mb-5">
                       Providers
                     </p>
                     <OnrampComparison

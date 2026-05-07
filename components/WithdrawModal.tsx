@@ -13,8 +13,8 @@ import {
   useSmartAccountClient,
   useSendUserOperation,
 } from '@account-kit/react';
-import { encodeFunctionData, parseUnits, erc20Abi } from 'viem';
-import { getUSDCBalance, isValidAddress, USDC_ADDRESS, USDC_DECIMALS } from '@/lib/transactions/sendYUSD';
+import { isValidAddress } from '@/lib/transactions/sendYUSD';
+import { buildWithdraw, getBalance as getYusdBalance } from '@/lib/yusd';
 
 const BRAND_LAVENDER = '#e1a8f0';
 
@@ -59,9 +59,9 @@ export function WithdrawModal({ isOpen, onClose, onSuccess }: WithdrawModalProps
   useEffect(() => {
     if (isOpen && walletAddress) {
       setIsLoadingBalance(true);
-      getUSDCBalance(walletAddress as `0x${string}`)
-        .then(bal => {
-          setBalance(bal);
+      getYusdBalance(walletAddress as `0x${string}`)
+        .then(b => {
+          setBalance(b.assets);
           setIsLoadingBalance(false);
         })
         .catch(() => {
@@ -115,24 +115,16 @@ export function WithdrawModal({ isOpen, onClose, onSuccess }: WithdrawModalProps
     setError(null);
     
     try {
-      // Build the ERC20 transfer call data
-      const transferData = encodeFunctionData({
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [
-          externalAddress as `0x${string}`,
-          parseUnits(amount, USDC_DECIMALS),
-        ],
-      });
-      
-      // Send the user operation (gas is sponsored!)
-      await sendUserOperationAsync({
-        uo: {
-          target: USDC_ADDRESS,
-          data: transferData,
-          value: 0n,
-        },
-      });
+      // Route through the yUSD interface. Stub mode: USDC ERC-20 transfer
+      // straight to the external address. Vault mode (later): vault redeem
+      // to the smart wallet then a follow-up transfer — handled inside the
+      // off-ramp flow, not this direct-to-address modal.
+      const { uo } = buildWithdraw(amount, externalAddress as `0x${string}`)
+      // buildWithdraw returns an array; the direct-address modal expects a
+      // single call (in stub mode that's what it is — the array has length 1).
+      const call = uo[0]
+      if (!call) throw new Error('Withdraw not configured for this mode')
+      await sendUserOperationAsync({ uo: call })
     } catch (err) {
       console.error('Transaction error:', err);
       setError(err instanceof Error ? err.message : 'Transaction failed');

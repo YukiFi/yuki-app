@@ -325,6 +325,94 @@ export async function initializeDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_contacts_contact_user_id ON contacts(contact_user_id);
     `);
 
+    // Add columns introduced by the yUSD architecture plan. Idempotent —
+    // each ALTER is gated by an information_schema lookup so re-running the
+    // initializer is safe.
+    await client.query(`
+      DO $$
+      BEGIN
+        -- deposits.intent_id: client-generated UUID, attached to onramp URL
+        -- as partnerUserRef so we can correlate the popup completion to a
+        -- pending deposits row before the on-chain transfer arrives.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deposits' AND column_name = 'intent_id') THEN
+          ALTER TABLE deposits ADD COLUMN intent_id TEXT;
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_deposits_intent_id ON deposits(intent_id) WHERE intent_id IS NOT NULL;
+        END IF;
+
+        -- deposits.deposit_op_hash: the UserOp hash of the auto-deposit into
+        -- the yUSD vault. NULL in stub mode (no UserOp fired). Unique so we
+        -- never enqueue two deposit UserOps for the same arrival.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deposits' AND column_name = 'deposit_op_hash') THEN
+          ALTER TABLE deposits ADD COLUMN deposit_op_hash TEXT;
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_deposits_deposit_op_hash ON deposits(deposit_op_hash) WHERE deposit_op_hash IS NOT NULL;
+        END IF;
+
+        -- deposits.fiat_status: tracks the onramp side (card charged, card
+        -- failed) independently of the on-chain deposit lifecycle.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deposits' AND column_name = 'fiat_status') THEN
+          ALTER TABLE deposits ADD COLUMN fiat_status TEXT;
+        END IF;
+
+        -- deposits.token_symbol_at_time: the user-facing label captured at
+        -- write time. Snapshot, not live-resolved — see lib/transactions/
+        -- getTransaction.ts for the precedence comment. Default 'yUSD'
+        -- correctly backfills empty existing rows (audit confirmed both Neon
+        -- branches were empty at Phase 1 cutover).
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'deposits' AND column_name = 'token_symbol_at_time') THEN
+          ALTER TABLE deposits ADD COLUMN token_symbol_at_time TEXT NOT NULL DEFAULT 'yUSD';
+        END IF;
+
+        -- withdrawals: off-ramp tracking columns.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'withdrawals' AND column_name = 'coinbase_session_id') THEN
+          ALTER TABLE withdrawals ADD COLUMN coinbase_session_id TEXT;
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_withdrawals_coinbase_session_id ON withdrawals(coinbase_session_id) WHERE coinbase_session_id IS NOT NULL;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'withdrawals' AND column_name = 'coinbase_deposit_address') THEN
+          ALTER TABLE withdrawals ADD COLUMN coinbase_deposit_address TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'withdrawals' AND column_name = 'redeem_op_hash') THEN
+          ALTER TABLE withdrawals ADD COLUMN redeem_op_hash TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'withdrawals' AND column_name = 'transfer_op_hash') THEN
+          ALTER TABLE withdrawals ADD COLUMN transfer_op_hash TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'withdrawals' AND column_name = 'payout_method') THEN
+          ALTER TABLE withdrawals ADD COLUMN payout_method TEXT;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'withdrawals' AND column_name = 'fiat_status') THEN
+          ALTER TABLE withdrawals ADD COLUMN fiat_status TEXT;
+        END IF;
+
+        -- withdrawals.token_symbol_at_time: matches the deposits column.
+        -- See getTransaction.ts precedence comment for snapshot semantics.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'withdrawals' AND column_name = 'token_symbol_at_time') THEN
+          ALTER TABLE withdrawals ADD COLUMN token_symbol_at_time TEXT NOT NULL DEFAULT 'yUSD';
+        END IF;
+      END $$;
+    `);
+
+    // Reserve the requests table now (Phase 1) so Phase 2 SendModal can
+    // emit "request fulfilled" events against the right schema from day one.
+    // Phase 3 wires the actual UI + API routes.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS requests (
+        id TEXT PRIMARY KEY,
+        requester_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount_usd NUMERIC(12,2) NOT NULL,
+        memo TEXT,
+        target_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        paid_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        paid_tx_hash TEXT,
+        paid_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 days')
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_requests_requester ON requests(requester_user_id);
+      CREATE INDEX IF NOT EXISTS idx_requests_target_open ON requests(target_user_id) WHERE status = 'open';
+    `);
+
     console.log('[DB] PostgreSQL schema initialized successfully');
   } finally {
     client.release();
@@ -855,10 +943,48 @@ export interface Deposit {
   tx_hash: string | null;
   amount_wei: string;
   token_address: string;
-  status: 'pending' | 'confirmed' | 'failed';
+  // Deposit lifecycle, expanded by the yUSD pipeline:
+  //   intent     — onramp popup opened, no on-chain transfer yet
+  //   pending    — on-chain transfer detected, deposit UserOp not yet fired
+  //   depositing — deposit UserOp submitted, awaiting receipt
+  //   confirmed  — terminal (vault deposit confirmed, or stub-mode skip)
+  //   retry      — vault paused/capped or deposit UserOp errored; manual retry
+  //   failed     — terminal failure (rare)
+  status: 'intent' | 'pending' | 'depositing' | 'confirmed' | 'retry' | 'failed';
   coinbase_charge_id: string | null;
   created_at: Date;
   confirmed_at: Date | null;
+  intent_id: string | null;
+  deposit_op_hash: string | null;
+  fiat_status: 'pending' | 'charged' | 'failed' | null;
+  token_symbol_at_time: string;
+}
+
+export interface Withdrawal {
+  id: string;
+  user_id: string;
+  wallet_address: string;
+  tx_hash: string | null;
+  amount_wei: string;
+  token_address: string;
+  destination_address: string;
+  // Outbound lifecycle (sub-phase 2b will exercise the full set):
+  //   pending     — confirm received, redeem not yet fired
+  //   redeeming   — vault redemption UserOp submitted
+  //   transferring — USDC transfer to off-ramp deposit address submitted
+  //   settling    — Coinbase has the USDC; bank payout in progress
+  //   completed   — terminal success
+  //   failed      — terminal failure (on-chain or off-ramp)
+  status: 'pending' | 'redeeming' | 'transferring' | 'settling' | 'completed' | 'failed';
+  created_at: Date;
+  completed_at: Date | null;
+  coinbase_session_id: string | null;
+  coinbase_deposit_address: string | null;
+  redeem_op_hash: string | null;
+  transfer_op_hash: string | null;
+  payout_method: 'bank' | 'debit' | null;
+  fiat_status: 'pending' | 'processing' | 'completed' | 'failed' | null;
+  token_symbol_at_time: string;
 }
 
 export async function createDepositPg(
@@ -901,11 +1027,277 @@ export async function updateDepositStatusPg(txHash: string, status: string): Pro
   if (!pool) return;
 
   await pool.query(
-    `UPDATE deposits 
+    `UPDATE deposits
      SET status = $1, confirmed_at = CASE WHEN $1 = 'confirmed' THEN CURRENT_TIMESTAMP ELSE confirmed_at END
      WHERE tx_hash = $2`,
     [status, txHash]
   );
+}
+
+// ─── yUSD pipeline helpers ───────────────────────────────────────────────
+// Added in sub-phase 2a.
+
+/**
+ * Create an "intent" deposit row before the user opens the onramp popup.
+ *
+ * The `intent_id` is attached to Coinbase's `partnerUserRef` so we can
+ * correlate the popup completion to this row even before the on-chain
+ * transfer arrives. `tx_hash` stays NULL until `recordDepositArrivalPg`
+ * fills it in. Idempotent on `intent_id`.
+ */
+export async function createDepositIntentPg(args: {
+  id: string;
+  userId: string;
+  walletAddress: string;
+  intentId: string;
+  amountWei: string;
+  tokenAddress: string;
+  tokenSymbol: string;
+  fiatStatus?: 'pending' | 'charged' | 'failed';
+}): Promise<Deposit | null> {
+  if (!pool) return null;
+
+  const result = await pool.query<Deposit>(
+    `INSERT INTO deposits
+       (id, user_id, wallet_address, tx_hash, amount_wei, token_address,
+        status, intent_id, fiat_status, token_symbol_at_time, created_at)
+     VALUES ($1, $2, $3, NULL, $4, $5, 'intent', $6, $7, $8, CURRENT_TIMESTAMP)
+     ON CONFLICT (intent_id) DO NOTHING
+     RETURNING *`,
+    [
+      args.id,
+      args.userId,
+      args.walletAddress,
+      args.amountWei,
+      args.tokenAddress,
+      args.intentId,
+      args.fiatStatus || 'pending',
+      args.tokenSymbol,
+    ],
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Record an on-chain inbound transfer detected by the indexer.
+ *
+ * Tries to attach the tx_hash to the most-recent open intent for this
+ * wallet whose amount is within tolerance. If no matching intent exists
+ * (raw crypto deposit from another wallet), creates a fresh row with
+ * `intent_id = NULL` and `status = 'pending'`.
+ *
+ * Idempotent: `tx_hash` is `UNIQUE`, so duplicate arrivals (e.g., the
+ * indexer firing twice during a reconnect) don't double-write.
+ */
+export async function recordDepositArrivalPg(args: {
+  walletAddress: string;
+  txHash: string;
+  amountWei: string;
+  tokenAddress: string;
+  tokenSymbol: string;
+}): Promise<Deposit | null> {
+  if (!pool) return null;
+
+  // Try to claim an open intent first. Match by wallet + amount (exact, in
+  // wei) to avoid grabbing the wrong intent when the user has multiple in
+  // flight. Only claim rows where tx_hash is still NULL — once claimed, the
+  // race is over.
+  const claimed = await pool.query<Deposit>(
+    `UPDATE deposits
+       SET tx_hash = $1, status = 'pending'
+       WHERE id = (
+         SELECT id FROM deposits
+          WHERE LOWER(wallet_address) = LOWER($2)
+            AND status = 'intent'
+            AND tx_hash IS NULL
+            AND amount_wei = $3
+            AND token_address = $4
+          ORDER BY created_at DESC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+       )
+       RETURNING *`,
+    [args.txHash, args.walletAddress, args.amountWei, args.tokenAddress],
+  );
+  if (claimed.rows[0]) return claimed.rows[0];
+
+  // No matching intent — record as a fresh non-intent arrival (raw crypto
+  // deposit). user_id stays NULL until we resolve it via wallet_address;
+  // the API route does that lookup before calling this helper.
+  const id = `dep_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  const fresh = await pool.query<Deposit>(
+    `INSERT INTO deposits
+       (id, user_id, wallet_address, tx_hash, amount_wei, token_address,
+        status, token_symbol_at_time, created_at)
+     VALUES (
+       $1,
+       (SELECT id FROM users WHERE LOWER(wallet_address) = LOWER($2) LIMIT 1),
+       $2, $3, $4, $5, 'pending', $6, CURRENT_TIMESTAMP
+     )
+     ON CONFLICT (tx_hash) DO NOTHING
+     RETURNING *`,
+    [id, args.walletAddress, args.txHash, args.amountWei, args.tokenAddress, args.tokenSymbol],
+  );
+  return fresh.rows[0] || null;
+}
+
+/**
+ * Set the auto-deposit UserOp hash on a row. Called after
+ * `useSendUserOperation`'s `sendUserOperationAsync` resolves.
+ *
+ * Idempotent: bails if `deposit_op_hash` is already populated. Prevents
+ * double-deposits when the arrival fires twice during indexer reconnect.
+ */
+export async function setDepositOpHashPg(
+  id: string,
+  opHash: string,
+): Promise<boolean> {
+  if (!pool) return false;
+  const result = await pool.query(
+    `UPDATE deposits
+       SET deposit_op_hash = $1, status = 'depositing'
+       WHERE id = $2 AND deposit_op_hash IS NULL
+       RETURNING id`,
+    [opHash, id],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Mark a deposit as terminal — `confirmed`, `retry`, or `failed`.
+ */
+export async function markDepositTerminalPg(
+  id: string,
+  status: 'confirmed' | 'retry' | 'failed',
+): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `UPDATE deposits
+       SET status = $1,
+           confirmed_at = CASE WHEN $1 = 'confirmed' THEN CURRENT_TIMESTAMP ELSE confirmed_at END
+       WHERE id = $2`,
+    [status, id],
+  );
+}
+
+/** Update fiat-side status (Coinbase webhook or popup-close fallback). */
+export async function setDepositFiatStatusPg(
+  intentId: string,
+  fiatStatus: 'pending' | 'charged' | 'failed',
+): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `UPDATE deposits SET fiat_status = $1 WHERE intent_id = $2`,
+    [fiatStatus, intentId],
+  );
+}
+
+/** Single fetch by id, scoped to a wallet (auth). */
+export async function getDepositByIdPg(
+  id: string,
+  walletAddress: string,
+): Promise<Deposit | null> {
+  if (!pool) return null;
+  const result = await pool.query<Deposit>(
+    `SELECT * FROM deposits
+       WHERE id = $1 AND LOWER(wallet_address) = LOWER($2)`,
+    [id, walletAddress],
+  );
+  return result.rows[0] || null;
+}
+
+/** Snapshot lookup for getTransaction.ts. No auth — receipts are public. */
+export async function getDepositByTxHashPg(
+  txHash: string,
+): Promise<Deposit | null> {
+  if (!pool) return null;
+  const result = await pool.query<Deposit>(
+    `SELECT * FROM deposits WHERE tx_hash = $1`,
+    [txHash],
+  );
+  return result.rows[0] || null;
+}
+
+/**
+ * Sum confirmed deposits minus completed withdrawals for a wallet, all in
+ * the smallest token unit (wei for the token's `decimals`). Caller formats.
+ *
+ * Used as cost basis for `getEarned`. In stub mode this stays effectively
+ * equal to the live balance, so earned clamps to $0.00 — which is the
+ * truthful answer (USDC doesn't accrue yield). The data accumulates
+ * correctly for vault cutover continuity: the moment the vault lights up,
+ * every existing user already has a basis on record.
+ */
+export async function getCostBasisPg(
+  walletAddress: string,
+): Promise<{ deposited: string; withdrawn: string; basis: string }> {
+  if (!pool) return { deposited: '0', withdrawn: '0', basis: '0' };
+
+  const dep = await pool.query<{ sum: string | null }>(
+    `SELECT COALESCE(SUM(amount_wei::numeric), 0)::text AS sum
+       FROM deposits
+       WHERE LOWER(wallet_address) = LOWER($1) AND status = 'confirmed'`,
+    [walletAddress],
+  );
+  const wd = await pool.query<{ sum: string | null }>(
+    `SELECT COALESCE(SUM(amount_wei::numeric), 0)::text AS sum
+       FROM withdrawals
+       WHERE LOWER(wallet_address) = LOWER($1) AND status = 'completed'`,
+    [walletAddress],
+  );
+  const deposited = dep.rows[0]?.sum ?? '0';
+  const withdrawn = wd.rows[0]?.sum ?? '0';
+  // Caller does the BigInt math if it cares about wei precision. For the
+  // 2-decimal display path, simple subtraction is fine.
+  const basis = (
+    BigInt(deposited) - BigInt(withdrawn)
+  ).toString();
+  return { deposited, withdrawn, basis };
+}
+
+/**
+ * Open transfers for a wallet — feeds the StatusContext single source of
+ * truth. Returns deposits in any non-terminal state and withdrawals in any
+ * non-terminal state. Both ArrivalListener and StatusBanner read from this.
+ */
+export async function getOpenTransfersPg(
+  walletAddress: string,
+): Promise<{ deposits: Deposit[]; withdrawals: Withdrawal[] }> {
+  if (!pool) return { deposits: [], withdrawals: [] };
+
+  const [d, w] = await Promise.all([
+    pool.query<Deposit>(
+      `SELECT * FROM deposits
+         WHERE LOWER(wallet_address) = LOWER($1)
+           AND status IN ('intent', 'pending', 'depositing', 'retry')
+         ORDER BY created_at DESC`,
+      [walletAddress],
+    ),
+    pool.query<Withdrawal>(
+      `SELECT * FROM withdrawals
+         WHERE LOWER(wallet_address) = LOWER($1)
+           AND status IN ('pending', 'redeeming', 'transferring', 'settling')
+         ORDER BY created_at DESC`,
+      [walletAddress],
+    ),
+  ]);
+  return { deposits: d.rows, withdrawals: w.rows };
+}
+
+/** Snapshot lookup for getTransaction.ts — withdrawal side. */
+export async function getWithdrawalByTxHashPg(
+  txHash: string,
+): Promise<Withdrawal | null> {
+  if (!pool) return null;
+  // tx_hash on withdrawals points to the on-chain USDC transfer to the
+  // off-ramp deposit address. transfer_op_hash is the UserOp hash, not the
+  // tx hash itself — they're different. We match on tx_hash here for the
+  // receipt page lookup.
+  const result = await pool.query<Withdrawal>(
+    `SELECT * FROM withdrawals WHERE tx_hash = $1`,
+    [txHash],
+  );
+  return result.rows[0] || null;
 }
 
 // ============================================
