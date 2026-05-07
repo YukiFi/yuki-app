@@ -9,9 +9,16 @@ import { useSmartAccountClient } from "@account-kit/react"
 import { useBalance } from "@/lib/hooks/useBalance"
 import { OnrampComparison } from "@/components/onramp/OnrampComparison"
 import { ProviderModal } from "@/components/onramp/ProviderModal"
+import { InboundAddTab } from "@/components/funds/InboundAddTab"
 import type { OnrampQuote } from "@/lib/types/onramp"
 
 const LAVENDER = "#e1a8f0"
+
+// Sub-phase 2a feature flag. When off (default), the Add tab renders the
+// legacy single-input + OnrampComparison flow unchanged. When on, the Add
+// tab renders the three-path InboundAddTab and the layout-level
+// ArrivalListener handles arrival → DB write → auto-deposit UserOp.
+const INBOUND_V2 = process.env.NEXT_PUBLIC_INBOUND_V2 === "1"
 
 type Mode = "add" | "withdraw"
 type Step = "input" | "confirm" | "success"
@@ -149,7 +156,23 @@ export default function FundsPage() {
         )}
 
         <AnimatePresence mode="wait">
-          {step === "input" && (
+          {/* Sub-phase 2a inbound-V2: when the flag is on and the user is on
+              the Add tab, render the new three-path tab. The Withdraw tab is
+              unchanged here (it still uses the legacy single-input flow);
+              sub-phase 2b rebuilds it for off-ramp. */}
+          {step === "input" && INBOUND_V2 && mode === "add" && (
+            <motion.div
+              key="inbound-v2-add"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              <InboundAddTab walletAddress={walletAddress} />
+            </motion.div>
+          )}
+
+          {step === "input" && !(INBOUND_V2 && mode === "add") && (
             <motion.div
               key={`input-${mode}`}
               initial={{ opacity: 0, y: 4 }}

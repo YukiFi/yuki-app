@@ -18,6 +18,13 @@ interface ProviderModalProps {
     walletAddress: string;
     onClose: () => void;
     onSuccess: () => void;
+    /**
+     * Optional intent_id from POST /api/deposits/intent. Appended to the
+     * Coinbase URL as `partnerUserRef`, which Coinbase echoes back to webhook
+     * receivers. Used in sub-phase 2a's inbound pipeline to correlate the
+     * popup completion with the pre-recorded "intent" deposits row.
+     */
+    intentId?: string;
 }
 
 export function ProviderModal({
@@ -27,6 +34,7 @@ export function ProviderModal({
     walletAddress,
     onClose,
     onSuccess,
+    intentId,
 }: ProviderModalProps) {
     useEffect(() => {
         if (!isOpen || !provider || !quote || !walletAddress) return;
@@ -34,12 +42,12 @@ export function ProviderModal({
         if (provider === "coinbase") {
             openCoinbaseWidget();
         }
-    }, [isOpen, provider, quote, walletAddress]);
+    }, [isOpen, provider, quote, walletAddress, intentId]);
 
     const openCoinbaseWidget = () => {
         // Build Coinbase Onramp URL with correct parameters
         // Using the simpler URL format that Coinbase expects
-        const params = new URLSearchParams({
+        const baseParams: Record<string, string> = {
             appId: process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY || '',
             addresses: JSON.stringify({
                 [walletAddress]: ['base'], // wallet address mapped to networks
@@ -49,7 +57,11 @@ export function ProviderModal({
             defaultNetwork: 'base',
             defaultPaymentMethod: 'CARD',
             presetCryptoAmount: quote?.fiatAmount.toString() || '100',
-        });
+        };
+        if (intentId) {
+            baseParams.partnerUserRef = intentId;
+        }
+        const params = new URLSearchParams(baseParams);
 
         const coinbaseUrl = `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
 
