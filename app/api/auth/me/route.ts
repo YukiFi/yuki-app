@@ -6,15 +6,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getOrCreateUserByWalletAddress, getUserByWalletAddress } from '@/lib/db';
+import { getUserByWalletAddress, setUserEmailIfChanged } from '@/lib/db';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
   try {
     let walletAddress: string;
+    let alchemyEmail: string | undefined;
 
     try {
       const body = await request.json();
       walletAddress = body.walletAddress;
+      alchemyEmail = typeof body.email === 'string' ? body.email : undefined;
     } catch {
       return NextResponse.json(
         { error: 'Invalid request body' },
@@ -41,13 +45,22 @@ export async function POST(request: NextRequest) {
     const normalizedAddress = walletAddress.toLowerCase();
 
     // Get user by wallet address (no auto-creation)
-    const user = await getUserByWalletAddress(normalizedAddress);
+    let user = await getUserByWalletAddress(normalizedAddress);
 
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
+    }
+
+    // Sync Alchemy session email into our DB if it's present, valid, and different.
+    if (alchemyEmail && EMAIL_PATTERN.test(alchemyEmail.trim())) {
+      const wrote = await setUserEmailIfChanged(user.id, alchemyEmail);
+      if (wrote) {
+        const refreshed = await getUserByWalletAddress(normalizedAddress);
+        if (refreshed) user = refreshed;
+      }
     }
 
     return NextResponse.json({

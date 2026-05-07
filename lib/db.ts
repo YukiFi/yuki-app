@@ -517,6 +517,39 @@ export async function getOrCreateUserByWalletAddress(walletAddress: string): Pro
 }
 
 /**
+ * Conditionally sync a user's email (e.g. from Alchemy session).
+ * Only writes when value differs from the existing row, to avoid noisy updates.
+ */
+export async function setUserEmailIfChanged(userId: string, email: string): Promise<boolean> {
+  if (USE_POSTGRES) {
+    try {
+      const pg = await getPgDb();
+      if (pg) {
+        return await pg.setUserEmailIfChangedPg(userId, email);
+      }
+    } catch (error) {
+      const shouldFallback = handlePgError(error, 'setUserEmailIfChanged');
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+
+  // In-memory fallback
+  const user = db.users.get(userId);
+  const normalized = email.trim().toLowerCase();
+  if (!user || !normalized) return false;
+  if (user.email === normalized) return false;
+  user.email = normalized;
+  user.updated_at = new Date();
+  db.users.set(userId, user);
+  if (!db.indices.usersByEmail.has(normalized)) {
+    db.indices.usersByEmail.set(normalized, userId);
+  }
+  return true;
+}
+
+/**
  * Get user by wallet address
  */
 export async function getUserByWalletAddress(walletAddress: string): Promise<User | null> {

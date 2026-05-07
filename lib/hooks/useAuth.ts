@@ -65,11 +65,14 @@ export function useAuth() {
     }
 
     try {
-      // Fetch user data from our API using wallet address
+      // Fetch user data from our API using wallet address.
+      // We forward Alchemy's session email so the server can persist it into
+      // our DB on first sight (or when the user changes their Alchemy email).
+      const alchemyEmail = alchemyUser?.email || null;
       const response = await fetch('/api/auth/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress }),
+        body: JSON.stringify({ walletAddress, email: alchemyEmail }),
       });
 
       if (response.ok) {
@@ -78,7 +81,8 @@ export function useAuth() {
           user: {
             id: data.user?.id || walletAddress,
             walletAddress: walletAddress,
-            email: alchemyUser?.email || null,
+            // Prefer DB email (source of truth) and fall back to live Alchemy session.
+            email: data.user?.email || alchemyEmail,
             username: data.user?.username || null,
             displayName: data.user?.displayName || null,
             avatarUrl: data.user?.avatarUrl || null,
