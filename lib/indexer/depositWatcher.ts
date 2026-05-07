@@ -27,12 +27,23 @@ export interface DepositEvent {
 export type DepositCallback = (deposit: DepositEvent) => void;
 
 /**
- * Create a public client for the Base network
+ * Create a public client for the Base network.
+ *
+ * pollingInterval is set to 12s rather than viem's HTTP default of 4s. On
+ * Base's 2s block time, 4s = ~1 poll per 2 blocks, which is overkill for
+ * "did a deposit just land" — a 12s ceiling on detection latency is plenty
+ * for a Venmo-feel UX, and it cuts the watcher's CU burn ~3× at idle. Each
+ * tick is an eth_getLogs call (~75 CU on Alchemy), so 900/hr → 300/hr per
+ * session. WebSocket transport (eth_subscribe) is the proper fix at scale;
+ * deferred until usage warrants it.
  */
+const WATCHER_POLLING_INTERVAL_MS = 12_000;
+
 function getPublicClient() {
   return createPublicClient({
     chain: base,
     transport: http(process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org'),
+    pollingInterval: WATCHER_POLLING_INTERVAL_MS,
   });
 }
 
