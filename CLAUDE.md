@@ -18,7 +18,6 @@ This file captures non-obvious operational context for the project. Code convent
 
 ## Database (Neon)
 
-- **Single canonical project**: `yuki-db` (id `polished-sun-69129803`) under the Neon org **"Vercel: Haruxe"** (`org-silent-credit-64942940`). This is what the Vercel integration provisions and what production reads.
 - The old project `deceit` (id `snowy-glitter-19227604`) under your personal Neon org is **archived** — ignore it.
 - A `dev` branch exists on `yuki-db` (endpoint `ep-billowing-sky-aqs045ho`). Schema is copy-on-write from `main`. Use it for local seeding so you don't pollute production data.
 - **Schema migrations** run on cold start in `lib/db-postgres.ts:initializeDatabase()`. This is "good enough" for now but is a known footgun on preview deploys (race conditions between concurrent first requests). Migrate to `drizzle-kit` or `node-pg-migrate` before the team grows.
