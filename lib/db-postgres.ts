@@ -1062,7 +1062,11 @@ export async function createDepositIntentPg(args: {
        (id, user_id, wallet_address, tx_hash, amount_wei, token_address,
         status, intent_id, fiat_status, token_symbol_at_time, created_at)
      VALUES ($1, $2, $3, NULL, $4, $5, 'intent', $6, $7, $8, CURRENT_TIMESTAMP)
-     ON CONFLICT (intent_id) DO NOTHING
+     -- WHERE clause mirrors the partial unique index
+     -- idx_deposits_intent_id (... WHERE intent_id IS NOT NULL).
+     -- PostgreSQL requires the conflict target's predicate to exactly
+     -- match the partial index's predicate.
+     ON CONFLICT (intent_id) WHERE intent_id IS NOT NULL DO NOTHING
      RETURNING *`,
     [
       args.id,
