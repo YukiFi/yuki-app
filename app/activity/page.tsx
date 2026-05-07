@@ -1,296 +1,257 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { useSmartAccountClient } from "@account-kit/react";
-import { useTransactionHistory, type Transaction, type TransactionType } from "@/lib/hooks/useTransactionHistory";
+import { useMemo } from "react"
+import {
+  Activity as ActivityIcon,
+  ArrowDownLeft,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ArrowUpRight,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react"
+import { useSmartAccountClient } from "@account-kit/react"
+import {
+  useTransactionHistory,
+  type Transaction,
+  type TransactionType,
+} from "@/lib/hooks/useTransactionHistory"
 
-const BRAND_LAVENDER = "#e1a8f0";
+const LAVENDER = "#e1a8f0"
 
-// Group transactions by relative time periods
-function groupTransactionsByDate(transactions: Transaction[]) {
-  const groups: { [key: string]: Transaction[] } = {};
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+// ────────────────────────────────────────────────────────────────────────────
+// Type metadata
+// ────────────────────────────────────────────────────────────────────────────
 
-  transactions.forEach(tx => {
-    const txDate = new Date(tx.timestamp);
-    let key: string;
-
-    if (txDate >= today) {
-      key = "Today";
-    } else if (txDate >= yesterday) {
-      key = "Yesterday";
-    } else if (txDate >= lastWeek) {
-      key = "This Week";
-    } else if (txDate >= lastMonth) {
-      key = "This Month";
-    } else {
-      key = txDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-    }
-
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(tx);
-  });
-
-  return groups;
+const TYPE_META: Record<
+  TransactionType,
+  { Icon: LucideIcon; label: string; sign: "+" | "−"; accent?: string }
+> = {
+  sent:       { Icon: ArrowUpRight,    label: "Sent",       sign: "−" },
+  received:   { Icon: ArrowDownLeft,   label: "Received",   sign: "+" },
+  deposit:    { Icon: ArrowDownToLine, label: "Deposit",    sign: "+" },
+  withdrawal: { Icon: ArrowUpFromLine, label: "Withdrawal", sign: "−" },
+  yield:      { Icon: Sparkles,        label: "Yield",      sign: "+", accent: LAVENDER },
 }
 
-function getTransactionIcon(type: TransactionType) {
-  const baseClass = "w-5 h-5";
+// ────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────────────────
 
-  switch (type) {
-    case "sent":
-      return (
-        <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
-        </svg>
-      );
-    case "received":
-      return (
-        <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" />
-        </svg>
-      );
-    case "deposit":
-      return (
-        <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m0 0l6.75-6.75M12 19.5l-6.75-6.75" />
-        </svg>
-      );
-    case "withdrawal":
-      return (
-        <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 19.5v-15m0 0l-6.75 6.75M12 4.5l6.75 6.75" />
-        </svg>
-      );
-    case "yield":
-      return (
-        <svg className={baseClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      );
+function formatUSD(v: number) {
+  return v.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function formatTime(d: Date) {
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+}
+
+function shortHash(hash: string) {
+  return `${hash.slice(0, 6)}…${hash.slice(-4)}`
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function bucketFor(d: Date): string {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diffDays = Math.round((today.getTime() - target.getTime()) / DAY_MS)
+
+  if (diffDays === 0) return "Today"
+  if (diffDays === 1) return "Yesterday"
+  if (diffDays < 7) return d.toLocaleDateString("en-US", { weekday: "long" })
+  if (target.getFullYear() === now.getFullYear()) {
+    return d.toLocaleDateString("en-US", { month: "long", day: "numeric" })
   }
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  });
+function groupByBucket(transactions: Transaction[]) {
+  const groups = new Map<string, Transaction[]>()
+  for (const tx of transactions) {
+    const key = bucketFor(tx.timestamp)
+    const arr = groups.get(key) ?? []
+    arr.push(tx)
+    groups.set(key, arr)
+  }
+  return Array.from(groups.entries())
 }
 
-function TransactionRow({
-  transaction,
-  index
-}: {
-  transaction: Transaction;
-  index: number;
-}) {
-  const [isHovered, setIsHovered] = useState(false);
+// ────────────────────────────────────────────────────────────────────────────
+// Pieces
+// ────────────────────────────────────────────────────────────────────────────
 
-  const isPositive = transaction.amount > 0;
-  const isYield = transaction.type === "yield";
-
+function GroupHeader({ label }: { label: string }) {
   return (
+    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 px-3 sm:px-4 pt-6 pb-3">
+      {label}
+    </p>
+  )
+}
+
+function Row({ tx }: { tx: Transaction }) {
+  const meta = TYPE_META[tx.type]
+  const { Icon, label, sign, accent } = meta
+  const isPending = tx.status === "pending"
+  const hashHref = tx.txHash ? `https://basescan.org/tx/${tx.txHash}` : undefined
+
+  const inner = (
     <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="group relative py-4 sm:py-5 cursor-pointer"
+      className={`group flex items-center gap-4 px-3 sm:px-4 py-3.5 rounded-[4px] transition-colors hover:bg-zinc-900 focus-visible:bg-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-[#e1a8f0] ${
+        isPending ? "opacity-60" : ""
+      }`}
     >
-      {/* Hover background */}
-      <motion.div
-        className="absolute inset-x-0 inset-y-0 -mx-4 sm:-mx-5 rounded-2xl"
-        initial={false}
-        animate={{
-          backgroundColor: isHovered ? "rgba(255,255,255,0.03)" : "transparent",
-        }}
-        transition={{ duration: 0.2 }}
-      />
+      <div className="shrink-0 w-9 h-9 rounded-[4px] bg-zinc-900 group-hover:bg-zinc-800 flex items-center justify-center transition-colors">
+        <Icon
+          className="w-4 h-4"
+          style={accent ? { color: accent } : { color: "rgba(255,255,255,0.75)" }}
+          aria-hidden
+        />
+      </div>
 
-      <div className="relative flex items-center gap-3 sm:gap-4">
-        {/* Icon */}
-        <motion.div
-          className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{
-            backgroundColor: isYield
-              ? `${BRAND_LAVENDER}15`
-              : "rgba(255,255,255,0.05)",
-            color: isYield
-              ? BRAND_LAVENDER
-              : isPositive
-                ? "rgba(255,255,255,0.7)"
-                : "rgba(255,255,255,0.4)"
-          }}
-          animate={{
-            scale: isHovered ? 1.05 : 1,
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          {getTransactionIcon(transaction.type)}
-        </motion.div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-white font-medium text-sm sm:text-base truncate">
-              {transaction.description}
-            </p>
-            {transaction.status === "pending" && (
-              <span className="text-xs text-white/30 bg-white/[0.05] px-2 py-0.5 rounded-full">
-                Pending
-              </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-[14px] font-medium tracking-tight text-white truncate">
+            {tx.description}
+          </p>
+          <p className="text-[14px] font-medium tabular-nums text-white shrink-0">
+            {sign}${formatUSD(Math.abs(tx.amount))}
+            {tx.tokenSymbol && tx.tokenSymbol.toUpperCase() !== "USDC" && (
+              <span className="ml-1 text-xs text-white/40">{tx.tokenSymbol}</span>
             )}
-          </div>
-          <p className="text-white/30 text-xs sm:text-sm mt-0.5">
-            {formatTime(transaction.timestamp)}
           </p>
         </div>
-
-        {/* Amount */}
-        <motion.div
-          className="text-base sm:text-lg font-medium tabular-nums flex-shrink-0"
-          style={{
-            color: isYield
-              ? BRAND_LAVENDER
-              : isPositive
-                ? "white"
-                : "rgba(255,255,255,0.5)",
-            fontFeatureSettings: "'tnum' 1"
-          }}
-          animate={{
-            x: isHovered ? -4 : 0,
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          {isPositive ? "+" : ""}
-          ${Math.abs(transaction.amount).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-          })}
-        </motion.div>
-
-        {/* Arrow on hover */}
-        <motion.div
-          className="text-white/20 hidden sm:block"
-          initial={{ opacity: 0, x: -10 }}
-          animate={{
-            opacity: isHovered ? 1 : 0,
-            x: isHovered ? 0 : -10
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </motion.div>
+        <div className="flex items-baseline justify-between gap-3 mt-0.5">
+          <p className="text-xs text-white/45 truncate">
+            <span>{label}</span>
+            {tx.counterparty && <span className="text-white/35"> · {tx.counterparty}</span>}
+            {tx.txHash && <span className="text-white/30"> · {shortHash(tx.txHash)}</span>}
+          </p>
+          <p className="text-xs text-white/45 shrink-0">
+            {isPending ? "Pending" : formatTime(tx.timestamp)}
+          </p>
+        </div>
       </div>
     </div>
-  );
+  )
+
+  return hashHref ? (
+    <a
+      href={hashHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block w-full outline-none rounded-[4px]"
+    >
+      {inner}
+    </a>
+  ) : (
+    inner
+  )
 }
+
+function SkeletonRow() {
+  return (
+    <div className="flex items-center gap-4 px-3 sm:px-4 py-3.5">
+      <div className="shrink-0 w-9 h-9 rounded-[4px] bg-zinc-900" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3.5 w-1/3 rounded-[2px] bg-zinc-900" />
+        <div className="h-3 w-1/4 rounded-[2px] bg-zinc-900/70" />
+      </div>
+      <div className="h-3.5 w-16 rounded-[2px] bg-zinc-900 shrink-0" />
+    </div>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center text-center py-16 sm:py-24">
+      <div className="w-12 h-12 rounded-[4px] bg-zinc-900 flex items-center justify-center mb-5">
+        <ActivityIcon className="w-5 h-5 text-white/45" aria-hidden />
+      </div>
+      <p className="text-base font-medium tracking-tight text-white">
+        No activity yet
+      </p>
+      <p className="text-sm text-white/50 mt-1.5 max-w-xs leading-relaxed">
+        Your sends, receives, deposits, and yield events will appear here.
+      </p>
+    </div>
+  )
+}
+
+function ErrorState({ message }: { message: string | null }) {
+  return (
+    <div className="px-3 sm:px-4 py-12 text-center">
+      <p className="text-sm text-white/65">Couldn&apos;t load activity right now.</p>
+      {message && (
+        <p className="mt-1 text-xs text-white/35 truncate max-w-md mx-auto">
+          {message}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────────────
 
 export default function ActivityPage() {
-  const { client } = useSmartAccountClient({});
-  const [filter, setFilter] = useState<"all" | "yield" | "transfers">("all");
+  const { client } = useSmartAccountClient({})
+  const walletAddress = client?.account?.address as `0x${string}` | undefined
+  const { transactions, isLoading, error } = useTransactionHistory(walletAddress, {
+    enabled: !!walletAddress,
+    limit: 100,
+  })
 
-  // Get wallet address from smart account client
-  const walletAddress = client?.account?.address as `0x${string}` | undefined;
-  const { transactions, isLoading } = useTransactionHistory(walletAddress, { enabled: !!walletAddress });
+  const groups = useMemo(() => groupByBucket(transactions), [transactions])
 
-  const filteredTransactions = transactions.filter(tx => {
-    if (filter === "yield") return tx.type === "yield";
-    if (filter === "transfers") return tx.type !== "yield";
-    return true;
-  });
-
-  const groupedTransactions = groupTransactionsByDate(filteredTransactions);
-  const groupOrder = ["Today", "Yesterday", "This Week", "This Month"];
-
-  // Calculate total yield
-  const totalYield = transactions
-    .filter(tx => tx.type === "yield")
-    .reduce((sum, tx) => sum + tx.amount, 0);
-
-  let rowIndex = 0;
-
-  return (
-    <div className="min-h-[calc(100vh-3.5rem)] w-full flex flex-col items-center px-4 sm:px-8 lg:px-16 py-8 sm:py-12">
-      <div className="w-full max-w-[1100px]">
-        {/* Header */}
-        <div className="mb-8 sm:mb-10">
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Activity</h1>
-          <p className="text-white/40 text-sm sm:text-base">
-            <span style={{ color: BRAND_LAVENDER }}>${totalYield.toFixed(2)}</span> earned all time
-          </p>
-        </div>
-
-        {/* Filter tabs */}
-        <div className="flex gap-1 mb-8 sm:mb-10">
-          {[
-            { key: "all", label: "All" },
-            { key: "yield", label: "Yield" },
-            { key: "transfers", label: "Transfers" },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key as typeof filter)}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer"
-              style={{
-                backgroundColor: filter === key ? `${BRAND_LAVENDER}20` : "transparent",
-                color: filter === key ? BRAND_LAVENDER : "rgba(255,255,255,0.4)"
-              }}
-            >
-              {label}
-            </button>
+  const renderBody = () => {
+    if (isLoading && transactions.length === 0) {
+      return (
+        <div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonRow key={i} />
           ))}
         </div>
+      )
+    }
+    if (error && transactions.length === 0) return <ErrorState message={error} />
+    if (transactions.length === 0) return <EmptyState />
 
-        {/* Transaction groups */}
-        <div className="space-y-6 sm:space-y-8">
-          {isLoading ? (
-            <div className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-4 py-8 sm:px-5 sm:py-12 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-            </div>
-          ) : transactions.length === 0 ? (
-            <div className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-4 py-8 sm:px-5 sm:py-12 text-center">
-              <p className="text-white/40 text-sm">No transactions yet</p>
-              <p className="text-white/25 text-xs mt-1">Your transaction history will appear here</p>
-            </div>
-          ) : Object.keys(groupedTransactions)
-            .sort((a, b) => {
-              const aIndex = groupOrder.indexOf(a);
-              const bIndex = groupOrder.indexOf(b);
-              if (aIndex === -1 && bIndex === -1) return 0;
-              if (aIndex === -1) return 1;
-              if (bIndex === -1) return -1;
-              return aIndex - bIndex;
-            })
-            .map((groupName) => (
-              <div key={groupName} className="bg-white/[0.04] backdrop-blur-[40px] rounded-[32px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] px-4 py-2 sm:px-5 sm:py-3">
-                {/* Group header */}
-                <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  {groupName}
-                </p>
-
-                {/* Transactions in group */}
-                <div className="divide-y divide-white/[0.04]">
-                  {groupedTransactions[groupName].map((tx) => (
-                    <TransactionRow
-                      key={tx.id}
-                      transaction={tx}
-                      index={rowIndex++}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
-          }
+    return groups.map(([label, txs]) => (
+      <section key={label}>
+        <GroupHeader label={label} />
+        <div>
+          {txs.map((tx) => (
+            <Row key={tx.id} tx={tx} />
+          ))}
         </div>
+      </section>
+    ))
+  }
+
+  return (
+    <div className="px-4 sm:px-8 lg:px-12 py-8 sm:py-12 lg:py-16">
+      <div className="w-full max-w-[800px] mx-auto">
+        <header className="mb-8 sm:mb-10">
+          <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white mb-2.5">
+            Activity
+          </h1>
+          <p className="text-sm sm:text-base leading-relaxed text-white/55 max-w-xl">
+            A history of your sends, receives, deposits, and yield events.
+          </p>
+        </header>
+
+        <div className="-mx-3 sm:-mx-4">{renderBody()}</div>
       </div>
     </div>
-  );
+  )
 }

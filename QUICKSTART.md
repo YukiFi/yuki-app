@@ -16,7 +16,7 @@ Your Yuki app now has a complete authentication system with:
 ### 1. Install Dependencies (Already Done ✓)
 
 ```bash
-bun add wagmi viem @tanstack/react-query @rainbow-me/rainbowkit
+pnpm add wagmi viem @tanstack/react-query @rainbow-me/rainbowkit
 ```
 
 ### 2. Get a WalletConnect Project ID
@@ -34,7 +34,7 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 
 ```bash
 cd /home/haruxe/Projects/Yuki/app
-bun dev
+pnpm dev
 ```
 
 ### 4. Test the Authentication

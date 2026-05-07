@@ -1,613 +1,567 @@
-"use client";
+"use client"
 
-import { Suspense, useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from "framer-motion"
 import {
-  useSignerStatus,
-  useUser as useAlchemyUser,
   useAuthenticate,
-} from "@account-kit/react";
-import { AlchemySignerStatus } from "@account-kit/signer";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+  useSignerStatus,
+  useSmartAccountClient,
+} from "@account-kit/react"
+import { ArrowLeft, Check, Fingerprint } from "lucide-react"
 
-const BRAND_LAVENDER = "#e1a8f0";
-const ease = [0.22, 1, 0.36, 1] as const;
+const LAVENDER = "#e1a8f0"
 
-function LoginContent() {
-  const router = useRouter();
+type Step = "email" | "verify" | "passkey" | "success"
 
-  // Alchemy authentication hooks
-  const signerStatus = useSignerStatus();
-  const { isConnected, isInitializing, status, isAuthenticating: signerAuthenticating } = signerStatus;
-  const alchemyUser = useAlchemyUser();
-  const { authenticate, isPending: isAuthenticating } = useAuthenticate();
+// ────────────────────────────────────────────────────────────────────────────
+// Primitives
+// ────────────────────────────────────────────────────────────────────────────
 
-  // Determine if we're waiting for OTP verification based on signer status
-  const isAwaitingOtp = status === AlchemySignerStatus.AWAITING_EMAIL_AUTH ||
-    status === AlchemySignerStatus.AWAITING_OTP_AUTH;
+function Spinner({ className = "" }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin ${className}`}
+    />
+  )
+}
 
-  // Local state for custom email OTP flow
-  const [email, setEmail] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [step, setStep] = useState<"input" | "verify" | "passkey" | "success">("input");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
+const PRIMARY =
+  "inline-flex items-center justify-center gap-2 w-full h-11 rounded-[4px] text-sm font-semibold tracking-tight text-black outline-none transition-[box-shadow,filter,opacity] duration-150 enabled:hover:brightness-105 enabled:hover:shadow-[0_0_28px_-4px_rgba(225,168,240,0.5)] focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed"
 
-  // Ref to track if error animation should play
-  const errorRef = useRef<HTMLDivElement>(null);
+const SECONDARY =
+  "inline-flex items-center justify-center gap-2 w-full h-11 rounded-[4px] bg-zinc-800 text-sm font-medium tracking-tight text-white outline-none transition-colors duration-150 enabled:hover:bg-zinc-700 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed"
 
-  // Ref to track if user manually changed step (to prevent auto-switching)
-  const manualStepChangeRef = useRef(false);
+const TEXT_BTN =
+  "inline-flex items-center justify-center h-9 px-2 rounded-[4px] text-xs tracking-tight text-white/55 outline-none transition-colors hover:text-white focus-visible:text-white focus-visible:ring-2 focus-visible:ring-[#e1a8f0] disabled:opacity-50 disabled:cursor-not-allowed"
 
-  // Debug: Log signer status changes
-  useEffect(() => {
-    console.log("[Auth] Signer status changed:", status, signerStatus);
-  }, [status, signerStatus]);
+// ────────────────────────────────────────────────────────────────────────────
+// OTP input
+// ────────────────────────────────────────────────────────────────────────────
 
-  // Automatically switch to verify step when signer is awaiting OTP
-  useEffect(() => {
-    if (isAwaitingOtp && step === "input" && !manualStepChangeRef.current) {
-      console.log("[Auth] Signer is awaiting OTP, switching to verify step");
-      setStep("verify");
-      setResendCooldown(60);
-    }
-  }, [isAwaitingOtp, step]);
+function OtpInput({
+  value,
+  onChange,
+  autoFocus,
+  disabled,
+}: {
+  value: string
+  onChange: (v: string) => void
+  autoFocus?: boolean
+  disabled?: boolean
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const focus = () => inputRef.current?.focus()
 
-  // Redirect if already connected - but wait a moment to ensure state is stable
-  useEffect(() => {
-    if (!isConnected || isInitializing) return;
-
-    // Show success state briefly before redirecting
-    setStep("success");
-    const timer = setTimeout(() => {
-      router.push("/");
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [isConnected, isInitializing, router]);
-
-  // Also redirect if manually set to success step
-  useEffect(() => {
-    if (step === "success" && isConnected) {
-      const timer = setTimeout(() => {
-        router.push("/");
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [step, isConnected, router]);
-
-  // Cooldown timer for resend
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
-
-  // Auto-submit when OTP is complete
-  useEffect(() => {
-    if (verificationCode.length === 6 && step === "verify") {
-      handleVerifyCode();
-    }
-  }, [verificationCode, step]);
-
-  // Show loading while Alchemy initializes
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b0f] px-4">
-        <div className="mb-12">
-          <Image
-            src="/images/Yuki.svg"
-            alt="Yuki"
-            width={56}
-            height={56}
-            priority
-          />
-        </div>
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-white/10 border-t-white/30 rounded-full"
-        />
+  return (
+    <div className="relative" onClick={focus}>
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        autoFocus={autoFocus}
+        disabled={disabled}
+        aria-label="One-time code"
+        className="absolute inset-0 w-full h-full opacity-0 cursor-text"
+      />
+      <div className="grid grid-cols-6 gap-2 sm:gap-2.5">
+        {Array.from({ length: 6 }).map((_, i) => {
+          const char = value[i] ?? ""
+          const isActive = i === Math.min(value.length, 5)
+          return (
+            <div
+              key={i}
+              className={`h-12 sm:h-14 rounded-[4px] bg-zinc-800 flex items-center justify-center text-lg sm:text-xl font-medium tabular-nums text-white transition-shadow ${
+                isActive ? "shadow-[0_0_0_2px_#e1a8f0]" : ""
+              }`}
+            >
+              {char ||
+                (isActive ? (
+                  <span
+                    aria-hidden
+                    className="block w-px h-5 animate-pulse"
+                    style={{ backgroundColor: LAVENDER }}
+                  />
+                ) : (
+                  ""
+                ))}
+            </div>
+          )
+        })}
       </div>
-    );
-  }
+    </div>
+  )
+}
 
-  // Already connected - show success state
-  if (isConnected || step === "success") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0b0b0f]">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, ease }}
-          className="text-center"
-        >
-          <motion.div
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.3, ease }}
-            className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.04] flex items-center justify-center"
-          >
-            <svg className="w-7 h-7 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </motion.div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.3, ease }}
-            className="text-white/60 text-sm"
-          >
-            Welcome back
-          </motion.p>
-        </motion.div>
-      </div>
-    );
-  }
+// ────────────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────────────
 
-  const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
+export default function LoginPage() {
+  const router = useRouter()
+  const { authenticate } = useAuthenticate()
+  const { isConnected, isInitializing, status } = useSignerStatus()
+  const { client } = useSmartAccountClient({})
+  const walletAddress = client?.account?.address
 
-    setLoading(true);
-    setError(null);
-    // Reset manual step change flag so auto-switching works
-    manualStepChangeRef.current = false;
+  const [step, setStep] = useState<Step>("email")
+  const [email, setEmail] = useState("")
+  const [code, setCode] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const [hasMounted, setHasMounted] = useState(false)
+  const manualReturnRef = useRef(false)
 
-    try {
-      console.log("[Auth] Starting email authentication for:", email);
-      console.log("[Auth] Current signer status:", status);
+  // Avoid hydration mismatch — branch on init state only after first paint.
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
 
-      // Use Alchemy's authenticate with email OTP
-      const result = await authenticate({
-        type: "email",
-        email: email,
-      });
+  const statusStr = status as unknown as string
+  const isAwaitingOtp =
+    statusStr === "AWAITING_EMAIL_AUTH" || statusStr === "AWAITING_OTP_AUTH"
 
-      console.log("[Auth] Authentication initiated, result:", result);
-      console.log("[Auth] Signer status after authenticate:", status);
-    } catch (err: unknown) {
-      console.error("[Auth] Error sending code:", err);
+  // Already connected on mount → success → route
+  useEffect(() => {
+    if (isInitializing) return
+    if (isConnected && (step === "email" || step === "verify")) {
+      setStep("success")
+    }
+  }, [isInitializing, isConnected, step])
 
-      let errorMessage = "Failed to send verification code. Please check your email and try again.";
-      if (err instanceof Error) {
-        errorMessage = err.message;
-        console.error("[Auth] Full error:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+  // Signer awaiting OTP but UI hasn't moved
+  useEffect(() => {
+    if (isAwaitingOtp && step === "email" && !manualReturnRef.current) {
+      setStep("verify")
+      setCooldown((c) => (c > 0 ? c : 60))
+    }
+  }, [isAwaitingOtp, step])
+
+  // Cooldown
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
+
+  // Auto-submit at 6 digits
+  useEffect(() => {
+    if (code.length === 6 && step === "verify" && !loading) {
+      void verifyCode()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, step])
+
+  // Verified → passkey upsell
+  useEffect(() => {
+    if (isConnected && step === "verify") {
+      setStep("passkey")
+    }
+  }, [isConnected, step])
+
+  // Success → onboarding-aware redirect (avoids landing on / and bouncing)
+  useEffect(() => {
+    if (step !== "success") return
+    if (!walletAddress) return
+
+    let cancelled = false
+    const minDelay = new Promise<void>((resolve) => setTimeout(resolve, 500))
+
+    ;(async () => {
+      let target = "/setup"
+      try {
+        const res = await fetch("/api/auth/onboarding-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+          body: JSON.stringify({ walletAddress }),
+        })
+        if (res.ok) {
+          const data = (await res.json()) as { completed?: boolean }
+          if (data.completed) {
+            target = "/"
+            try {
+              sessionStorage.setItem(`onboarding_complete_${walletAddress}`, "true")
+            } catch {
+              // sessionStorage unavailable; OnboardingGuard will re-check
+            }
+          }
+        }
+      } catch {
+        // Network failure → /setup is the safe default for new users
       }
 
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
+      await minDelay
+      if (!cancelled) router.replace(target)
+    })()
+
+    return () => {
+      cancelled = true
     }
-  };
+  }, [step, walletAddress, router])
 
-  const handleVerifyCode = async () => {
-    if (verificationCode.length !== 6) return;
-
-    setLoading(true);
-    setError(null);
-
+  async function sendEmail(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email || loading) return
+    setLoading(true)
+    setError(null)
+    manualReturnRef.current = false
     try {
-      // Verify the OTP code with Alchemy
-      await authenticate({
-        type: "otp",
-        otpCode: verificationCode,
-      });
-
-      // Success! Go to passkey step
-      setStep("passkey");
-    } catch (err: unknown) {
-      console.error("Error verifying code:", err);
-      const errorMessage = err instanceof Error ? err.message : "Invalid verification code";
-      setError(errorMessage);
-      setVerificationCode("");
+      await authenticate({ type: "email", email, emailMode: "otp" })
+      setStep("verify")
+      setCooldown(60)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send your code. Try again.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const handlePasskeyAuth = async () => {
-    setLoading(true);
-    setError(null);
-
+  async function verifyCode() {
+    if (code.length !== 6) return
+    setLoading(true)
+    setError(null)
     try {
-      // Try to authenticate with existing passkey
-      await authenticate({
-        type: "passkey",
-        createNew: false,
-      });
-    } catch (err: unknown) {
-      console.error("Passkey auth error:", err);
-      // If no existing passkey, offer to create one
-      const errorMessage = err instanceof Error ? err.message : "No passkey found";
-      setError(`${errorMessage}. Would you like to create one after logging in with email?`);
+      await authenticate({ type: "otp", otpCode: code })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That code didn't work. Try again.")
+      setCode("")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const handleCreatePasskey = async () => {
-    setLoading(true);
-    setError(null);
+  async function resendCode() {
+    if (cooldown > 0 || loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      await authenticate({ type: "email", email, emailMode: "otp" })
+      setCooldown(60)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't resend the code.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
+  async function passkeyLogin() {
+    if (loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      await authenticate({ type: "passkey", createNew: false })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No passkey found. Try email instead.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function createPasskey() {
+    if (loading) return
+    setLoading(true)
+    setError(null)
     try {
       await authenticate({
         type: "passkey",
         createNew: true,
         username: email || "yuki-user",
-      });
-
-      // Passkey created, will redirect via the isConnected effect
-    } catch (err: unknown) {
-      console.error("Passkey creation error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to create passkey";
-      setError(errorMessage);
+      })
+      setStep("success")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't add a passkey.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const handleResendCode = async () => {
-    if (resendCooldown > 0) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      await authenticate({
-        type: "email",
-        email: email,
-      });
-      setResendCooldown(60);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to resend code";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (hasMounted && isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+        <Spinner className="w-6 h-6 text-white/40" />
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b0f] px-4">
-      {/* Logo */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, ease }}
-        className="mb-12"
-      >
-        <Image
-          src="/images/appletname.svg"
-          alt="Yuki"
-          width={120}
-          height={94}
-          priority
-        />
-      </motion.div>
-
-      <div className="w-full max-w-[420px]">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1, ease }}
+    <div className="min-h-screen flex flex-col bg-zinc-950">
+      {/* Header */}
+      <header className="px-5 sm:px-8 py-5 sm:py-6">
+        <Link
+          href="/"
+          aria-label="Yuki home"
+          className="inline-flex items-center rounded-[4px] outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
         >
-          <Card className="border-0 bg-white/[0.04] backdrop-blur-[40px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] rounded-[32px]">
-            <CardHeader className="text-center pb-6 pt-8 px-8">
-              <CardTitle className="text-2xl font-medium text-white mb-2">
-                {step === "input" ? "Sign in" : step === "verify" ? "Verify" : "Secure your wallet"}
-              </CardTitle>
-              <CardDescription className="text-white/50 text-sm">
-                {step === "input"
-                  ? "Access your wallet"
-                  : step === "verify"
-                    ? `Code sent to ${email}`
-                    : "Add biometric authentication"
-                }
-              </CardDescription>
-            </CardHeader>
+          <Image src="/images/applet.svg" alt="Yuki" width={28} height={28} priority />
+        </Link>
+      </header>
 
-            <CardContent className="px-8 pb-8">
-              <AnimatePresence mode="wait">
-                {step === "input" ? (
-                  <motion.div
-                    key="input"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25, ease }}
-                    className="space-y-6"
-                  >
-                    {/* Email input */}
-                    <form onSubmit={handleSendCode} className="space-y-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="email" className="text-white/60 text-sm font-normal">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@example.com"
-                          required
-                          autoFocus
-                          className="transition-all duration-250 focus:shadow-[0_0_0_2px_rgba(225,168,240,0.3)]"
-                        />
-                      </div>
+      <main className="flex-1 flex items-start sm:items-center justify-center px-5 pt-2 sm:pt-0 pb-16">
+        <div className="w-full max-w-[400px]">
+          <section className="bg-zinc-900 rounded-md p-7 sm:p-9 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
+            <AnimatePresence mode="wait">
+              {step === "email" && (
+                <motion.form
+                  key="email"
+                  onSubmit={sendEmail}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="space-y-7"
+                >
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/50">
+                      Welcome
+                    </p>
+                    <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white">
+                      Sign in to Yuki
+                    </h1>
+                    <p className="text-sm leading-relaxed text-white/55">
+                      Enter your email to continue. We'll create an account if it's new.
+                    </p>
+                  </div>
 
-                      <AnimatePresence>
-                        {error && (
-                          <motion.div
-                            ref={errorRef}
-                            initial={{ opacity: 0, y: -5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            transition={{ duration: 0.2, ease }}
-                            className="p-4 bg-red-500/10 rounded-2xl"
-                          >
-                            <p className="text-sm text-red-400/90">{error}</p>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <Button
-                        type="submit"
-                        disabled={loading || !email}
-                        className="w-full transition-all duration-250"
-                        size="lg"
-                      >
-                        {loading ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <motion.span
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                              className="w-4 h-4 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
-                            />
-                            Sending
-                          </span>
-                        ) : (
-                          "Continue"
-                        )}
-                      </Button>
-                    </form>
-
-                    {/* Divider */}
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-white/[0.06]" />
-                      </div>
-                      <div className="relative flex justify-center text-xs">
-                        <span className="bg-white/[0.04] backdrop-blur-sm px-4 py-1 rounded-full text-white/30">or</span>
-                      </div>
-                    </div>
-
-                    {/* Passkey button */}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handlePasskeyAuth}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="email"
+                      className="block text-[11px] font-medium uppercase tracking-[0.06em] text-white/50"
+                    >
+                      Email
+                    </label>
+                    <input
+                      id="email"
+                      type="email"
+                      autoComplete="email"
+                      autoFocus
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
                       disabled={loading}
-                      className="w-full border-0 bg-white/[0.03] hover:bg-white/[0.05] transition-all duration-250 focus:shadow-[0_0_0_2px_rgba(225,168,240,0.3)]"
-                      size="lg"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33" />
-                      </svg>
-                      Passkey
-                    </Button>
-                  </motion.div>
-                ) : step === "verify" ? (
-                  /* Verification step */
-                  <motion.form
-                    key="verify"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25, ease }}
-                    id="verify-form"
-                    onSubmit={(e) => { e.preventDefault(); handleVerifyCode(); }}
-                    className="space-y-6"
+                      className="w-full h-11 rounded-[4px] bg-zinc-800 px-3.5 text-[15px] text-white placeholder:text-white/30 outline-none transition-shadow focus:shadow-[0_0_0_2px_#e1a8f0] disabled:opacity-60"
+                    />
+                  </div>
+
+                  {error && (
+                    <p role="alert" className="text-sm leading-relaxed text-red-300/90">
+                      {error}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={!email || loading}
+                    style={!email || loading ? undefined : { backgroundColor: LAVENDER }}
+                    className={`${PRIMARY} ${!email || loading ? "bg-zinc-800 text-white/40" : ""}`}
                   >
-                    <div className="space-y-4">
-                      <Label className="text-white/60 text-sm font-normal">Verification code</Label>
-                      <div className="flex justify-center mt-2">
-                        <InputOTP
-                          maxLength={6}
-                          value={verificationCode}
-                          onChange={setVerificationCode}
-                          autoFocus
-                        >
-                          <InputOTPGroup>
-                            <InputOTPSlot index={0} />
-                            <InputOTPSlot index={1} />
-                            <InputOTPSlot index={2} />
-                            <InputOTPSlot index={3} />
-                            <InputOTPSlot index={4} />
-                            <InputOTPSlot index={5} />
-                          </InputOTPGroup>
-                        </InputOTP>
-                      </div>
-                    </div>
+                    {loading ? <Spinner className="text-black" /> : "Continue"}
+                  </button>
 
-                    <AnimatePresence>
-                      {error && (
-                        <motion.div
-                          ref={errorRef}
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -5 }}
-                          transition={{ duration: 0.2, ease }}
-                          className="p-4 bg-red-500/10 rounded-2xl"
-                        >
-                          <p className="text-sm text-red-400/90">{error}</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                  <div className="flex items-center gap-3">
+                    <span className="flex-1 h-px bg-white/[0.06]" />
+                    <span className="text-[11px] uppercase tracking-[0.06em] text-white/30">
+                      or
+                    </span>
+                    <span className="flex-1 h-px bg-white/[0.06]" />
+                  </div>
 
-                    <Button
-                      type="submit"
-                      disabled={loading || verificationCode.length !== 6}
-                      className="w-full transition-all duration-250"
-                      size="lg"
-                    >
-                      {loading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <motion.span
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="w-4 h-4 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
-                          />
-                          Verifying
-                        </span>
-                      ) : (
-                        "Verify"
-                      )}
-                    </Button>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          manualStepChangeRef.current = true;
-                          setStep("input");
-                          setVerificationCode("");
-                          setError(null);
-                        }}
-                        className="transition-all duration-250 text-white/40 hover:text-white/60"
-                      >
-                        ← Change email
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleResendCode}
-                        disabled={loading || resendCooldown > 0}
-                        className="transition-all duration-250 text-white/40 hover:text-white/60"
-                      >
-                        {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend"}
-                      </Button>
-                    </div>
-                  </motion.form>
-                ) : (
-                  /* Passkey step */
-                  <motion.div
-                    key="passkey"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25, ease }}
-                    className="space-y-6"
+                  <button
+                    type="button"
+                    onClick={passkeyLogin}
+                    disabled={loading}
+                    className={SECONDARY}
                   >
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="w-16 h-16 rounded-full bg-white/[0.06] flex items-center justify-center">
-                        <svg className="w-8 h-8 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                        </svg>
-                      </div>
-                      <p className="text-white/60 text-sm max-w-[280px]">
-                        Sign in faster next time with biometric authentication
+                    <Fingerprint className="w-4 h-4" />
+                    Continue with passkey
+                  </button>
+                </motion.form>
+              )}
+
+              {step === "verify" && (
+                <motion.div
+                  key="verify"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="space-y-7"
+                >
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/50">
+                      Verify
+                    </p>
+                    <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white">
+                      Check your email
+                    </h1>
+                    <p className="text-sm leading-relaxed text-white/55">
+                      We sent a six-digit code to{" "}
+                      <span className="text-white">{email}</span>.
+                    </p>
+                  </div>
+
+                  <OtpInput value={code} onChange={setCode} autoFocus disabled={loading} />
+
+                  {error && (
+                    <p role="alert" className="text-sm leading-relaxed text-red-300/90">
+                      {error}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={verifyCode}
+                    disabled={code.length !== 6 || loading}
+                    style={
+                      code.length !== 6 || loading ? undefined : { backgroundColor: LAVENDER }
+                    }
+                    className={`${PRIMARY} ${
+                      code.length !== 6 || loading ? "bg-zinc-800 text-white/40" : ""
+                    }`}
+                  >
+                    {loading ? <Spinner className="text-black" /> : "Verify"}
+                  </button>
+
+                  <div className="flex items-center justify-between -mx-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        manualReturnRef.current = true
+                        setStep("email")
+                        setCode("")
+                        setError(null)
+                      }}
+                      className={TEXT_BTN}
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+                      Different email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resendCode}
+                      disabled={cooldown > 0 || loading}
+                      className={TEXT_BTN}
+                    >
+                      {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === "passkey" && (
+                <motion.div
+                  key="passkey"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="space-y-7"
+                >
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/50">
+                      One more step
+                    </p>
+                    <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white">
+                      Add a passkey
+                    </h1>
+                    <p className="text-sm leading-relaxed text-white/55">
+                      Sign in faster next time with Face ID, Touch ID, or your device unlock.
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-3.5 rounded-[4px] bg-zinc-800 p-4">
+                    <div
+                      className="shrink-0 w-9 h-9 rounded-[4px] flex items-center justify-center"
+                      style={{ backgroundColor: "rgba(225,168,240,0.12)" }}
+                    >
+                      <Fingerprint className="w-4 h-4" style={{ color: LAVENDER }} />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <p className="text-[14px] font-medium tracking-tight text-white">
+                        Biometric authentication
+                      </p>
+                      <p className="text-xs leading-relaxed text-white/55">
+                        Your passkey stays on this device. Hardware-backed and phishing-resistant.
                       </p>
                     </div>
+                  </div>
 
-                    <AnimatePresence>
-                      {error && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -5 }}
-                          transition={{ duration: 0.2, ease }}
-                          className="p-4 bg-red-500/10 rounded-2xl"
-                        >
-                          <p className="text-sm text-red-400/90">{error}</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                  {error && (
+                    <p role="alert" className="text-sm leading-relaxed text-red-300/90">
+                      {error}
+                    </p>
+                  )}
 
-                    <div className="space-y-3">
-                      <Button
-                        onClick={handleCreatePasskey}
-                        disabled={loading}
-                        className="w-full transition-all duration-250"
-                        size="lg"
-                      >
-                        {loading ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <motion.span
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                              className="w-4 h-4 border-2 border-[#1a0a1f]/30 border-t-[#1a0a1f] rounded-full"
-                            />
-                            Creating
-                          </span>
-                        ) : (
-                          "Create passkey"
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          // Skip passkey, will redirect via isConnected effect
-                          setStep("success");
-                        }}
-                        variant="ghost"
-                        className="w-full transition-all duration-250 text-white/40 hover:text-white/60"
-                        size="lg"
-                      >
-                        Skip for now
-                      </Button>
-                    </div>
+                  <div className="space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={createPasskey}
+                      disabled={loading}
+                      style={loading ? undefined : { backgroundColor: LAVENDER }}
+                      className={`${PRIMARY} ${loading ? "bg-zinc-800 text-white/40" : ""}`}
+                    >
+                      {loading ? <Spinner className="text-black" /> : "Create passkey"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep("success")}
+                      disabled={loading}
+                      className="inline-flex w-full h-11 items-center justify-center rounded-[4px] text-sm font-medium tracking-tight text-white/55 outline-none transition-colors hover:text-white disabled:opacity-50 focus-visible:text-white focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                    >
+                      Skip for now
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {step === "success" && (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="py-3 text-center"
+                >
+                  <motion.div
+                    initial={{ scale: 0.85, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+                    className="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-4"
+                    style={{ backgroundColor: "rgba(225,168,240,0.12)" }}
+                  >
+                    <Check className="w-6 h-6" style={{ color: LAVENDER }} strokeWidth={2.5} />
                   </motion.div>
-                )}
-              </AnimatePresence>
-            </CardContent>
-          </Card>
-        </motion.div>
+                  <p className="text-base font-medium tracking-tight text-white">
+                    You're in
+                  </p>
+                  <p className="text-sm text-white/55 mt-1">Taking you to your dashboard…</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.4, ease }}
-          className="text-xs text-white/20 mt-8 text-center"
-        >
-          By continuing, you agree to Yuki's Terms and Privacy Policy
-        </motion.p>
-      </div>
-    </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b0b0f] px-4">
-          <div className="mb-12">
-            <Image
-              src="/images/appletname.svg"
-              alt="Yuki"
-              width={120}
-              height={94}
-              priority
-            />
-          </div>
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-8 h-8 border-2 border-white/10 border-t-white/30 rounded-full"
-          />
+          <p className="mt-6 text-center text-xs tracking-tight text-white/35 leading-relaxed">
+            By continuing, you agree to Yuki's{" "}
+            <Link href="/legal" className="text-white/60 hover:text-white">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/legal" className="text-white/60 hover:text-white">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </div>
-      }
-    >
-      <LoginContent />
-    </Suspense>
-  );
+      </main>
+    </div>
+  )
 }

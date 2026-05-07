@@ -1,253 +1,242 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { useSmartAccountClient } from "@account-kit/react";
-import { useBalance } from "@/lib/hooks/useBalance";
-import { OnrampComparison } from "@/components/onramp/OnrampComparison";
-import { ProviderModal } from "@/components/onramp/ProviderModal";
-import type { OnrampQuote } from "@/lib/types/onramp";
+import { useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from "framer-motion"
+import { ArrowLeft } from "lucide-react"
+import { useSmartAccountClient } from "@account-kit/react"
+import { useBalance } from "@/lib/hooks/useBalance"
+import { OnrampComparison } from "@/components/onramp/OnrampComparison"
+import { ProviderModal } from "@/components/onramp/ProviderModal"
+import type { OnrampQuote } from "@/lib/types/onramp"
 
-const BRAND_LAVENDER = "#e1a8f0";
+const LAVENDER = "#e1a8f0"
 
-type Mode = "add" | "withdraw";
+type Mode = "add" | "withdraw"
+type Step = "input" | "confirm" | "success"
+
+const QUICK_PICKS = [50, 100, 250, 500]
+
+// ────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+function formatUSD(v: number) {
+  return v.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────────────
 
 export default function FundsPage() {
-  const { client } = useSmartAccountClient({});
-  const [mode, setMode] = useState<Mode>("add");
-  const [step, setStep] = useState<"input" | "confirm" | "success">("input");
-  const [amount, setAmount] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const [selectedQuote, setSelectedQuote] = useState<OnrampQuote | null>(null);
-  const [showProviderModal, setShowProviderModal] = useState(false);
+  const router = useRouter()
+  const { client } = useSmartAccountClient({})
+  const walletAddress = client?.account?.address as `0x${string}` | undefined
+  const { total, refetch } = useBalance(walletAddress, {
+    enabled: !!walletAddress,
+  })
+  const balance = parseFloat(total) || 0
 
-  // Get wallet address from smart account client
-  const walletAddress = client?.account?.address as `0x${string}` | undefined;
-  const { total, refetch } = useBalance(walletAddress, { enabled: !!walletAddress });
-  const totalBalance = parseFloat(total) || 0;
+  const [mode, setMode] = useState<Mode>("add")
+  const [step, setStep] = useState<Step>("input")
+  const [amount, setAmount] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  const numericAmount = parseFloat(amount) || 0;
+  const [showProviderModal, setShowProviderModal] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
+  const [selectedQuote, setSelectedQuote] = useState<OnrampQuote | null>(null)
+
+  const numeric = parseFloat(amount) || 0
+  const overBalance = mode === "withdraw" && numeric > balance
+  const canContinue = numeric > 0 && !overBalance
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^0-9.]/g, "");
-    const parts = val.split(".");
-    if (parts.length > 2) return;
-    if (parts[1]?.length > 2) return;
-    setAmount(val);
-  };
+    const val = e.target.value.replace(/[^0-9.]/g, "")
+    const parts = val.split(".")
+    if (parts.length > 2) return
+    if (parts[1]?.length > 2) return
+    setAmount(val)
+  }
 
-  const handleAdd = () => {
-    setIsLoading(true);
+  const switchMode = (next: Mode) => {
+    if (next === mode) return
+    setMode(next)
+    setAmount("")
+    setStep("input")
+  }
 
-    // In production, this would trigger a deposit flow
+  const onSelectProvider = (provider: string, quote: OnrampQuote) => {
+    setSelectedProvider(provider)
+    setSelectedQuote(quote)
+    setShowProviderModal(true)
+  }
+
+  const onProviderSuccess = () => {
+    setShowProviderModal(false)
+    setStep("success")
+    refetch()
+  }
+
+  const confirmWithdraw = async () => {
+    if (!canContinue) return
+    setSubmitting(true)
+    // In production this would broadcast a withdrawal transaction.
     setTimeout(() => {
-      setIsLoading(false);
-      setStep("success");
-      refetch();
-    }, 1500);
-  };
+      setSubmitting(false)
+      setStep("success")
+      refetch()
+    }, 1400)
+  }
 
-  const handleWithdraw = () => {
-    if (!numericAmount || numericAmount <= 0 || numericAmount > totalBalance) return;
-
-    setIsLoading(true);
-
-    // In production, this would trigger a withdrawal transaction
-    setTimeout(() => {
-      setIsLoading(false);
-      setStep("success");
-      refetch();
-    }, 2000);
-  };
-
-  const resetForm = () => {
-    setStep("input");
-    setAmount("");
-  };
-
-  const canContinue = numericAmount > 0 && (mode === "add" || numericAmount <= totalBalance);
+  const close = () => {
+    router.push("/")
+  }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center px-4 sm:px-8 lg:px-12 py-6 sm:py-10 lg:py-16">
-      <div className="w-full max-w-[600px]">
+    <div className="px-4 sm:px-8 lg:px-12 py-8 sm:py-12 lg:py-16">
+      <div className="w-full max-w-[600px] mx-auto">
         {/* Back link */}
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-white/40 hover:text-white/60 transition-colors mb-6 sm:mb-8"
+          className="inline-flex items-center gap-1.5 text-xs text-white/45 mb-8 rounded-sm outline-none transition-colors hover:text-white focus-visible:text-white focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Back
+          <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
+          Back to home
         </Link>
+
+        {/* Header */}
+        <header className="mb-8 sm:mb-10">
+          <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white mb-2.5">
+            Funds
+          </h1>
+          <p className="text-sm sm:text-base leading-relaxed text-white/55 max-w-xl">
+            Add money to your balance, or move it to your bank.
+          </p>
+        </header>
+
+        {/* Mode segmented toggle */}
+        {step === "input" && (
+          <div
+            role="tablist"
+            aria-label="Funds action"
+            className="inline-flex bg-zinc-900 rounded-[6px] p-1 mb-8"
+          >
+            {(["add", "withdraw"] as const).map((m) => {
+              const active = mode === m
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => switchMode(m)}
+                  className={`h-8 px-4 rounded-[4px] text-sm font-medium tracking-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 ${
+                    active
+                      ? "bg-zinc-800 text-white"
+                      : "text-white/55 hover:text-white"
+                  }`}
+                >
+                  {m === "add" ? "Add" : "Withdraw"}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         <AnimatePresence mode="wait">
           {step === "input" && (
             <motion.div
-              key="input"
-              initial={{ opacity: 0, y: 10 }}
+              key={`input-${mode}`}
+              initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
             >
-              {/* Page Title */}
-              <h1 className="text-lg sm:text-xl lg:text-2xl text-white mb-6 sm:mb-8">
-                {mode === "add" ? "Add Funds" : "Withdraw"}
-              </h1>
+              {/* Amount input */}
+              <div className="mb-6">
+                <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 mb-3">
+                  {mode === "add" ? "Amount to add" : "Amount to withdraw"}
+                </p>
+                <div className="flex items-baseline mb-4">
+                  <span
+                    style={{ color: LAVENDER }}
+                    className="text-5xl sm:text-6xl font-light"
+                  >
+                    $
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={handleAmountChange}
+                    placeholder="0"
+                    className="bg-transparent text-white text-5xl sm:text-6xl font-light w-full outline-none placeholder:text-white/20 tabular-nums"
+                  />
+                </div>
 
-              {/* Mode Toggle */}
-              <div className="bg-white/[0.03] rounded-2xl p-1.5 mb-6 sm:mb-8">
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    onClick={() => { setMode("add"); setAmount(""); }}
-                    className={`py-3 sm:py-3.5 text-sm sm:text-base font-medium rounded-xl transition-all duration-200 ${mode === "add"
-                      ? "bg-white text-black shadow-lg"
-                      : "text-white/50 hover:text-white/70"
-                      }`}
-                  >
-                    Add
-                  </button>
-                  <button
-                    onClick={() => { setMode("withdraw"); setAmount(""); }}
-                    className={`py-3 sm:py-3.5 text-sm sm:text-base font-medium rounded-xl transition-all duration-200 ${mode === "withdraw"
-                      ? "bg-white text-black shadow-lg"
-                      : "text-white/50 hover:text-white/70"
-                      }`}
-                  >
-                    Withdraw
-                  </button>
+                <div className="flex items-center justify-between min-h-[20px]">
+                  {mode === "withdraw" && (
+                    <p className="text-xs text-white/45 tabular-nums">
+                      Available{" "}
+                      <span className="text-white/65">${formatUSD(balance)}</span>
+                    </p>
+                  )}
+                  {mode === "add" && <span />}
+                  {overBalance && (
+                    <p className="text-xs text-red-300/80">
+                      Exceeds available balance.
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {mode === "add" ? (
-                /* Add Funds - Simple Coinbase Integration */
-                <>
-                  {/* Amount Input Card */}
-                  <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 mb-6">
-                    {/* Label */}
-                    <div className="mb-4 sm:mb-6">
-                      <p className="text-white/50 text-xs sm:text-sm font-medium">Amount to add</p>
-                    </div>
-
-                    {/* Amount Input */}
-                    <div className="flex items-baseline mb-6 sm:mb-8">
-                      <span style={{ color: BRAND_LAVENDER }} className="text-4xl sm:text-5xl font-light">$</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={amount}
-                        onChange={handleAmountChange}
-                        placeholder="0"
-                        className="bg-transparent text-white text-4xl sm:text-5xl font-light w-full focus:outline-none placeholder:text-white/20"
-                        style={{ fontFeatureSettings: "'tnum' 1" }}
-                        autoFocus
-                      />
-                    </div>
-
-                    {/* Quick amounts */}
-                    <div className="grid grid-cols-4 gap-2 sm:gap-3">
-                      {[100, 500, 1000, 5000].map((val, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setAmount(val.toString())}
-                          className="py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-all duration-150 bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/80 active:scale-[0.98]"
-                        >
-                          ${val.toLocaleString()}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Continue Button */}
+              {/* Quick picks */}
+              <div className="grid grid-cols-4 gap-2 mb-7">
+                {QUICK_PICKS.map((v) => (
                   <button
-                    onClick={() => {
-                      setSelectedProvider("coinbase");
-                      setSelectedQuote({
-                        provider: "coinbase",
-                        providerName: "Coinbase",
-                        fiatAmount: numericAmount,
-                        fiatCurrency: "USD",
-                        cryptoAmount: numericAmount,
-                        cryptoCurrency: "USDC",
-                        totalFees: 0,
-                        feePercentage: 0,
-                        feeBreakdown: [],
-                        success: true,
-                        timestamp: Date.now(),
-                      });
-                      setShowProviderModal(true);
-                    }}
-                    disabled={!canContinue}
-                    className={`w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 ${canContinue
-                      ? "bg-white text-black active:scale-[0.98] cursor-pointer"
-                      : "bg-white/[0.05] text-white/30 cursor-not-allowed"
-                      }`}
+                    key={v}
+                    type="button"
+                    onClick={() => setAmount(String(v))}
+                    className="h-9 rounded-[4px] bg-zinc-900 text-sm font-medium tracking-tight text-white/70 outline-none transition-colors hover:bg-zinc-800 hover:text-white tabular-nums focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                   >
-                    Continue with Coinbase
+                    ${v}
                   </button>
-                </>
-              ) : (
-                /* Withdraw - Keep existing amount input */
-                <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 mb-6">
-                  {/* Label and Available Balance */}
-                  <div className="flex items-center justify-between mb-4 sm:mb-6">
-                    <p className="text-white/50 text-xs sm:text-sm font-medium">Amount</p>
-                    <p className="text-white/30 text-xs sm:text-sm tabular-nums" style={{ fontFeatureSettings: "'tnum' 1" }}>
-                      Available: ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                ))}
+              </div>
+
+              {/* Mode-specific body */}
+              {mode === "add" ? (
+                numeric > 0 ? (
+                  <section>
+                    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 mb-3">
+                      Providers
                     </p>
-                  </div>
-
-                  {/* Amount Input */}
-                  <div className="flex items-baseline mb-6 sm:mb-8">
-                    <span style={{ color: BRAND_LAVENDER }} className="text-4xl sm:text-5xl font-light">$</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={amount}
-                      onChange={handleAmountChange}
-                      placeholder="0"
-                      className="bg-transparent text-white text-4xl sm:text-5xl font-light w-full focus:outline-none placeholder:text-white/20"
-                      style={{ fontFeatureSettings: "'tnum' 1" }}
-                      autoFocus
+                    <OnrampComparison
+                      amount={numeric}
+                      onSelectProvider={onSelectProvider}
                     />
-                  </div>
-
-                  {/* Quick amounts */}
-                  <div className="grid grid-cols-4 gap-2 sm:gap-3">
-                    {[100, 500, 1000, totalBalance].map((val, idx) => {
-                      const isMax = idx === 3;
-                      const displayVal = isMax ? "MAX" : `$${val.toLocaleString()}`;
-                      const disabled = val > totalBalance;
-
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => setAmount(val.toString())}
-                          disabled={disabled}
-                          className={`py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-all duration-150 ${disabled
-                            ? "bg-white/[0.02] text-white/20 cursor-not-allowed"
-                            : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08] hover:text-white/80 active:scale-[0.98]"
-                            }`}
-                        >
-                          {displayVal}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Continue Button - Only show for withdraw mode */}
-              {mode === "withdraw" && (
+                  </section>
+                ) : (
+                  <p className="text-sm text-white/45">
+                    Enter an amount to compare onramp providers.
+                  </p>
+                )
+              ) : (
                 <button
-                  onClick={() => setStep("confirm")}
+                  type="button"
                   disabled={!canContinue}
-                  className={`w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 ${canContinue
-                    ? "bg-white text-black active:scale-[0.98] cursor-pointer"
-                    : "bg-white/[0.05] text-white/30 cursor-not-allowed"
-                    }`}
+                  onClick={() => setStep("confirm")}
+                  style={canContinue ? { backgroundColor: LAVENDER } : undefined}
+                  className={`inline-flex w-full h-11 items-center justify-center rounded-[4px] text-sm font-semibold tracking-tight outline-none transition-[box-shadow,filter,opacity,background-color] duration-150 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
+                    canContinue
+                      ? "text-black hover:brightness-105 hover:shadow-[0_0_28px_-4px_rgba(225,168,240,0.5)]"
+                      : "bg-zinc-800 text-white/40 cursor-not-allowed"
+                  }`}
                 >
                   Continue
                 </button>
@@ -258,71 +247,50 @@ export default function FundsPage() {
           {step === "confirm" && (
             <motion.div
               key="confirm"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
             >
-              {/* Page Title */}
-              <h1 className="text-lg sm:text-xl lg:text-2xl text-white mb-6 sm:mb-8">
-                Confirm {mode === "add" ? "Deposit" : "Withdrawal"}
-              </h1>
+              <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 mb-4">
+                Review
+              </p>
+              <p className="text-5xl sm:text-6xl font-light tracking-tight tabular-nums text-white mb-2">
+                <span style={{ color: LAVENDER }}>$</span>
+                {formatUSD(numeric)}
+              </p>
+              <p className="text-sm text-white/55 mb-7">
+                Withdraw to your bank account.
+              </p>
 
-              {/* Confirmation Card */}
-              <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-5 py-6 sm:px-8 sm:py-8 mb-6">
-                {/* Amount Display */}
-                <div className="text-center mb-6 sm:mb-8">
-                  <p className="text-white/50 text-xs sm:text-sm font-medium mb-3">
-                    {mode === "add" ? "Adding" : "Withdrawing"}
-                  </p>
-                  <p
-                    className="text-4xl sm:text-5xl font-light text-white"
-                    style={{ fontFeatureSettings: "'tnum' 1" }}
-                  >
-                    <span style={{ color: BRAND_LAVENDER }}>$</span>
-                    {numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </p>
+              <div className="-mx-3 sm:-mx-4 mb-8">
+                <div className="flex items-center justify-between gap-4 px-3 sm:px-4 py-3.5">
+                  <p className="text-[14px] text-white/55">Arrival</p>
+                  <p className="text-[14px] text-white">1–3 business days</p>
                 </div>
-
-                {/* Details */}
-                <div className="space-y-3 sm:space-y-4 pt-6 sm:pt-8 border-t border-white/[0.05]">
-                  {mode === "withdraw" && (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/40 text-sm">To</span>
-                        <span className="text-white/60 text-sm">Bank Account ••••4829</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white/40 text-sm">Arrival</span>
-                        <span className="text-white/60 text-sm">1-2 business days</span>
-                      </div>
-                    </>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/40 text-sm">Fee</span>
-                    <span className="text-white/60 text-sm">Free</span>
-                  </div>
+                <div className="flex items-center justify-between gap-4 px-3 sm:px-4 py-3.5">
+                  <p className="text-[14px] text-white/55">Network fee</p>
+                  <p className="text-[14px] text-white">Free</p>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setStep("input")}
-                  className="py-4 rounded-xl sm:rounded-2xl bg-white/[0.05] text-white/60 text-base font-medium hover:bg-white/[0.08] hover:text-white/80 transition-all duration-150 active:scale-[0.98]"
+                  disabled={submitting}
+                  className="inline-flex h-11 px-5 items-center justify-center rounded-[4px] bg-zinc-900 text-sm font-medium tracking-tight text-white/70 outline-none transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                 >
                   Back
                 </button>
                 <button
-                  onClick={mode === "add" ? handleAdd : handleWithdraw}
-                  disabled={isLoading}
-                  className="py-4 rounded-xl sm:rounded-2xl bg-white text-black text-base font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  type="button"
+                  onClick={confirmWithdraw}
+                  disabled={submitting}
+                  style={{ backgroundColor: LAVENDER }}
+                  className="inline-flex flex-1 h-11 items-center justify-center rounded-[4px] text-sm font-semibold tracking-tight text-black outline-none transition-[box-shadow,filter,opacity] duration-150 hover:brightness-105 hover:shadow-[0_0_28px_-4px_rgba(225,168,240,0.5)] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
                 >
-                  {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin mx-auto" />
-                  ) : (
-                    mode === "add" ? "Confirm" : "Withdraw"
-                  )}
+                  {submitting ? "Sending…" : "Confirm withdrawal"}
                 </button>
               </div>
             </motion.div>
@@ -331,80 +299,56 @@ export default function FundsPage() {
           {step === "success" && (
             <motion.div
               key="success"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="text-center py-12"
+              transition={{ duration: 0.18 }}
+              className="text-center py-8"
             >
-              {/* Success Icon */}
               <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.1, duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
-                className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-                style={{ backgroundColor: `${BRAND_LAVENDER}15` }}
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+                className="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-4"
+                style={{ backgroundColor: "rgba(225,168,240,0.12)" }}
               >
                 <svg
-                  className="w-10 h-10"
-                  style={{ color: BRAND_LAVENDER }}
+                  className="w-6 h-6"
+                  style={{ color: LAVENDER }}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  strokeWidth={1.5}
+                  strokeWidth={2.5}
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </motion.div>
-
-              {/* Success Message */}
-              <h2 className="text-2xl sm:text-3xl font-medium text-white mb-3">
-                {mode === "add" ? "Funds Added" : "Withdrawal Initiated"}
-              </h2>
-              <p className="text-white/50 text-sm sm:text-base mb-8 max-w-md mx-auto">
-                {mode === "add"
-                  ? `$${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} has been added to your balance.`
-                  : `$${numericAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })} is on its way to your bank.`
-                }
+              <p className="text-base font-medium tracking-tight text-white">
+                {mode === "add" ? "Funds on the way" : "Withdrawal sent"}
               </p>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={resetForm}
-                  className="px-6 py-3.5 rounded-xl bg-white/[0.05] text-white/60 text-sm font-medium hover:bg-white/[0.08] hover:text-white/80 transition-all duration-150 active:scale-[0.98]"
-                >
-                  {mode === "add" ? "Add More" : "Withdraw More"}
-                </button>
-                <Link
-                  href="/"
-                  className="px-6 py-3.5 rounded-xl bg-white text-black text-sm font-medium hover:bg-gray-100 transition-all duration-150 active:scale-[0.98] text-center"
-                >
-                  Back to Dashboard
-                </Link>
-              </div>
+              <p className="text-sm text-white/45 mt-1 tabular-nums">
+                ${formatUSD(numeric)}
+              </p>
+              <button
+                type="button"
+                onClick={close}
+                className="mt-6 inline-flex h-9 px-4 items-center justify-center rounded-[4px] bg-zinc-900 text-sm font-medium tracking-tight text-white/70 outline-none transition-colors hover:bg-zinc-800 hover:text-white focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+              >
+                Back to dashboard
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Provider Modal */}
       <ProviderModal
         isOpen={showProviderModal}
         provider={selectedProvider}
         quote={selectedQuote}
         walletAddress={walletAddress || ""}
-        onClose={() => {
-          setShowProviderModal(false);
-          setSelectedProvider(null);
-          setSelectedQuote(null);
-        }}
-        onSuccess={() => {
-          setShowProviderModal(false);
-          setStep("success");
-          refetch();
-        }}
+        onClose={() => setShowProviderModal(false)}
+        onSuccess={onProviderSuccess}
       />
     </div>
-  );
+  )
 }

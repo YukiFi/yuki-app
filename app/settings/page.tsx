@@ -1,368 +1,342 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { 
-  useUser as useAlchemyUser,
-  useSignerStatus,
-  useSmartAccountClient,
-  useLogout,
-} from "@account-kit/react";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useLogout } from "@account-kit/react"
+import { ChevronRight } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
 
-const BRAND_LAVENDER = "#e1a8f0";
+const LAVENDER = "#e1a8f0"
 
-type SettingsSection = "account" | "wallet" | "security";
+// ────────────────────────────────────────────────────────────────────────────
+// Pieces
+// ────────────────────────────────────────────────────────────────────────────
 
-export default function SettingsPage() {
-  const { isLoading: authLoading } = useAuth();
-  const { isConnected, isInitializing } = useSignerStatus();
-  const { client } = useSmartAccountClient({});
-  const alchemyUser = useAlchemyUser();
-  const { logout } = useLogout();
-  
-  // Get wallet address from smart account client
-  const walletAddress = client?.account?.address;
-  
-  // Section state
-  const [activeSection, setActiveSection] = useState<SettingsSection>("account");
-  
-  // Copy states
-  const [copiedAddress, setCopiedAddress] = useState(false);
-  
-  // Profile data state
-  const [profile, setProfile] = useState<{
-    handle: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-    email: string | null;
-  } | null>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  
-  // Fetch profile data
-  useEffect(() => {
-    async function fetchProfile() {
-      if (!walletAddress) {
-        setIsLoadingProfile(false);
-        return;
-      }
-      
-      try {
-        const response = await fetch('/api/profile/me', {
-          headers: {
-            'x-wallet-address': walletAddress,
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setProfile({
-            handle: data.handle || '',
-            displayName: data.displayName || null,
-            avatarUrl: data.avatarUrl || null,
-            email: alchemyUser?.email || null,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch profile:', error);
-      } finally {
-        setIsLoadingProfile(false);
-      }
-    }
-    
-    if (isConnected && walletAddress) {
-      fetchProfile();
-    }
-  }, [isConnected, walletAddress, alchemyUser?.email]);
-  
-  const handleCopyAddress = async () => {
-    if (!walletAddress) return;
-    await navigator.clipboard.writeText(walletAddress);
-    setCopiedAddress(true);
-    setTimeout(() => setCopiedAddress(false), 2000);
-  };
-  
-  const handleSignOut = async () => {
-    await logout();
-    window.location.href = "/login";
-  };
-  
-  // Loading state
-  if (isInitializing || authLoading) {
-    return (
-      <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-white/50 animate-spin" />
+function GroupHeader({ label }: { label: string }) {
+  return (
+    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 px-3 sm:px-4 pt-7 pb-3">
+      {label}
+    </p>
+  )
+}
+
+function Row({
+  label,
+  description,
+  children,
+  hover = false,
+}: {
+  label: string
+  description?: string
+  children?: React.ReactNode
+  hover?: boolean
+}) {
+  return (
+    <div
+      className={`flex items-center gap-4 px-3 sm:px-4 py-4 rounded-[4px] transition-colors ${
+        hover ? "hover:bg-zinc-900" : ""
+      }`}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] font-medium tracking-tight text-white">{label}</p>
+        {description && (
+          <p className="text-xs text-white/45 mt-0.5 leading-relaxed">{description}</p>
+        )}
       </div>
-    );
+      {children && <div className="flex items-center gap-3 shrink-0">{children}</div>}
+    </div>
+  )
+}
+
+function EditableRow({
+  label,
+  description,
+  value,
+  placeholder,
+  field,
+  walletAddress,
+  onSaved,
+  prefix,
+  transform = (v: string) => v,
+}: {
+  label: string
+  description?: string
+  value: string
+  placeholder: string
+  field: "username" | "displayName"
+  walletAddress: string | undefined
+  onSaved: () => void
+  prefix?: string
+  transform?: (v: string) => string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const start = () => {
+    const initial = field === "username" ? value.replace(/^@/, "") : value
+    setDraft(initial)
+    setError(null)
+    setEditing(true)
   }
-  
-  if (!isConnected) {
-    return null;
+
+  const cancel = () => {
+    setEditing(false)
+    setError(null)
   }
-  
-  const sections = [
-    { key: "account" as const, label: "Account" },
-    { key: "wallet" as const, label: "Wallet" },
-    { key: "security" as const, label: "Security" },
-  ];
+
+  const save = async () => {
+    if (!walletAddress) {
+      setError("No wallet connected.")
+      return
+    }
+    const trimmed = draft.trim()
+    if (!trimmed) {
+      setError("Can't be empty.")
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/profile/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress, [field]: trimmed }),
+      })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || "Couldn't save changes.")
+      }
+      onSaved()
+      setEditing(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save changes.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] w-full flex flex-col items-center px-4 sm:px-8 lg:px-16 py-8 sm:py-12">
-      <div className="w-full max-w-[1100px]">
-        {/* Header */}
-        <div className="mb-8 sm:mb-10">
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Settings</h1>
-          <p className="text-white/40 text-sm sm:text-base">
-            Manage your account and wallet
-          </p>
-        </div>
+    <div className="flex items-start gap-4 px-3 sm:px-4 py-4 rounded-[4px]">
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] font-medium tracking-tight text-white">{label}</p>
+        {description && (
+          <p className="text-xs text-white/45 mt-0.5 leading-relaxed">{description}</p>
+        )}
+        {error && <p className="text-xs text-red-300/80 mt-2">{error}</p>}
+      </div>
 
-        {/* Section tabs */}
-        <div className="flex gap-1 mb-8 sm:mb-10">
-          {sections.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveSection(key)}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer"
-              style={{
-                backgroundColor: activeSection === key ? `${BRAND_LAVENDER}20` : "transparent",
-                color: activeSection === key ? BRAND_LAVENDER : "rgba(255,255,255,0.4)"
+      {editing ? (
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center bg-zinc-800 rounded-[4px] focus-within:shadow-[0_0_0_2px_#e1a8f0] transition-shadow">
+            {prefix && (
+              <span style={{ color: LAVENDER }} className="pl-2.5 pr-1 text-sm">
+                {prefix}
+              </span>
+            )}
+            <input
+              type="text"
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(transform(e.target.value))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save()
+                if (e.key === "Escape") cancel()
               }}
-            >
-              {label}
-            </button>
-          ))}
+              placeholder={placeholder}
+              disabled={saving}
+              className={`h-9 ${prefix ? "pl-0 pr-2.5" : "px-2.5"} w-[160px] sm:w-[200px] bg-transparent text-[14px] text-white outline-none placeholder:text-white/30`}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            style={{ backgroundColor: LAVENDER }}
+            className="h-9 px-3 rounded-[4px] text-xs font-semibold tracking-tight text-black outline-none transition-[box-shadow,filter,opacity] hover:brightness-105 hover:shadow-[0_0_20px_-4px_rgba(225,168,240,0.5)] disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+          >
+            {saving ? "…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={cancel}
+            disabled={saving}
+            className="h-9 px-3 rounded-[4px] bg-zinc-900 text-xs font-medium tracking-tight text-white/65 outline-none transition-colors hover:bg-zinc-800 hover:text-white disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+          >
+            Cancel
+          </button>
         </div>
+      ) : (
+        <div className="flex items-center gap-3 shrink-0">
+          <p className="text-[14px] text-white truncate max-w-[180px] sm:max-w-[240px]">
+            {value || <span className="text-white/30">{placeholder}</span>}
+          </p>
+          <button
+            type="button"
+            onClick={start}
+            className="text-xs tracking-tight text-white/55 outline-none transition-colors hover:text-white focus-visible:text-white focus-visible:ring-2 focus-visible:ring-[#e1a8f0] rounded-sm"
+          >
+            Edit
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
-        {/* Content */}
-        <motion.div
-          key={activeSection}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="space-y-4 sm:space-y-6"
-        >
-          {activeSection === "account" && (
-            <>
-              {/* Account Section */}
-              <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  Profile
-                </p>
-                <div className="divide-y divide-white/[0.04]">
-                  {/* Username */}
-                  <div className="py-4 sm:py-5 flex items-center justify-between">
-                    <div>
-                      <p className="text-white/40 text-xs mb-1">Username</p>
-                      <p className="text-white font-medium text-sm sm:text-base">
-                        {isLoadingProfile ? '...' : (profile?.handle || 'Not set')}
-                      </p>
-                    </div>
-                    <a 
-                      href="/setup"
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                      style={{ 
-                        backgroundColor: `${BRAND_LAVENDER}15`,
-                        color: BRAND_LAVENDER
-                      }}
-                    >
-                      Change
-                    </a>
-                  </div>
-                  
-                  {/* Display Name */}
-                  <div className="py-4 sm:py-5">
-                    <p className="text-white/40 text-xs mb-1">Display Name</p>
-                    <p className="text-white font-medium text-sm sm:text-base">
-                      {isLoadingProfile ? '...' : (profile?.displayName || 'Not set')}
-                    </p>
-                  </div>
-                  
-                  {/* Email */}
-                  {alchemyUser?.email && (
-                    <div className="py-4 sm:py-5">
-                      <p className="text-white/40 text-xs mb-1">Email</p>
-                      <p className="text-white font-medium text-sm sm:text-base">{alchemyUser.email}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+// ────────────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────────────
 
-          {activeSection === "wallet" && (
-            <>
-              {/* Wallet Address */}
-              <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  Wallet Address
-                </p>
-                <div className="py-4 sm:py-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-white font-mono text-sm break-all">
-                        {walletAddress || 'Loading...'}
-                      </p>
-                      {walletAddress && (
-                        <a
-                          href={`https://basescan.org/address/${walletAddress}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs mt-2 inline-block hover:underline"
-                          style={{ color: BRAND_LAVENDER }}
-                        >
-                          View on Basescan →
-                        </a>
-                      )}
-                    </div>
-                    <button
-                      onClick={handleCopyAddress}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0"
-                      style={{ 
-                        backgroundColor: copiedAddress ? "rgba(74, 222, 128, 0.15)" : "rgba(255,255,255,0.05)",
-                        color: copiedAddress ? "rgb(74, 222, 128)" : "rgba(255,255,255,0.6)"
-                      }}
-                    >
-                      {copiedAddress ? "Copied!" : "Copy"}
-                    </button>
-                  </div>
-                </div>
-              </div>
+export default function SettingsPage() {
+  const { user, walletAddress, refreshUser } = useAuth()
+  const { logout } = useLogout()
+  const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
 
-              {/* Network */}
-              <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  Network
-                </p>
-                <div className="py-4 sm:py-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                      <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-white font-medium text-sm sm:text-base">Base Mainnet</p>
-                      <p className="text-white/40 text-xs">Fast, low-cost transactions on Ethereum L2</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                      <span className="text-xs text-green-400">Connected</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+  const username = user?.username
+    ? user.username.startsWith("@")
+      ? user.username
+      : `@${user.username}`
+    : ""
+  const displayName = user?.displayName || ""
+  const email = user?.email || ""
 
-              {/* Gas Sponsorship */}
-              <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  Gas Fees
-                </p>
-                <div className="py-4 sm:py-5">
-                  <div className="flex items-start gap-3">
-                    <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: `${BRAND_LAVENDER}15` }}
-                    >
-                      <svg className="w-5 h-5" style={{ color: BRAND_LAVENDER }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-white font-medium text-sm sm:text-base">Gas Sponsored ✨</p>
-                      <p className="text-white/40 text-xs mt-1">
-                        All your transactions are gas-free! Yuki covers the network fees so you never need ETH.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    try {
+      await logout()
+    } finally {
+      router.push("/")
+    }
+  }
 
-          {activeSection === "security" && (
-            <>
-              {/* Passkey Security */}
-              <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  Authentication
-                </p>
-                <div className="py-4 sm:py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-white font-medium text-sm sm:text-base">Smart Wallet Secured</p>
-                      <p className="text-white/40 text-xs mt-1">
-                        Your wallet is secured with passkey authentication. This provides hardware-level security for all transactions.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+  const tips = [
+    "Never share your passkey or recovery phrase with anyone.",
+    "Verify the recipient and amount before signing any transaction.",
+    "Keep your device unlock and biometrics up to date.",
+  ]
 
-              {/* Security Tips */}
-              <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                <p className="text-white/50 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  Security Tips
-                </p>
-                <div className="divide-y divide-white/[0.04]">
-                  <div className="py-4 sm:py-5 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-white/[0.05] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-xs text-white/60">1</span>
-                    </div>
-                    <div>
-                      <p className="text-white text-sm">Never share your passkey</p>
-                      <p className="text-white/40 text-xs mt-0.5">Your passkey is stored securely on your device</p>
-                    </div>
-                  </div>
-                  <div className="py-4 sm:py-5 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-white/[0.05] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-xs text-white/60">2</span>
-                    </div>
-                    <div>
-                      <p className="text-white text-sm">Verify transaction details</p>
-                      <p className="text-white/40 text-xs mt-0.5">Always double-check addresses and amounts before confirming</p>
-                    </div>
-                  </div>
-                  <div className="py-4 sm:py-5 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-white/[0.05] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-xs text-white/60">3</span>
-                    </div>
-                    <div>
-                      <p className="text-white text-sm">Keep your device secure</p>
-                      <p className="text-white/40 text-xs mt-0.5">Use a strong PIN or biometric lock on your device</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+  return (
+    <div className="px-4 sm:px-8 lg:px-12 py-8 sm:py-12 lg:py-16">
+      <div className="w-full max-w-[800px] mx-auto">
+        <header className="mb-8 sm:mb-10">
+          <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white mb-2.5">
+            Settings
+          </h1>
+          <p className="text-sm sm:text-base leading-relaxed text-white/55 max-w-xl">
+            Manage your profile, network, and security from one place.
+          </p>
+        </header>
 
-              {/* Sign Out */}
-              <div className="bg-red-500/[0.05] border border-red-500/10 rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-                <p className="text-red-400/70 text-xs font-medium tracking-wide py-3 sm:py-4">
-                  Danger Zone
-                </p>
-                <div className="py-4 sm:py-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-white text-sm font-medium">Sign Out</p>
-                      <p className="text-white/40 text-xs mt-0.5">You can sign back in anytime with your passkey</p>
-                    </div>
-                    <button
-                      onClick={handleSignOut}
-                      className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </motion.div>
+        <div className="-mx-3 sm:-mx-4">
+          {/* Profile */}
+          <section>
+            <GroupHeader label="Profile" />
+            <EditableRow
+              label="Username"
+              description="Used to receive money and identify you publicly."
+              value={username}
+              placeholder="username"
+              field="username"
+              walletAddress={walletAddress}
+              onSaved={refreshUser}
+              prefix="@"
+              transform={(v) => v.replace(/^@/, "").replace(/[^a-zA-Z0-9_]/g, "")}
+            />
+            <EditableRow
+              label="Display name"
+              description="Shown next to your username on your profile."
+              value={displayName}
+              placeholder="Your name"
+              field="displayName"
+              walletAddress={walletAddress}
+              onSaved={refreshUser}
+            />
+            <Row
+              label="Email"
+              description="Managed by your sign-in provider."
+            >
+              <p className="text-[14px] text-white truncate max-w-[200px] sm:max-w-[260px]">
+                {email || <span className="text-white/30">Not set</span>}
+              </p>
+            </Row>
+          </section>
+
+          {/* Network */}
+          <section>
+            <GroupHeader label="Network" />
+            <Row
+              label="Connected network"
+              description="Your wallet operates on this chain."
+            >
+              <p className="text-[14px] text-white">Base Mainnet</p>
+              <span className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: LAVENDER }}
+                />
+                <span className="text-xs tabular-nums text-white/55">Connected</span>
+              </span>
+            </Row>
+          </section>
+
+          {/* Security */}
+          <section>
+            <GroupHeader label="Security" />
+            <Link
+              href="/settings/security"
+              className="block rounded-[4px] outline-none focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
+            >
+              <Row
+                hover
+                label="Smart wallet"
+                description="Secured by passkey on this device."
+              >
+                <span className="text-[13px] text-white/55">Manage</span>
+                <ChevronRight className="w-4 h-4 text-white/35" aria-hidden />
+              </Row>
+            </Link>
+            <div className="px-3 sm:px-4 pt-2 pb-4">
+              <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 mb-2">
+                Tips
+              </p>
+              <ul className="space-y-1.5">
+                {tips.map((t, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-2.5 text-xs leading-relaxed text-white/55"
+                  >
+                    <span aria-hidden className="text-white/30">·</span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          {/* Account */}
+          <section>
+            <GroupHeader label="Account" />
+            <Row
+              label="Sign out"
+              description="End your session on this device."
+            >
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="inline-flex items-center justify-center h-9 px-4 rounded-[4px] bg-zinc-900 text-sm font-medium tracking-tight text-white outline-none transition-colors hover:bg-zinc-800 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+              >
+                {signingOut ? "Signing out…" : "Sign out"}
+              </button>
+            </Row>
+          </section>
+        </div>
       </div>
     </div>
-  );
+  )
 }

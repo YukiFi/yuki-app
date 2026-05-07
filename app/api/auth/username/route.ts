@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateUserByWalletAddress, updateUsername, getUserByUsername } from "@/lib/db";
+import { getOrCreateUserByWalletAddress, updateUsername, getUserByUsername, updateUserProfile } from "@/lib/db";
 
 const RESERVED_USERNAMES = [
   "admin", "root", "support", "help", "yuki", "system", "wallet",
@@ -170,8 +170,21 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    // 9. If the user has no display name yet (first-time setup), seed it
+    // from the username so they show up nicely in the app immediately.
+    // Existing custom display names are preserved on subsequent renames.
+    if (!user.display_name) {
+      const handleNoAt = username.startsWith("@") ? username.slice(1) : username;
+      try {
+        await updateUserProfile(user.id, { display_name: handleNoAt });
+      } catch (error) {
+        // Non-fatal — username save already succeeded. Surface in logs only.
+        console.error("[API] Display name seeding failed:", error);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
       username,
       lastChanged: new Date().toISOString()
     });

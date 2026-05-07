@@ -26,6 +26,9 @@ interface OnboardingGuardProps {
 const PUBLIC_ROUTES = ['/login', '/documents', '/legal', '/help'];
 // Routes accessible during onboarding
 const ONBOARDING_ROUTES = ['/setup'];
+// Routes unauthenticated visitors can browse (exact match). Authed users
+// still go through the normal onboarding flow on these routes.
+const BROWSEABLE_ROUTES = ['/'];
 
 // Time to wait after initialization before redirecting to login (ms)
 // This prevents redirect loops during Alchemy rehydration
@@ -54,6 +57,7 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   // Check if current route is public (no auth needed)
   const isPublicRoute = PUBLIC_ROUTES.some(route => pathname?.startsWith(route));
   const isOnboardingRoute = ONBOARDING_ROUTES.some(route => pathname?.startsWith(route));
+  const isBrowseableRoute = pathname ? BROWSEABLE_ROUTES.includes(pathname) : false;
 
   // Check if this is a profile route (/@handle or /handle pattern)
   const isProfileRoute = pathname && !pathname.startsWith('/api') &&
@@ -212,9 +216,14 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
       return;
     }
 
+    // Browseable routes - unauthenticated visitors can stay and look around
+    if (isBrowseableRoute) {
+      return;
+    }
+
     // Auth has stabilized and user is not connected - redirect to login
     router.replace('/login');
-  }, [isInitializing, isConnected, walletAddress, pathname, isPublicRoute, isProfileRoute, isOnboardingRoute, onboardingComplete, router, checkOnboardingStatus, authStabilized]);
+  }, [isInitializing, isConnected, walletAddress, pathname, isPublicRoute, isProfileRoute, isOnboardingRoute, isBrowseableRoute, onboardingComplete, router, checkOnboardingStatus, authStabilized]);
 
   // Public routes and profile routes - render immediately
   if (isPublicRoute || isProfileRoute) {
@@ -233,6 +242,12 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   // Not connected - wait for auth to stabilize before showing redirect spinner
   // This prevents flash of redirect when Alchemy is rehydrating
   if (!isConnected || !walletAddress) {
+    // Browseable routes: once auth has settled, render the page so visitors
+    // can preview the app before signing in.
+    if (isBrowseableRoute && authStabilized) {
+      return <>{children}</>;
+    }
+
     // If auth hasn't stabilized yet, show loading (session might be rehydrating)
     // Once stabilized, the useEffect will handle the redirect
     return (

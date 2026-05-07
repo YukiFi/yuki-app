@@ -86,6 +86,7 @@ export default function RootLayout({
     <html
       lang="en"
       className="scroll-smooth"
+      data-scroll-behavior="smooth"
       style={{ backgroundColor: '#0b0b0f', colorScheme: 'dark' }}
     >
       <head>

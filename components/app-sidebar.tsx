@@ -104,9 +104,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <Image
                   src="/images/appletname.svg"
                   alt="Yuki"
-                  width={72}
-                  height={28}
-                  className="h-[40px] w-auto transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden opacity-90"
+                  width={102}
+                  height={40}
+                  style={{ width: "auto", height: "40px" }}
+                  className="transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:hidden opacity-90"
                 />
                 <Image
                   src="/images/applet.svg"

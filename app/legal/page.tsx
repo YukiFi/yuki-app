@@ -1,175 +1,144 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { motion } from "framer-motion";
+import Link from "next/link"
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  Check,
+  FileText,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react"
 
-const legalDocuments = [
+const LAVENDER = "#e1a8f0"
+
+type LegalDoc = {
+  title: string
+  description: string
+  href: string
+  icon: LucideIcon
+}
+
+const DOCS: LegalDoc[] = [
   {
     title: "Terms of Service",
-    description: "The rules and guidelines for using Yuki",
+    description: "The rules and guidelines for using Yuki.",
     href: "/documents/terms",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
+    icon: FileText,
   },
   {
     title: "Privacy Policy",
-    description: "How we collect, use, and protect your data",
+    description: "How we collect, use, and protect your data.",
     href: "/documents/privacy",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    ),
+    icon: ShieldCheck,
   },
   {
     title: "Risk Disclosure",
-    description: "Important information about risks and disclaimers",
+    description: "Important information about risks and disclaimers.",
     href: "/documents/risk",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    ),
+    icon: AlertTriangle,
   },
-];
+]
+
+const SUMMARY = [
+  "Your assets are held on-chain, not by Yuki.",
+  "We collect minimal personal data and never sell it.",
+  "All crypto activity carries risk — use responsibly.",
+  "You can delete your account and data at any time.",
+]
+
+// ────────────────────────────────────────────────────────────────────────────
+// Pieces
+// ────────────────────────────────────────────────────────────────────────────
+
+function GroupHeader({ label }: { label: string }) {
+  return (
+    <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35 px-3 sm:px-4 pt-7 pb-3">
+      {label}
+    </p>
+  )
+}
+
+function DocRow({ doc }: { doc: LegalDoc }) {
+  const Icon = doc.icon
+  return (
+    <Link
+      href={doc.href}
+      className="group flex items-center gap-4 px-3 sm:px-4 py-4 rounded-[4px] outline-none transition-colors hover:bg-zinc-900 focus-visible:bg-zinc-900 focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
+    >
+      <div className="shrink-0 w-9 h-9 rounded-[4px] bg-zinc-900 group-hover:bg-zinc-800 flex items-center justify-center transition-colors">
+        <Icon className="w-4 h-4 text-white/75" aria-hidden />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] font-medium tracking-tight text-white">
+          {doc.title}
+        </p>
+        <p className="text-xs text-white/45 mt-0.5 truncate">{doc.description}</p>
+      </div>
+      <ArrowUpRight
+        className="w-4 h-4 shrink-0 text-white/35 transition-colors group-hover:text-white"
+        aria-hidden
+      />
+    </Link>
+  )
+}
+
+function SummaryItem({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-3 px-3 sm:px-4 py-2.5">
+      <span
+        aria-hidden
+        className="shrink-0 mt-0.5 w-4 h-4 rounded-[2px] flex items-center justify-center"
+        style={{ backgroundColor: "rgba(225,168,240,0.12)" }}
+      >
+        <Check className="w-3 h-3" style={{ color: LAVENDER }} strokeWidth={3} />
+      </span>
+      <span className="text-sm leading-relaxed text-white/65">{children}</span>
+    </li>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────────────
 
 export default function LegalPage() {
   return (
-    <div className="w-full min-h-screen pt-24 pb-12 relative">
-      {/* Ambient glow */}
-      <motion.div
-        animate={{ opacity: [0.1, 0.2, 0.1], scale: [1, 1.05, 1] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#004BAD]/15 rounded-full blur-[150px] pointer-events-none"
-      />
-
-      <div className="max-w-[800px] mx-auto px-4 sm:px-6 relative z-10">
-        {/* Header */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="mb-10"
-        >
-          <h1 
-            className="font-semibold text-4xl sm:text-5xl text-white tracking-tight mb-3"
-            style={{ 
-              WebkitFontSmoothing: "antialiased",
-              textRendering: "geometricPrecision",
-            }}
-          >
-            LEGAL & PRIVACY
+    <div className="px-4 sm:px-8 lg:px-12 py-8 sm:py-12 lg:py-16">
+      <div className="w-full max-w-[800px] mx-auto">
+        <header className="mb-8 sm:mb-10">
+          <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white mb-2.5">
+            Legal
           </h1>
-          <p className="text-white/40">
-            Important documents and policies for using Yuki
+          <p className="text-sm sm:text-base leading-relaxed text-white/55 max-w-xl">
+            The full text of our policies, plus a short plain-language summary.
           </p>
-        </motion.section>
+        </header>
 
-        {/* Documents */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-3 mb-10"
-        >
-          {legalDocuments.map((doc, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + index * 0.05, duration: 0.5 }}
-            >
-              <Link
-                href={doc.href}
-                className="block group"
-              >
-                <div className="p-5 sm:p-6 bg-white/5 rounded-2xl hover:bg-white/10 transition-all">
-                  <div className="flex items-start gap-4">
-                    <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-white/60 group-hover:bg-white group-hover:text-black transition-all flex-shrink-0">
-                      {doc.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-semibold text-white group-hover:text-white/90 transition-colors mb-1">
-                        {doc.title}
-                      </h3>
-                      <p className="text-sm text-white/40">
-                        {doc.description}
-                      </p>
-                    </div>
-                    <svg 
-                      className="w-5 h-5 text-white/20 group-hover:text-white/50 transition-colors flex-shrink-0 mt-1" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-        </motion.section>
+        <div className="-mx-3 sm:-mx-4">
+          {/* Documents */}
+          <section>
+            <GroupHeader label="Documents" />
+            {DOCS.map((doc) => (
+              <DocRow key={doc.href} doc={doc} />
+            ))}
+          </section>
 
-        {/* Summary Box */}
-        <motion.section 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="p-6 bg-white/5 rounded-2xl"
-        >
-          <h2 className="text-white/40 text-sm uppercase tracking-widest mb-4">In Summary</h2>
-          <ul className="space-y-3 text-sm text-white/50">
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>Your assets are held on-chain, not by Yuki</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>We collect minimal personal data and never sell it</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>All crypto activity carries risk — use responsibly</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>You can delete your account and data anytime</span>
-            </li>
-          </ul>
-        </motion.section>
-
-        {/* Contact */}
-        <motion.section 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-10"
-        >
-          <div className="p-5 bg-white/5 rounded-2xl">
-            <p className="text-sm text-white/40 mb-2">
-              Have questions about our policies?
+          {/* Summary */}
+          <section>
+            <GroupHeader label="In summary" />
+            <ul>
+              {SUMMARY.map((line, i) => (
+                <SummaryItem key={i}>{line}</SummaryItem>
+              ))}
+            </ul>
+            <p className="px-3 sm:px-4 pt-4 pb-2 text-xs leading-relaxed text-white/35 max-w-xl">
+              The summary is for convenience only. Your relationship with Yuki
+              is governed by the documents above.
             </p>
-            <a 
-              href="mailto:legal@yuki.finance"
-              className="text-sm font-medium text-white hover:text-white/80 transition-colors"
-            >
-              legal@yuki.finance
-            </a>
-          </div>
-        </motion.section>
+          </section>
+        </div>
       </div>
     </div>
-  );
+  )
 }

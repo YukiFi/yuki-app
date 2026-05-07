@@ -2,28 +2,17 @@
 
 import { usePathname } from "next/navigation"
 import { useSignerStatus } from "@account-kit/react"
-import { AppSidebar } from "@/components/app-sidebar"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+import { Sidebar, SidebarProvider, SidebarTrigger } from "@/components/Sidebar"
+import { SiteNav } from "@/components/SiteNav"
 
-/**
- * LayoutContent - Layout shell pattern
- * 
- * Key performance principles:
- * 1. Pre-allocate sidebar space to prevent layout shift
- * 2. Render layout structure immediately, even before auth resolves
- * 3. Use opacity transitions instead of conditional mounting
- * 4. No flash of different layout during hydration
- */
+// Routes that unauthenticated visitors can preview without being redirected
+// to /login. Mirror this with BROWSEABLE_ROUTES in OnboardingGuard.
+const BROWSEABLE_ROUTES = ["/"]
+
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { isConnected, isInitializing } = useSignerStatus()
 
-  // Consider loaded when not initializing
   const isLoaded = !isInitializing
 
   // Pages that should NOT show the sidebar (full-bleed layouts)
@@ -32,7 +21,6 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const isSetupPage = pathname === "/setup" || pathname?.startsWith("/setup/")
   const isFullBleedPage = isLoginPage || isOnboardingPage || isSetupPage
 
-  // Full-bleed layout for login/onboarding - no sidebar shell needed
   if (isFullBleedPage) {
     return (
       <div className="relative z-10">
@@ -41,37 +29,43 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     )
   }
 
-  // App layout with sidebar shell
-  // Key: Render the sidebar structure IMMEDIATELY, even before auth resolves
-  // This prevents layout shift when auth completes
+  // Public preview shell - unauthenticated visitor browsing a browseable route.
+  const isBrowseableRoute = pathname ? BROWSEABLE_ROUTES.includes(pathname) : false
+  if (isLoaded && !isConnected && isBrowseableRoute) {
+    return (
+      <div className="min-h-screen flex flex-col bg-zinc-950">
+        <SiteNav />
+        <main className="flex-1">{children}</main>
+      </div>
+    )
+  }
+
+  // Authenticated app shell
+  const showShell = isLoaded && isConnected
   return (
     <SidebarProvider>
-      {/* Sidebar - always rendered to prevent layout shift */}
-      {/* Visibility controlled by opacity, not mount/unmount */}
-      <div
-        className="transition-opacity duration-150"
-        style={{ opacity: isLoaded && isConnected ? 1 : 0 }}
-      >
-        <AppSidebar />
-      </div>
-
-      <SidebarInset>
-        {/* Header - always visible, provides visual stability */}
-        <header
-          className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.04] bg-[#0b0b0f] px-4 transition-opacity duration-150"
-          style={{ opacity: isLoaded && isConnected ? 1 : 0 }}
+      <div className="flex min-h-screen bg-zinc-950">
+        {/* shrink-0 keeps the sidebar's track from collapsing when main
+            content has wide intrinsic width (tables, code blocks, etc). */}
+        <div
+          className="shrink-0 transition-opacity duration-150"
+          style={{ opacity: showShell ? 1 : 0 }}
         >
-          <SidebarTrigger className="-ml-1 text-white/50 hover:text-white/80 hover:bg-white/[0.04]" />
-          <Separator orientation="vertical" className="mr-2 h-4 bg-white/[0.06]" />
-          <div className="flex-1" />
-        </header>
-
-        {/* Main content area - always has consistent padding */}
-        <div className="flex-1">
-          {/* Show content when auth is resolved, or show immediately if loading takes too long */}
-          {children}
+          <Sidebar />
         </div>
-      </SidebarInset>
+
+        <div className="flex-1 flex flex-col min-w-0">
+          <header
+            className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 px-4 sm:px-6 bg-zinc-950 transition-opacity duration-150 shadow-[0_1px_0_0_rgba(255,255,255,0.03),0_12px_32px_-16px_rgba(0,0,0,0.7)]"
+            style={{ opacity: showShell ? 1 : 0 }}
+          >
+            <SidebarTrigger />
+            <div className="flex-1" />
+          </header>
+
+          <main className="flex-1 min-w-0">{children}</main>
+        </div>
+      </div>
     </SidebarProvider>
   )
 }

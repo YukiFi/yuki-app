@@ -1,412 +1,287 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
-import { useSmartAccountClient } from "@account-kit/react";
-import { useTransactionHistory } from "@/lib/hooks/useTransactionHistory";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import Link from "next/link"
+import { AnimatePresence, motion } from "framer-motion"
+import {
+  Plus,
+  Trash2,
+  UserPlus,
+  Users as UsersIcon,
+  X,
+} from "lucide-react"
+import { useSmartAccountClient } from "@account-kit/react"
+import { useTransactionHistory } from "@/lib/hooks/useTransactionHistory"
 
-const BRAND_LAVENDER = "#e1a8f0";
+const LAVENDER = "#e1a8f0"
 
-interface SavedContact {
-  id: string;
-  userId: string;
-  username: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  walletAddress: string | null;
-  nickname: string | null;
-  addedAt: string;
+// ────────────────────────────────────────────────────────────────────────────
+// Types
+// ────────────────────────────────────────────────────────────────────────────
+
+type Contact = {
+  id: string
+  userId: string
+  username: string
+  displayName: string | null
+  avatarUrl: string | null
+  walletAddress: string | null
+  nickname: string | null
 }
 
-interface TransactionContact {
-  address: string;
-  username?: string;
-  displayName?: string;
-  avatarUrl?: string;
-  lastTransaction: Date;
-  totalSent: number;
-  totalReceived: number;
-  transactionCount: number;
-  isSaved?: boolean;
+type Recent = { handle: string; username?: string }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+function withAtSign(u: string | null | undefined) {
+  if (!u) return ""
+  return u.startsWith("@") ? u : `@${u}`
 }
 
-// Extract unique contacts from transactions
-function extractContacts(transactions: { counterparty?: string; amount: number; timestamp: Date; type: string }[]): TransactionContact[] {
-  const contactMap = new Map<string, TransactionContact>();
-
-  transactions.forEach(tx => {
-    if (!tx.counterparty) return;
-
-    const address = tx.counterparty.toLowerCase();
-    const existing = contactMap.get(address);
-
-    if (existing) {
-      existing.transactionCount++;
-      if (tx.type === 'sent') {
-        existing.totalSent += Math.abs(tx.amount);
-      } else {
-        existing.totalReceived += tx.amount;
-      }
-      if (tx.timestamp > existing.lastTransaction) {
-        existing.lastTransaction = tx.timestamp;
-      }
-    } else {
-      contactMap.set(address, {
-        address: tx.counterparty,
-        lastTransaction: tx.timestamp,
-        totalSent: tx.type === 'sent' ? Math.abs(tx.amount) : 0,
-        totalReceived: tx.type === 'received' ? tx.amount : 0,
-        transactionCount: 1,
-      });
-    }
-  });
-
-  // Sort by most recent transaction
-  return Array.from(contactMap.values())
-    .sort((a, b) => b.lastTransaction.getTime() - a.lastTransaction.getTime());
+function profileHrefFor(username: string | null | undefined) {
+  if (!username) return undefined
+  return `/${username.replace(/^@/, "")}`
 }
 
-function formatRelativeTime(date: Date): string {
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 365) return `${Math.floor(days / 30)} months ago`;
-  return `${Math.floor(days / 365)} years ago`;
+function getInitial(displayName: string | null, username: string | null) {
+  const source = (displayName || username || "").replace(/^@/, "")
+  return source.charAt(0).toUpperCase() || "·"
 }
 
-function ContactRow({ contact, index }: { contact: TransactionContact; index: number }) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [resolvedUser, setResolvedUser] = useState<{
-    username?: string;
-    displayName?: string;
-    avatarUrl?: string;
-  } | null>(null);
+// ────────────────────────────────────────────────────────────────────────────
+// Avatar
+// ────────────────────────────────────────────────────────────────────────────
 
-  // Try to resolve the address to a user
-  useEffect(() => {
-    async function resolveUser() {
-      try {
-        const response = await fetch(`/api/user/by-address?address=${contact.address}`);
-        if (response.ok) {
-          const data = await response.json();
-          setResolvedUser(data);
-        }
-      } catch {
-        // Ignore - user might not be in our system
-      }
-    }
-    resolveUser();
-  }, [contact.address]);
-
-  const displayName = resolvedUser?.displayName || resolvedUser?.username?.replace('@', '') ||
-    `${contact.address.slice(0, 6)}...${contact.address.slice(-4)}`;
-  const username = resolvedUser?.username;
-  const profileUrl = username ? `/${username.replace('@', '')}` : undefined;
-
-  const netAmount = contact.totalReceived - contact.totalSent;
-
-  const content = (
-    <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="group relative py-4 sm:py-5 cursor-pointer"
-    >
-      {/* Hover background */}
-      <motion.div
-        className="absolute inset-x-0 inset-y-0 -mx-4 sm:-mx-5 rounded-2xl"
-        initial={false}
-        animate={{
-          backgroundColor: isHovered ? "rgba(255,255,255,0.03)" : "transparent",
-        }}
-        transition={{ duration: 0.2 }}
+function Avatar({
+  url,
+  fallback,
+  size = 36,
+}: {
+  url: string | null | undefined
+  fallback: string
+  size?: number
+}) {
+  if (url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt=""
+        className="rounded-[4px] object-cover shrink-0"
+        style={{ width: size, height: size }}
       />
-
-      <div className="relative flex items-center gap-3 sm:gap-4">
-        {/* Avatar */}
-        <motion.div
-          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
-          style={{
-            backgroundColor: resolvedUser?.avatarUrl ? "transparent" : "rgba(255,255,255,0.08)",
-          }}
-          animate={{
-            scale: isHovered ? 1.05 : 1,
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          {resolvedUser?.avatarUrl ? (
-            <img
-              src={resolvedUser.avatarUrl}
-              alt={displayName}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-white/60 text-sm font-medium">
-              {displayName.slice(0, 2).toUpperCase()}
-            </span>
-          )}
-        </motion.div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-white font-medium text-sm sm:text-base truncate">
-              {displayName}
-            </p>
-            {username && (
-              <span className="text-white/30 text-xs sm:text-sm truncate">
-                {username}
-              </span>
-            )}
-          </div>
-          <p className="text-white/30 text-xs sm:text-sm mt-0.5">
-            {contact.transactionCount} transaction{contact.transactionCount !== 1 ? 's' : ''} · {formatRelativeTime(contact.lastTransaction)}
-          </p>
-        </div>
-
-        {/* Net amount */}
-        <motion.div
-          className="text-sm sm:text-base font-medium tabular-nums flex-shrink-0 text-right"
-          style={{
-            color: netAmount >= 0 ? "white" : "rgba(255,255,255,0.5)",
-            fontFeatureSettings: "'tnum' 1"
-          }}
-          animate={{
-            x: isHovered ? -4 : 0,
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          <div>
-            {netAmount >= 0 ? "+" : "-"}${Math.abs(netAmount).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2
-            })}
-          </div>
-          <div className="text-white/30 text-xs font-normal">
-            net
-          </div>
-        </motion.div>
-
-        {/* Arrow on hover */}
-        <motion.div
-          className="text-white/20 hidden sm:block"
-          initial={{ opacity: 0, x: -10 }}
-          animate={{
-            opacity: isHovered ? 1 : 0,
-            x: isHovered ? 0 : -10
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </motion.div>
-      </div>
-    </div>
-  );
-
-  if (profileUrl) {
-    return <Link href={profileUrl}>{content}</Link>;
+    )
   }
-
-  return content;
-}
-
-function SavedContactRow({ contact, onRemove }: { contact: SavedContact; onRemove: () => void }) {
-  const [isHovered, setIsHovered] = useState(false);
-
-  const displayName = contact.displayName || contact.username?.replace('@', '') || 'Unknown';
-  const profileUrl = contact.username ? `/${contact.username.replace('@', '')}` : undefined;
-
   return (
     <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="group relative py-4 sm:py-5"
+      className="rounded-[4px] bg-zinc-800 text-white/85 flex items-center justify-center shrink-0 text-[13px] font-semibold tracking-tight"
+      style={{ width: size, height: size }}
+      aria-hidden
     >
-      {/* Hover background */}
-      <motion.div
-        className="absolute inset-x-0 inset-y-0 -mx-4 sm:-mx-5 rounded-2xl"
-        initial={false}
-        animate={{
-          backgroundColor: isHovered ? "rgba(255,255,255,0.03)" : "transparent",
-        }}
-        transition={{ duration: 0.2 }}
-      />
-
-      <div className="relative flex items-center gap-3 sm:gap-4">
-        {/* Avatar */}
-        <Link href={profileUrl || "#"} className="flex-shrink-0">
-          <motion.div
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center overflow-hidden cursor-pointer"
-            style={{
-              backgroundColor: contact.avatarUrl ? "transparent" : "rgba(255,255,255,0.08)",
-            }}
-            animate={{
-              scale: isHovered ? 1.05 : 1,
-            }}
-            transition={{ duration: 0.2 }}
-          >
-            {contact.avatarUrl ? (
-              <img
-                src={contact.avatarUrl}
-                alt={displayName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span className="text-white/60 text-sm font-medium">
-                {displayName.slice(0, 2).toUpperCase()}
-              </span>
-            )}
-          </motion.div>
-        </Link>
-
-        {/* Content */}
-        <Link href={profileUrl || "#"} className="flex-1 min-w-0 cursor-pointer">
-          <div className="flex items-center gap-2">
-            <p className="text-white font-medium text-sm sm:text-base truncate">
-              {contact.nickname || displayName}
-            </p>
-            {contact.username && (
-              <span className="text-white/30 text-xs sm:text-sm truncate">
-                {contact.username}
-              </span>
-            )}
-          </div>
-          {contact.nickname && (
-            <p className="text-white/30 text-xs sm:text-sm mt-0.5 truncate">
-              {displayName}
-            </p>
-          )}
-        </Link>
-
-        {/* Remove button */}
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            onRemove();
-          }}
-          className="text-white/30 hover:text-red-400 transition-colors p-2 -mr-2 cursor-pointer"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
+      {fallback}
     </div>
-  );
+  )
 }
 
-// Add Contact Modal
+// ────────────────────────────────────────────────────────────────────────────
+// Group header
+// ────────────────────────────────────────────────────────────────────────────
+
+function GroupHeader({
+  label,
+  trailing,
+}: {
+  label: string
+  trailing?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-baseline justify-between px-3 sm:px-4 pt-7 pb-3">
+      <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/35">
+        {label}
+      </p>
+      {trailing}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Contact row
+// ────────────────────────────────────────────────────────────────────────────
+
+function ContactRow({
+  contact,
+  onRemove,
+}: {
+  contact: Contact
+  onRemove: (c: Contact) => void
+}) {
+  const profileUrl = profileHrefFor(contact.username)
+  const primary = contact.nickname || contact.displayName || contact.username
+  const secondary = contact.username
+    ? withAtSign(contact.username)
+    : contact.walletAddress
+      ? `${contact.walletAddress.slice(0, 6)}…${contact.walletAddress.slice(-4)}`
+      : null
+  const tertiary =
+    contact.nickname && contact.displayName && contact.nickname !== contact.displayName
+      ? contact.displayName
+      : null
+
+  return (
+    <div className="group relative flex items-center gap-3.5 px-3 sm:px-4 py-3 rounded-[4px] transition-colors hover:bg-zinc-900">
+      {profileUrl && (
+        <Link
+          href={profileUrl}
+          aria-label={`Open ${primary}'s profile`}
+          className="absolute inset-0 z-0 rounded-[4px] outline-none focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
+        />
+      )}
+      <Avatar
+        url={contact.avatarUrl}
+        fallback={getInitial(contact.displayName, contact.username)}
+      />
+      <div className="flex-1 min-w-0 relative pointer-events-none">
+        <p className="text-[14px] font-medium tracking-tight text-white truncate">
+          {primary}
+        </p>
+        <p className="text-xs text-white/45 truncate">
+          {secondary}
+          {tertiary && <span className="text-white/30"> · {tertiary}</span>}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onRemove(contact)
+        }}
+        aria-label={`Remove ${primary}`}
+        className="relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-[4px] text-white/35 outline-none transition-[opacity,color,background-color] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-white hover:bg-zinc-800 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
+      >
+        <Trash2 className="w-4 h-4" aria-hidden />
+      </button>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Recent suggestion row
+// ────────────────────────────────────────────────────────────────────────────
+
+function RecentRow({
+  recent,
+  onAdd,
+}: {
+  recent: Recent
+  onAdd: (handle: string) => void
+}) {
+  const display = recent.username ? withAtSign(recent.username) : recent.handle
+  const fallback = (recent.username || recent.handle).replace(/^@/, "").charAt(0).toUpperCase() || "·"
+  return (
+    <div className="group flex items-center gap-3.5 px-3 sm:px-4 py-3 rounded-[4px] transition-colors hover:bg-zinc-900">
+      <Avatar url={null} fallback={fallback} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] font-medium tracking-tight text-white truncate">
+          {display}
+        </p>
+        <p className="text-xs text-white/40 truncate">Recently transacted</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => recent.username && onAdd(recent.username)}
+        disabled={!recent.username}
+        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[4px] bg-zinc-800 text-xs font-medium tracking-tight text-white/80 outline-none transition-colors hover:bg-zinc-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
+      >
+        <Plus className="w-3.5 h-3.5" aria-hidden />
+        Add
+      </button>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Add Contact modal
+// ────────────────────────────────────────────────────────────────────────────
+
 function AddContactModal({
   open,
   onClose,
-  onAdd,
-  walletAddress
+  walletAddress,
+  prefillUsername,
+  onAdded,
 }: {
-  open: boolean;
-  onClose: () => void;
-  onAdd: (contact: SavedContact) => void;
-  walletAddress: string;
+  open: boolean
+  onClose: () => void
+  walletAddress: string | undefined
+  prefillUsername: string | null
+  onAdded: () => void
 }) {
-  const [username, setUsername] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
-  const [userExists, setUserExists] = useState<boolean | null>(null);
-  const [foundUser, setFoundUser] = useState<{ username: string; displayName: string | null; avatarUrl: string | null } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [username, setUsername] = useState("")
+  const [nickname, setNickname] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Check if username exists
   useEffect(() => {
-    if (username.length < 3) {
-      setUserExists(null);
-      setFoundUser(null);
-      return;
+    if (open) {
+      setUsername(prefillUsername || "")
+      setNickname("")
+      setError(null)
+      const t = setTimeout(() => inputRef.current?.focus(), 80)
+      return () => clearTimeout(t)
     }
+  }, [open, prefillUsername])
 
-    setIsChecking(true);
-    const timeout = setTimeout(async () => {
-      try {
-        const cleanUsername = username.startsWith("@") ? username : `@${username}`;
-        const response = await fetch("/api/user/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier: cleanUsername, type: "username" }),
-        });
+  const close = () => {
+    onClose()
+  }
 
-        if (response.ok) {
-          const data = await response.json();
-          setUserExists(data.exists);
-          if (data.exists && data.user) {
-            setFoundUser({
-              username: data.user.username,
-              displayName: data.user.displayName,
-              avatarUrl: data.user.avatarUrl,
-            });
-          } else {
-            setFoundUser(null);
-          }
-        }
-      } catch {
-        setUserExists(null);
-        setFoundUser(null);
-      } finally {
-        setIsChecking(false);
-      }
-    }, 400);
-
-    return () => clearTimeout(timeout);
-  }, [username]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username || username.length < 3 || !userExists) return;
-
-    setIsLoading(true);
-    setError(null);
-
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!walletAddress) {
+      setError("No wallet connected.")
+      return
+    }
+    const cleaned = username.replace(/^@/, "").trim()
+    if (!cleaned) {
+      setError("Enter a username.")
+      return
+    }
+    setSubmitting(true)
+    setError(null)
     try {
-      const response = await fetch("/api/contacts", {
+      const res = await fetch("/api/contacts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-wallet-address": walletAddress,
         },
         body: JSON.stringify({
-          username: username.startsWith("@") ? username : `@${username}`,
-          nickname: nickname || undefined,
+          username: cleaned,
+          nickname: nickname.trim() || undefined,
         }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to add contact");
+      })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || "Couldn't add contact.")
       }
-
-      const data = await response.json();
-      onAdd(data.contact);
-      handleClose();
+      onAdded()
+      close()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add contact");
+      setError(err instanceof Error ? err.message : "Couldn't add contact.")
     } finally {
-      setIsLoading(false);
+      setSubmitting(false)
     }
-  };
-
-  const handleClose = () => {
-    setUsername("");
-    setNickname("");
-    setError(null);
-    setUserExists(null);
-    setFoundUser(null);
-    onClose();
-  };
+  }
 
   return (
     <AnimatePresence>
@@ -415,339 +290,345 @@ function AddContactModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-          onClick={handleClose}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-0 sm:px-4"
+          onClick={close}
         >
-          <motion.div
-            className="absolute inset-0 bg-[#0b0b0f]/90"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          />
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
+          <div className="absolute inset-0 bg-black/70" />
+          <motion.form
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
+            exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full sm:max-w-[440px] mx-0 sm:mx-4"
             onClick={(e) => e.stopPropagation()}
+            onSubmit={submit}
+            className="relative w-full sm:max-w-[420px] bg-zinc-900 rounded-md p-7 sm:p-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]"
           >
-            <div className="bg-[#0b0b0f] sm:bg-white/[0.03] rounded-t-3xl sm:rounded-3xl overflow-hidden">
-              {/* Header */}
-              <div className="px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-white/50 text-sm font-medium">Add Contact</p>
-                  <button
-                    onClick={handleClose}
-                    className="text-white/30 hover:text-white/50 transition-colors cursor-pointer p-1 -mr-1"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit}>
-                {/* Username input */}
-                <div className="px-6 sm:px-8 pb-4">
-                  <p className="text-white/40 text-sm font-medium mb-3">Username</p>
-                  <div className="flex items-center gap-1">
-                    <span style={{ color: BRAND_LAVENDER }} className="text-lg font-medium">@</span>
-                    <input
-                      type="text"
-                      value={username.replace(/^@/, "")}
-                      onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
-                      placeholder="username"
-                      className="flex-1 bg-transparent text-white text-lg focus:outline-none placeholder:text-white/25"
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* Status */}
-                  <div className="mt-3 min-h-[20px]">
-                    {isChecking && username.length >= 3 && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex items-center gap-2 text-white/40 text-xs"
-                      >
-                        <span className="w-3 h-3 border-2 border-white/20 border-t-white/50 rounded-full animate-spin" />
-                        Searching...
-                      </motion.div>
-                    )}
-                    {!isChecking && userExists === true && foundUser && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex items-center gap-2"
-                      >
-                        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                          {foundUser.avatarUrl ? (
-                            <img src={foundUser.avatarUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-white/60 text-xs">{(foundUser.displayName || foundUser.username)?.[0]?.toUpperCase()}</span>
-                          )}
-                        </div>
-                        <span className="text-emerald-400 text-xs">
-                          {foundUser.displayName || foundUser.username}
-                        </span>
-                      </motion.div>
-                    )}
-                    {!isChecking && userExists === false && username.length >= 3 && (
-                      <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-red-400 text-xs"
-                      >
-                        User not found
-                      </motion.p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Nickname input (optional) */}
-                <div className="px-6 sm:px-8 pb-4">
-                  <p className="text-white/40 text-sm font-medium mb-3">Nickname (optional)</p>
-                  <input
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="e.g. Mom, Best Friend"
-                    className="w-full bg-transparent text-white text-lg focus:outline-none placeholder:text-white/25"
-                  />
-                </div>
-
-                {/* Error */}
-                {error && (
-                  <div className="px-6 sm:px-8 pb-4">
-                    <p className="text-red-400 text-sm">{error}</p>
-                  </div>
-                )}
-
-                {/* Action */}
-                <div className="px-6 sm:px-8 pb-8 pt-4">
-                  <button
-                    type="submit"
-                    disabled={!userExists || isLoading}
-                    className={`
-                      w-full py-4 rounded-xl sm:rounded-2xl text-base font-medium transition-all duration-150 cursor-pointer touch-manipulation
-                      ${userExists && !isLoading
-                        ? "bg-white text-black active:scale-[0.98]"
-                        : "bg-white/[0.05] text-white/30"
-                      }
-                    `}
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                        Adding...
-                      </span>
-                    ) : (
-                      "Add Contact"
-                    )}
-                  </button>
-                </div>
-              </form>
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-[11px] uppercase tracking-[0.06em] font-medium text-white/50">
+                Add contact
+              </p>
+              <button
+                type="button"
+                onClick={close}
+                aria-label="Close"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] text-white/40 outline-none transition-colors hover:bg-zinc-800 hover:text-white focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          </motion.div>
+
+            <div className="space-y-2 mb-5">
+              <label
+                htmlFor="add-username"
+                className="block text-[11px] font-medium uppercase tracking-[0.06em] text-white/50"
+              >
+                Username
+              </label>
+              <div className="flex items-center bg-zinc-800 rounded-[4px] focus-within:shadow-[0_0_0_2px_#e1a8f0] transition-shadow">
+                <span style={{ color: LAVENDER }} className="pl-3 pr-1 text-base">
+                  @
+                </span>
+                <input
+                  id="add-username"
+                  ref={inputRef}
+                  type="text"
+                  value={username}
+                  onChange={(e) =>
+                    setUsername(
+                      e.target.value
+                        .replace(/^@/, "")
+                        .replace(/[^a-zA-Z0-9_]/g, ""),
+                    )
+                  }
+                  placeholder="username"
+                  disabled={submitting}
+                  className="flex-1 h-11 pr-3 bg-transparent text-white text-[15px] outline-none placeholder:text-white/30 disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 mb-6">
+              <label
+                htmlFor="add-nickname"
+                className="block text-[11px] font-medium uppercase tracking-[0.06em] text-white/50"
+              >
+                Nickname{" "}
+                <span className="text-white/30 normal-case tracking-normal">
+                  (optional)
+                </span>
+              </label>
+              <input
+                id="add-nickname"
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="e.g. Mom, Best Friend"
+                disabled={submitting}
+                className="w-full h-11 px-3 bg-zinc-800 rounded-[4px] text-[15px] text-white outline-none placeholder:text-white/30 transition-shadow focus:shadow-[0_0_0_2px_#e1a8f0] disabled:opacity-60"
+              />
+            </div>
+
+            {error && (
+              <p role="alert" className="text-sm text-red-300/80 mb-4">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting || !username.trim()}
+              style={
+                submitting || !username.trim()
+                  ? undefined
+                  : { backgroundColor: LAVENDER }
+              }
+              className={`inline-flex w-full h-11 items-center justify-center rounded-[4px] text-sm font-semibold tracking-tight outline-none transition-[box-shadow,filter,opacity,background-color] duration-150 focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 ${
+                submitting || !username.trim()
+                  ? "bg-zinc-800 text-white/40 cursor-not-allowed"
+                  : "text-black hover:brightness-105 hover:shadow-[0_0_28px_-4px_rgba(225,168,240,0.5)]"
+              }`}
+            >
+              {submitting ? "Adding…" : "Add contact"}
+            </button>
+          </motion.form>
         </motion.div>
       )}
     </AnimatePresence>
-  );
+  )
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────────────
+
 export default function ContactsPage() {
-  const { client } = useSmartAccountClient({});
-  const [filter, setFilter] = useState<"saved" | "recent">("saved");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [savedContacts, setSavedContacts] = useState<SavedContact[]>([]);
-  const [isLoadingSaved, setIsLoadingSaved] = useState(true);
+  const { client } = useSmartAccountClient({})
+  const walletAddress = client?.account?.address as `0x${string}` | undefined
 
-  // Get wallet address from smart account client
-  const walletAddress = client?.account?.address as `0x${string}` | undefined;
-  const { transactions, isLoading: isLoadingRecent } = useTransactionHistory(walletAddress, { enabled: !!walletAddress, limit: 100 });
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Fetch saved contacts
-  const fetchSavedContacts = useCallback(async () => {
-    if (!walletAddress) return;
+  const [addOpen, setAddOpen] = useState(false)
+  const [prefill, setPrefill] = useState<string | null>(null)
 
-    setIsLoadingSaved(true);
-    try {
-      const response = await fetch("/api/contacts", {
-        headers: { "x-wallet-address": walletAddress },
-      });
+  const { transactions } = useTransactionHistory(walletAddress, {
+    enabled: !!walletAddress,
+    limit: 50,
+  })
 
-      if (response.ok) {
-        const data = await response.json();
-        setSavedContacts(data.contacts || []);
-      }
-    } catch (error) {
-      console.error("Failed to fetch contacts:", error);
-    } finally {
-      setIsLoadingSaved(false);
+  const loadContacts = useCallback(async () => {
+    if (!walletAddress) {
+      setContacts([])
+      setLoading(false)
+      return
     }
-  }, [walletAddress]);
+    setLoading(true)
+    try {
+      const res = await fetch("/api/contacts", {
+        headers: { "x-wallet-address": walletAddress },
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { contacts?: Contact[] }
+        setContacts(data.contacts || [])
+        setLoadError(null)
+      } else {
+        setLoadError("Couldn't load contacts right now.")
+      }
+    } catch {
+      setLoadError("Couldn't load contacts right now.")
+    } finally {
+      setLoading(false)
+    }
+  }, [walletAddress])
 
   useEffect(() => {
-    fetchSavedContacts();
-  }, [fetchSavedContacts]);
+    loadContacts()
+  }, [loadContacts])
 
-  // Extract contacts from transactions
-  const recentContacts = useMemo(() => extractContacts(transactions), [transactions]);
+  const handleRemove = useCallback(
+    async (contact: Contact) => {
+      if (!walletAddress) return
+      const label = contact.nickname || contact.displayName || contact.username
+      if (typeof window !== "undefined" && !window.confirm(`Remove ${label}?`)) return
 
-  const handleAddContact = (contact: SavedContact) => {
-    setSavedContacts(prev => [contact, ...prev.filter(c => c.userId !== contact.userId)]);
-  };
-
-  const handleRemoveContact = async (contactUserId: string) => {
-    if (!walletAddress) return;
-
-    try {
-      const response = await fetch(`/api/contacts?userId=${contactUserId}`, {
-        method: "DELETE",
-        headers: { "x-wallet-address": walletAddress },
-      });
-
-      if (response.ok) {
-        setSavedContacts(prev => prev.filter(c => c.userId !== contactUserId));
+      // Optimistic remove
+      setContacts((prev) => prev.filter((c) => c.id !== contact.id))
+      try {
+        const res = await fetch(
+          `/api/contacts?userId=${encodeURIComponent(contact.userId)}`,
+          {
+            method: "DELETE",
+            headers: { "x-wallet-address": walletAddress },
+          },
+        )
+        if (!res.ok) await loadContacts()
+      } catch {
+        await loadContacts()
       }
-    } catch (error) {
-      console.error("Failed to remove contact:", error);
+    },
+    [walletAddress, loadContacts],
+  )
+
+  // Recently transacted suggestions (de-duped, excluding already-saved usernames)
+  const recents = useMemo<Recent[]>(() => {
+    const savedHandles = new Set(
+      contacts
+        .map((c) => c.username?.replace(/^@/, "").toLowerCase())
+        .filter(Boolean) as string[],
+    )
+    const seen = new Set<string>()
+    const out: Recent[] = []
+    for (const tx of transactions) {
+      if (!tx.counterparty) continue
+      if (tx.type !== "sent" && tx.type !== "received") continue
+      const handle = tx.counterparty
+      const key = handle.toLowerCase()
+      if (seen.has(key)) continue
+      const usernameRaw = handle.startsWith("@") ? handle.slice(1) : undefined
+      if (usernameRaw && savedHandles.has(usernameRaw.toLowerCase())) continue
+      seen.add(key)
+      out.push({ handle, username: usernameRaw })
+      if (out.length >= 6) break
     }
-  };
+    return out
+  }, [transactions, contacts])
 
-  const isLoading = filter === "saved" ? isLoadingSaved : isLoadingRecent;
-  const isEmpty = filter === "saved" ? savedContacts.length === 0 : recentContacts.length === 0;
+  const openAddBlank = () => {
+    setPrefill(null)
+    setAddOpen(true)
+  }
+  const openAddPrefilled = (username: string) => {
+    setPrefill(username)
+    setAddOpen(true)
+  }
 
-  return (
-    <div className="min-h-[calc(100vh-3.5rem)] w-full flex flex-col items-center px-4 sm:px-8 lg:px-16 py-8 sm:py-12">
-      <div className="w-full max-w-[1100px]">
-        {/* Header */}
-        <div className="mb-8 sm:mb-10 flex items-start justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Contacts</h1>
-            <p className="text-white/40 text-sm sm:text-base">
-              <span style={{ color: BRAND_LAVENDER }}>{savedContacts.length}</span> saved contact{savedContacts.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer"
-            style={{
-              backgroundColor: `${BRAND_LAVENDER}20`,
-              color: BRAND_LAVENDER
-            }}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Add
-          </button>
-        </div>
+  // ──────────────────────────────────────────────────────────────────────────
+  // Body renderer
+  // ──────────────────────────────────────────────────────────────────────────
 
-        {/* Filter tabs */}
-        <div className="flex gap-1 mb-8 sm:mb-10">
-          {[
-            { key: "saved", label: "Saved" },
-            { key: "recent", label: "Recent" },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key as typeof filter)}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer"
-              style={{
-                backgroundColor: filter === key ? `${BRAND_LAVENDER}20` : "transparent",
-                color: filter === key ? BRAND_LAVENDER : "rgba(255,255,255,0.4)"
-              }}
+  const renderBody = () => {
+    if (loading && contacts.length === 0) {
+      return (
+        <div>
+          <GroupHeader label="Saved" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3.5 px-3 sm:px-4 py-3"
             >
-              {label}
-            </button>
+              <div className="w-9 h-9 rounded-[4px] bg-zinc-900" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 w-1/3 rounded-[2px] bg-zinc-900" />
+                <div className="h-3 w-1/4 rounded-[2px] bg-zinc-900/70" />
+              </div>
+            </div>
           ))}
         </div>
+      )
+    }
 
-        {/* Contacts list */}
-        <div className="space-y-4 sm:space-y-6">
-          {isLoading ? (
-            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-8 sm:px-5 sm:py-12 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-            </div>
-          ) : isEmpty ? (
-            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-8 sm:px-5 sm:py-12 text-center">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: `${BRAND_LAVENDER}15` }}
-              >
-                <svg
-                  className="w-6 h-6"
-                  style={{ color: BRAND_LAVENDER }}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                </svg>
-              </div>
-              <p className="text-white/40 text-sm">
-                {filter === "saved" ? "No saved contacts yet" : "No recent transactions"}
+    if (loadError && contacts.length === 0) {
+      return (
+        <div className="px-3 sm:px-4 py-12 text-center">
+          <p className="text-sm text-white/65">{loadError}</p>
+          <button
+            type="button"
+            onClick={loadContacts}
+            className="mt-3 text-xs text-white/55 underline-offset-4 hover:underline hover:text-white outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-[#e1a8f0]"
+          >
+            Try again
+          </button>
+        </div>
+      )
+    }
+
+    if (contacts.length === 0 && recents.length === 0) {
+      return (
+        <div className="flex flex-col items-center text-center py-16 sm:py-24">
+          <div className="w-12 h-12 rounded-[4px] bg-zinc-900 flex items-center justify-center mb-5">
+            <UsersIcon className="w-5 h-5 text-white/45" aria-hidden />
+          </div>
+          <p className="text-base font-medium tracking-tight text-white">
+            No contacts yet
+          </p>
+          <p className="text-sm text-white/50 mt-1.5 max-w-xs leading-relaxed">
+            Add the people you send to and request from for one-tap access.
+          </p>
+          <button
+            type="button"
+            onClick={openAddBlank}
+            style={{ backgroundColor: LAVENDER }}
+            className="mt-5 inline-flex items-center gap-2 h-9 px-4 rounded-[4px] text-sm font-semibold tracking-tight text-black outline-none transition-[box-shadow,filter] hover:brightness-105 hover:shadow-[0_0_28px_-4px_rgba(225,168,240,0.5)] focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+          >
+            <UserPlus className="w-4 h-4" />
+            Add contact
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <>
+        {contacts.length > 0 && (
+          <section>
+            <GroupHeader
+              label={`Saved · ${contacts.length}`}
+            />
+            {contacts.map((c) => (
+              <ContactRow key={c.id} contact={c} onRemove={handleRemove} />
+            ))}
+          </section>
+        )}
+
+        {recents.length > 0 && (
+          <section>
+            <GroupHeader label="Recently transacted" />
+            {recents.map((r, i) => (
+              <RecentRow key={`${r.handle}-${i}`} recent={r} onAdd={openAddPrefilled} />
+            ))}
+          </section>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className="px-4 sm:px-8 lg:px-12 py-8 sm:py-12 lg:py-16">
+        <div className="w-full max-w-[800px] mx-auto">
+          <header className="mb-8 sm:mb-10 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-white mb-2.5">
+                Contacts
+              </h1>
+              <p className="text-sm sm:text-base leading-relaxed text-white/55 max-w-xl">
+                The people you send to and request from.
               </p>
-              <p className="text-white/25 text-xs mt-1">
-                {filter === "saved"
-                  ? "Add contacts by username to send money quickly"
-                  : "Send or receive money to see your contacts here"
-                }
-              </p>
-              {filter === "saved" && (
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="mt-4 px-4 py-2 rounded-full text-sm font-medium transition-all cursor-pointer"
-                  style={{
-                    backgroundColor: `${BRAND_LAVENDER}20`,
-                    color: BRAND_LAVENDER
-                  }}
-                >
-                  Add your first contact
-                </button>
-              )}
             </div>
-          ) : (
-            <div className="bg-white/[0.03] rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3">
-              <div className="divide-y divide-white/[0.04]">
-                {filter === "saved" ? (
-                  savedContacts.map((contact) => (
-                    <SavedContactRow
-                      key={contact.id}
-                      contact={contact}
-                      onRemove={() => handleRemoveContact(contact.userId)}
-                    />
-                  ))
-                ) : (
-                  recentContacts.map((contact, index) => (
-                    <ContactRow
-                      key={contact.address}
-                      contact={contact}
-                      index={index}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={openAddBlank}
+              style={{ backgroundColor: LAVENDER }}
+              className="shrink-0 inline-flex items-center gap-2 h-9 px-4 rounded-[4px] text-sm font-semibold tracking-tight text-black outline-none transition-[box-shadow,filter] hover:brightness-105 hover:shadow-[0_0_28px_-4px_rgba(225,168,240,0.5)] focus-visible:ring-2 focus-visible:ring-[#e1a8f0] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add</span>
+            </button>
+          </header>
+
+          <div className="-mx-3 sm:-mx-4">{renderBody()}</div>
         </div>
       </div>
 
-      {/* Add Contact Modal */}
-      {walletAddress && (
-        <AddContactModal
-          open={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          onAdd={handleAddContact}
-          walletAddress={walletAddress}
-        />
-      )}
-    </div>
-  );
+      <AddContactModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        walletAddress={walletAddress}
+        prefillUsername={prefill}
+        onAdded={loadContacts}
+      />
+    </>
+  )
 }
