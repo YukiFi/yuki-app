@@ -536,11 +536,31 @@ export async function updateUsernamePg(userId: string, username: string): Promis
   if (!pool) return;
 
   await pool.query(
-    `UPDATE users 
+    `UPDATE users
      SET username = $1, username_last_changed = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
      WHERE id = $2`,
     [username, userId]
   );
+}
+
+/**
+ * Conditionally update a user's email.
+ * Only writes when the new value is non-null AND differs from the current row.
+ * Returns true if a write happened, false otherwise.
+ */
+export async function setUserEmailIfChangedPg(userId: string, email: string): Promise<boolean> {
+  if (!pool) return false;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+
+  const result = await pool.query(
+    `UPDATE users
+     SET email = $1, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2 AND (email IS DISTINCT FROM $1)`,
+    [normalized, userId]
+  );
+
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function getUserByUsernamePg(username: string): Promise<User | null> {

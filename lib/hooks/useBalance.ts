@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getYUSDBalance, getUSDCBalance, getETHBalance } from '@/lib/transactions/sendYUSD';
+import { DEMO_MODE, DEMO_BALANCE } from '@/lib/demo-fixtures';
 
 export interface BalanceState {
   yUSD: string;
@@ -50,7 +51,17 @@ export function useBalance(
       }));
       return;
     }
-    
+
+    if (DEMO_MODE) {
+      setState({
+        ...DEMO_BALANCE,
+        isLoading: false,
+        error: null,
+        lastUpdated: new Date(),
+      });
+      return;
+    }
+
     try {
       // Fetch all balances in parallel
       const [yUSDBalance, usdcBalance, ethBalance] = await Promise.all([

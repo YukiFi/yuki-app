@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { formatUnits } from 'viem';
+import { DEMO_MODE, DEMO_TRANSACTIONS } from '@/lib/demo-fixtures';
 
 export type TransactionType = 'sent' | 'received' | 'deposit' | 'withdrawal' | 'yield';
 
@@ -188,7 +189,17 @@ export function useTransactionHistory(
       }));
       return;
     }
-    
+
+    if (DEMO_MODE) {
+      setState({
+        transactions: DEMO_TRANSACTIONS.slice(0, limit),
+        isLoading: false,
+        error: null,
+        lastUpdated: new Date(),
+      });
+      return;
+    }
+
     try {
       // Fetch both sent and received transfers in parallel
       const [sentTransfers, receivedTransfers] = await Promise.all([
