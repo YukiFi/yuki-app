@@ -40,9 +40,18 @@ export type DepositCallback = (deposit: DepositEvent) => void;
 const WATCHER_POLLING_INTERVAL_MS = 12_000;
 
 function getPublicClient() {
+  // Prefer the explicit Alchemy URL if set; fall back to the generic
+  // NEXT_PUBLIC_RPC_URL; last resort the public Base RPC. The public RPC
+  // 429s aggressively under any real load and load-balances across nodes
+  // (which causes filter-not-found errors on watchContractEvent), so
+  // hitting the fallback is a config-bug signal.
+  const rpcUrl =
+    process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL ||
+    process.env.NEXT_PUBLIC_RPC_URL ||
+    'https://mainnet.base.org';
   return createPublicClient({
     chain: base,
-    transport: http(process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org'),
+    transport: http(rpcUrl),
     pollingInterval: WATCHER_POLLING_INTERVAL_MS,
   });
 }
@@ -61,6 +70,12 @@ export function watchUSDCDeposits(
     abi: [TRANSFER_EVENT],
     eventName: 'Transfer',
     args: { to: address },
+    // poll: true forces viem to use eth_getLogs polling rather than node-
+    // side filters (eth_newFilter + eth_getFilterChanges). Filters get GC'd
+    // by load-balanced public RPCs between calls, surfacing as
+    // "filter not found" errors. eth_getLogs is stateless and works on any
+    // RPC, public or dedicated.
+    poll: true,
     onLogs: (logs) => {
       logs.forEach(log => {
         const deposit: DepositEvent = {
@@ -80,7 +95,7 @@ export function watchUSDCDeposits(
       console.error('USDC deposit watcher error:', error);
     },
   });
-  
+
   return unwatch;
 }
 
@@ -92,18 +107,20 @@ export function watchYUSDDeposits(
   onDeposit: DepositCallback
 ): () => void {
   const client = getPublicClient();
-  
+
   // Skip if yUSD address is not configured
   if (YUSD_ADDRESS === '0x0000000000000000000000000000000000000000') {
     console.log('[Indexer] yUSD address not configured, skipping watcher');
     return () => {};
   }
-  
+
   const unwatch = client.watchContractEvent({
     address: YUSD_ADDRESS,
     abi: [TRANSFER_EVENT],
     eventName: 'Transfer',
     args: { to: address },
+    // See comment on watchUSDCDeposits — same rationale.
+    poll: true,
     onLogs: (logs) => {
       logs.forEach(log => {
         const deposit: DepositEvent = {
@@ -123,7 +140,7 @@ export function watchYUSDDeposits(
       console.error('yUSD deposit watcher error:', error);
     },
   });
-  
+
   return unwatch;
 }
 
