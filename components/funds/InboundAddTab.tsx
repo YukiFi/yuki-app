@@ -238,10 +238,10 @@ function FiatPath({
         intentId: string;
       };
 
-      // Open the Coinbase popup with the intent id as partnerUserRef. The
-      // popup is best-effort; if the user closes it without completing,
-      // the intent row sits as 'intent' until the indexer claims it on
-      // arrival (or it ages out of view if no payment ever lands).
+      // Open Coinbase in a new tab (not a popup). Tabs are less aggressively
+      // blocked by browsers and match the standard onramp pattern. If the
+      // user closes the tab without completing, the intent row sits as
+      // 'intent' until the indexer claims it on arrival.
       const params = new URLSearchParams({
         appId: process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY || "",
         addresses: JSON.stringify({ [walletAddress]: ["base"] }),
@@ -253,17 +253,9 @@ function FiatPath({
         partnerUserRef: intentId,
       });
       const url = `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
-      const width = 500;
-      const height = 700;
-      const left = (window.screen.width - width) / 2;
-      const top = (window.screen.height - height) / 2;
-      const popup = window.open(
-        url,
-        "coinbase-onramp",
-        `width=${width},height=${height},left=${left},top=${top}`,
-      );
-      if (!popup) {
-        setError("Please allow popups for this site to continue.");
+      const tab = window.open(url, "_blank", "noopener,noreferrer");
+      if (!tab) {
+        setError("Your browser blocked the new tab. Please allow it and try again.");
         setSubmitting(false);
         return;
       }

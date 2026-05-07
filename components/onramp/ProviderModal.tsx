@@ -65,22 +65,12 @@ export function ProviderModal({
 
         const coinbaseUrl = `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
 
-        console.log('Opening Coinbase URL:', coinbaseUrl);
+        // Open in a new tab. Tabs are less aggressively blocked than popups
+        // and match the standard onramp redirect pattern.
+        const tab = window.open(coinbaseUrl, '_blank', 'noopener,noreferrer');
 
-        // Open in new window
-        const width = 500;
-        const height = 700;
-        const left = (window.screen.width - width) / 2;
-        const top = (window.screen.height - height) / 2;
-
-        const popup = window.open(
-            coinbaseUrl,
-            'coinbase-onramp',
-            `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`
-        );
-
-        if (!popup) {
-            alert('Please allow popups for this site to use Coinbase');
+        if (!tab) {
+            alert('Your browser blocked the new tab. Please allow it and try again.');
             onClose();
         }
         // Note: We don't auto-close anymore - user manually closes when done
