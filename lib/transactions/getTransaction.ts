@@ -17,7 +17,11 @@ import {
 import { createPublicViemClient } from "@/lib/wagmi";
 import { isBalanceToken, symbolForToken, YUSD_DECIMALS } from "@/lib/yusd";
 import { DEMO_TRANSACTIONS } from "@/lib/demo-fixtures";
-import { getUserByWalletAddressPg } from "@/lib/db-postgres";
+import {
+  getUserByWalletAddressPg,
+  getDepositByTxHashPg,
+  getWithdrawalByTxHashPg,
+} from "@/lib/db-postgres";
 
 export type TxParty = {
   address: string;
@@ -153,6 +157,38 @@ async function resolveOnChainTransaction(
   // requests.paid_tx_hash.
   // ────────────────────────────────────────────────────────────────────────
 
+  // ─── Symbol-resolution precedence ────────────────────────────────────────
+  // For owned resources (deposits, withdrawals, requests.paid_tx_hash), the
+  // snapshot column `token_symbol_at_time` is ALWAYS authoritative — it was
+  // captured at write time and is the user-facing label they saw on the
+  // receipt. Live-decode below is the fallback for tx hashes that don't
+  // appear in any owned table (e.g., direct P2P sends that pre-date a
+  // dedicated transfers table).
+  //
+  // DO NOT "optimize" this by skipping the snapshot lookup. The whole point
+  // of (b) snapshot-at-write is that share links remain stable across vault
+  // cutover — relabeling history would break /tx/[hash] receipts that users
+  // have already shared. Live-decode is correct only when there's no
+  // snapshot to honor.
+  // ────────────────────────────────────────────────────────────────────────
+
+  let snapshotSymbol: string | null = null;
+  try {
+    // Both helpers are O(1) lookups (tx_hash UNIQUE on deposits, indexed on
+    // withdrawals). Run in parallel; first hit wins. A tx_hash should only
+    // ever appear in one of the two tables, but we don't enforce that here
+    // — if both somehow match, deposits takes precedence as the more
+    // common case.
+    const [depRow, wdRow] = await Promise.all([
+      getDepositByTxHashPg(hash),
+      getWithdrawalByTxHashPg(hash),
+    ]);
+    if (depRow?.token_symbol_at_time) snapshotSymbol = depRow.token_symbol_at_time;
+    else if (wdRow?.token_symbol_at_time) snapshotSymbol = wdRow.token_symbol_at_time;
+  } catch {
+    // DB unavailable — fall through to live decode. Snapshot is best-effort.
+  }
+
   if (receipt?.logs?.length) {
     try {
       const events = parseEventLogs({
@@ -172,8 +208,8 @@ async function resolveOnChainTransaction(
         const decimals = isYusd ? YUSD_DECIMALS : 18;
         amount = parseFloat(formatUnits(args.value, decimals));
         amountWei = args.value.toString();
-        // Live-decode fallback (no snapshot available for this tx_hash).
-        tokenSymbol = symbolForToken(balanceLog.address, "TOKEN");
+        // Snapshot wins; live decode only fills the gap.
+        tokenSymbol = snapshotSymbol ?? symbolForToken(balanceLog.address, "TOKEN");
       }
     } catch {
       // No decodable Transfer; fall back to plain ETH path below.
@@ -183,7 +219,10 @@ async function resolveOnChainTransaction(
   if (amount === 0 && tx.value > 0n) {
     amount = parseFloat(formatUnits(tx.value, 18));
     amountWei = tx.value.toString();
-    tokenSymbol = "ETH";
+    // Snapshot still wins even on the ETH-transfer fallback path. Defensive
+    // — the precedence rule is "snapshot is authoritative for owned rows,"
+    // not "snapshot is authoritative unless we hit this unusual branch."
+    tokenSymbol = snapshotSymbol ?? "ETH";
   }
 
   const [fromParty, toParty] = await Promise.all([
