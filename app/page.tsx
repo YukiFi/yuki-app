@@ -165,7 +165,7 @@ export default function Dashboard() {
   const isPreview = !isInitializing && !isConnected
 
   const walletAddress = client?.account?.address as `0x${string}` | undefined
-  const { total } = useBalance(walletAddress, { enabled: !!walletAddress })
+  const { balance: total } = useBalance(walletAddress, { enabled: !!walletAddress })
 
   const balance = parseFloat(total) || 0
   const todayYield = balance * (APY / 365)

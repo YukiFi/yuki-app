@@ -39,21 +39,24 @@ export function useDeposits(
   
   const unwatchRef = useRef<(() => void) | null>(null);
   
-  // Fetch historical deposits
+  // Fetch historical deposits. When historyBlockCount === 0n, skip the
+  // fetch entirely — useful for consumers like ArrivalListener that only
+  // care about live arrivals and don't want to hit Alchemy free tier's
+  // 10-block eth_getLogs cap on a 10k-block historical pull.
   const fetchHistory = useCallback(async () => {
-    if (!address || !enabled) {
+    if (!address || !enabled || historyBlockCount === 0n) {
       setIsLoading(false);
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const { getCurrentBlockNumber } = await import('@/lib/indexer/depositWatcher');
       const currentBlock = await getCurrentBlockNumber();
       const fromBlock = currentBlock > historyBlockCount ? currentBlock - historyBlockCount : 0n;
-      
+
       const history = await getHistoricalDeposits(address, fromBlock);
       setDeposits(history);
     } catch (err) {

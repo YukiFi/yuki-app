@@ -18,6 +18,13 @@ interface ProviderModalProps {
     walletAddress: string;
     onClose: () => void;
     onSuccess: () => void;
+    /**
+     * Optional intent_id from POST /api/deposits/intent. Appended to the
+     * Coinbase URL as `partnerUserRef`, which Coinbase echoes back to webhook
+     * receivers. Used in sub-phase 2a's inbound pipeline to correlate the
+     * popup completion with the pre-recorded "intent" deposits row.
+     */
+    intentId?: string;
 }
 
 export function ProviderModal({
@@ -27,6 +34,7 @@ export function ProviderModal({
     walletAddress,
     onClose,
     onSuccess,
+    intentId,
 }: ProviderModalProps) {
     useEffect(() => {
         if (!isOpen || !provider || !quote || !walletAddress) return;
@@ -34,13 +42,18 @@ export function ProviderModal({
         if (provider === "coinbase") {
             openCoinbaseWidget();
         }
-    }, [isOpen, provider, quote, walletAddress]);
+    }, [isOpen, provider, quote, walletAddress, intentId]);
 
     const openCoinbaseWidget = () => {
         // Build Coinbase Onramp URL with correct parameters
         // Using the simpler URL format that Coinbase expects
-        const params = new URLSearchParams({
-            appId: process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY || '',
+        // Coinbase Onramp's `appId` is your CDP Project ID (UUID).
+        const projectId =
+            process.env.NEXT_PUBLIC_COINBASE_PROJECT_ID ||
+            process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY ||
+            '';
+        const baseParams: Record<string, string> = {
+            appId: projectId,
             addresses: JSON.stringify({
                 [walletAddress]: ['base'], // wallet address mapped to networks
             }),
@@ -49,26 +62,20 @@ export function ProviderModal({
             defaultNetwork: 'base',
             defaultPaymentMethod: 'CARD',
             presetCryptoAmount: quote?.fiatAmount.toString() || '100',
-        });
+        };
+        if (intentId) {
+            baseParams.partnerUserRef = intentId;
+        }
+        const params = new URLSearchParams(baseParams);
 
         const coinbaseUrl = `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
 
-        console.log('Opening Coinbase URL:', coinbaseUrl);
+        // Open in a new tab. Tabs are less aggressively blocked than popups
+        // and match the standard onramp redirect pattern.
+        const tab = window.open(coinbaseUrl, '_blank', 'noopener,noreferrer');
 
-        // Open in new window
-        const width = 500;
-        const height = 700;
-        const left = (window.screen.width - width) / 2;
-        const top = (window.screen.height - height) / 2;
-
-        const popup = window.open(
-            coinbaseUrl,
-            'coinbase-onramp',
-            `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`
-        );
-
-        if (!popup) {
-            alert('Please allow popups for this site to use Coinbase');
+        if (!tab) {
+            alert('Your browser blocked the new tab. Please allow it and try again.');
             onClose();
         }
         // Note: We don't auto-close anymore - user manually closes when done

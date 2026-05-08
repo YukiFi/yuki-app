@@ -9,9 +9,10 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { formatUnits } from 'viem';
-import { DEMO_MODE, DEMO_TRANSACTIONS } from '@/lib/demo-fixtures';
+import { DEMO_MODE, demoStore } from '@/lib/demo-fixtures';
+import { isBalanceToken, symbolForToken } from '@/lib/yusd';
 
 export type TransactionType = 'sent' | 'received' | 'deposit' | 'withdrawal' | 'yield';
 
@@ -147,10 +148,15 @@ function transferToTransaction(
     amount = -Math.abs(amount);
   }
   
-  // Determine token symbol
+  // Determine token symbol. Balance-token transfers (USDC in stub mode,
+  // vault token in vault mode) collapse to "yUSD" in the user-facing label.
+  // Native ETH transfers ("external" category) stay as ETH; everything else
+  // falls back to whatever the indexer attached.
   let tokenSymbol = transfer.asset || 'ETH';
   if (transfer.category === 'external') {
     tokenSymbol = 'ETH';
+  } else if (transfer.rawContract.address && isBalanceToken(transfer.rawContract.address)) {
+    tokenSymbol = symbolForToken(transfer.rawContract.address, tokenSymbol);
   }
   
   return {
@@ -191,12 +197,8 @@ export function useTransactionHistory(
     }
 
     if (DEMO_MODE) {
-      setState({
-        transactions: DEMO_TRANSACTIONS.slice(0, limit),
-        isLoading: false,
-        error: null,
-        lastUpdated: new Date(),
-      });
+      // Demo state flows through useSyncExternalStore at the return site —
+      // no-op here so we don't shadow it with a stale snapshot.
       return;
     }
 
@@ -262,7 +264,25 @@ export function useTransactionHistory(
     setState(prev => ({ ...prev, isLoading: true }));
     return fetchTransactions();
   }, [fetchTransactions]);
-  
+
+  // Subscribe to demo store unconditionally (hooks must be called every render),
+  // but only consume the value when DEMO_MODE is on.
+  const demoTransactions = useSyncExternalStore(
+    demoStore.subscribe,
+    () => demoStore.getTransactions(),
+    () => demoStore.getTransactions(),
+  );
+
+  if (DEMO_MODE) {
+    return {
+      transactions: demoTransactions.slice(0, limit),
+      isLoading: false,
+      error: null,
+      lastUpdated: new Date(0),
+      refetch,
+    };
+  }
+
   return {
     ...state,
     refetch,

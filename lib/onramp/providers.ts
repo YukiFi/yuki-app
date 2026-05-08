@@ -12,6 +12,7 @@ import type {
     TransakQuoteResponse,
     RampQuoteResponse,
 } from '@/lib/types/onramp';
+import { signCDPJWT, cdpAuthCheck } from '@/lib/onramp/cdp-jwt';
 
 // Timeout for API calls (3 seconds)
 const API_TIMEOUT = 3000;
@@ -29,12 +30,58 @@ async function fetchWithTimeout(
     return Promise.race([promise, timeoutPromise]);
 }
 
+// Module-level guard: only complain about missing CDP config once per process
+// instead of on every quote request.
+let cdpConfigWarned = false;
+
+/**
+ * Build a deterministic stand-in quote for dev when CDP creds are missing.
+ * Numbers are representative (~1.5% total) but clearly synthetic so they
+ * don't get mistaken for real production fees in logs.
+ */
+function mockCoinbaseQuote(request: OnrampQuoteRequest): OnrampQuote {
+    const coinbaseFee = +(request.fiatAmount * 0.0099).toFixed(2);
+    const networkFee = +Math.max(0.5, request.fiatAmount * 0.005).toFixed(2);
+    const totalFees = +(coinbaseFee + networkFee).toFixed(2);
+    const cryptoAmount = +Math.max(0, request.fiatAmount - totalFees).toFixed(2);
+    return {
+        provider: 'coinbase',
+        providerName: 'Coinbase',
+        fiatAmount: request.fiatAmount,
+        fiatCurrency: request.fiatCurrency,
+        cryptoAmount,
+        cryptoCurrency: request.cryptoCurrency,
+        totalFees,
+        feePercentage: (totalFees / request.fiatAmount) * 100,
+        feeBreakdown: [
+            { name: 'Coinbase Fee', amount: coinbaseFee },
+            { name: 'Network Fee', amount: networkFee },
+        ],
+        success: true,
+        timestamp: Date.now(),
+    };
+}
+
 export async function fetchCoinbaseQuote(
     request: OnrampQuoteRequest
 ): Promise<OnrampQuote> {
     try {
-        console.log('[Coinbase] Fetching quote for:', request);
-        console.log('[Coinbase] API Key exists:', !!process.env.COINBASE_ONRAMP_API_KEY);
+        // No CDP creds → return a plausible mock so the UI stays functional in
+        // dev. Real quotes resume the moment COINBASE_CDP_KEY_NAME is set.
+        const configError = cdpAuthCheck();
+        if (configError) {
+            if (!cdpConfigWarned) {
+                console.warn(
+                    `[Coinbase] Using mock quotes — ${configError}. See lib/onramp/cdp-jwt.ts for setup.`,
+                );
+                cdpConfigWarned = true;
+            }
+            return mockCoinbaseQuote(request);
+        }
+
+        const host = 'api.developer.coinbase.com';
+        const path = '/onramp/v1/buy/quote';
+        const jwt = signCDPJWT('POST', host, path);
 
         const requestBody = {
             purchase_currency: request.cryptoCurrency,
@@ -44,29 +91,23 @@ export async function fetchCoinbaseQuote(
             country: request.country || 'US',
         };
 
-        console.log('[Coinbase] Request body:', requestBody);
-
         const response = await fetchWithTimeout(
-            fetch('https://api.developer.coinbase.com/onramp/v1/buy/quote', {
+            fetch(`https://${host}${path}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.COINBASE_ONRAMP_API_KEY}`,
+                    'Authorization': `Bearer ${jwt}`,
                 },
                 body: JSON.stringify(requestBody),
             })
         );
 
-        console.log('[Coinbase] Response status:', response.status);
-
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('[Coinbase] API error response:', errorText);
             throw new Error(`Coinbase API error: ${response.status} - ${errorText}`);
         }
 
         const data: CoinbaseQuoteResponse = await response.json();
-        console.log('[Coinbase] Success! Quote data:', data);
 
         const coinbaseFee = parseFloat(data.coinbase_fee.value);
         const networkFee = parseFloat(data.network_fee.value);
@@ -90,7 +131,10 @@ export async function fetchCoinbaseQuote(
             timestamp: Date.now(),
         };
     } catch (error) {
-        console.error('[Coinbase] Error fetching quote:', error);
+        // Already-warned config errors are silent; surface real failures only.
+        if (cdpConfigWarned === false) {
+            console.error('[Coinbase] Error fetching quote:', error instanceof Error ? error.message : error);
+        }
         return {
             provider: 'coinbase',
             providerName: 'Coinbase',
