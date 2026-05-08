@@ -10,14 +10,24 @@
 
 import { Pool, PoolClient } from 'pg';
 
-// Create connection pool
+// Create connection pool.
+//
+// SSL is always enabled (Neon requires it on the pooler endpoint, and the
+// dev branch is on Neon too). rejectUnauthorized: false matches the working
+// node-script pattern and is what Neon's docs recommend.
+//
+// connectionTimeoutMillis bumped from 2s to 15s to accommodate Neon's
+// scale-to-zero cold-start (3-10s typical). With 2s, the first request
+// after a fresh dev-server boot was timing out and triggering the in-
+// memory fallback, which then 404'd auth + deposits because the user
+// row only exists in the real DB.
 const pool = process.env.DATABASE_URL
   ? new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: { rejectUnauthorized: false },
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 15_000,
   })
   : null;
 
