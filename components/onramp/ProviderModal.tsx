@@ -47,8 +47,13 @@ export function ProviderModal({
     const openCoinbaseWidget = () => {
         // Build Coinbase Onramp URL with correct parameters
         // Using the simpler URL format that Coinbase expects
+        // Coinbase Onramp's `appId` is your CDP Project ID (UUID).
+        const projectId =
+            process.env.NEXT_PUBLIC_COINBASE_PROJECT_ID ||
+            process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY ||
+            '';
         const baseParams: Record<string, string> = {
-            appId: process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY || '',
+            appId: projectId,
             addresses: JSON.stringify({
                 [walletAddress]: ['base'], // wallet address mapped to networks
             }),

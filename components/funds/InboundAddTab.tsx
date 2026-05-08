@@ -242,8 +242,15 @@ function FiatPath({
       // blocked by browsers and match the standard onramp pattern. If the
       // user closes the tab without completing, the intent row sits as
       // 'intent' until the indexer claims it on arrival.
+      // Coinbase Onramp's `appId` URL param is your CDP **Project ID**
+      // (UUID format). Prefer the explicit name; fall back to the legacy
+      // CLIENT_KEY var for deployments that haven't renamed yet.
+      const projectId =
+        process.env.NEXT_PUBLIC_COINBASE_PROJECT_ID ||
+        process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY ||
+        "";
       const params = new URLSearchParams({
-        appId: process.env.NEXT_PUBLIC_COINBASE_ONRAMP_CLIENT_KEY || "",
+        appId: projectId,
         addresses: JSON.stringify({ [walletAddress]: ["base"] }),
         assets: JSON.stringify(["USDC"]),
         defaultAsset: "USDC",
